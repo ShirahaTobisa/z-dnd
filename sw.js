@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'z-coc-shell-v6';
+const CACHE_VERSION = 'z-coc-shell-v7';
 const APP_SHELL = [
     './',
     './index.html',
@@ -8,6 +8,10 @@ const APP_SHELL = [
     './manifest.json',
     './favicon.svg',
     './assets/css/tailwind.css',
+    './assets/js/dnd/rules.js',
+    './assets/js/dnd/edition-2014.js',
+    './assets/js/dnd/edition-2024.js',
+    './assets/js/dnd/commands.js',
     './assets/art/generated/launch-ritual-moon-archive-v1.webp'
 ];
 

@@ -1,8 +1,8 @@
 {
   "id": "./",
   "name": "Zarkto's Table",
-  "short_name": "Z-COC",
-  "description": "Call of Cthulhu TRPG Assistant",
+  "short_name": "Z-DND",
+  "description": "Dungeons & Dragons TRPG Assistant",
   "lang": "zh-CN",
   "start_url": "./index.html",
   "scope": "./",
