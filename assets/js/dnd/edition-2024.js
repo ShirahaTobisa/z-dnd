@@ -8,6 +8,21 @@
         halfCasterStart: 1,
         subclassLevel: {},
         defaultSubclassLevel: 3,
+        // 兼职获得的熟练（armor 只用于显示）；skill 表示可从该职业技能表选 1 项
+        multiclassGains: {
+            barbarian: { armor: ['盾牌'], weapons: ['军用武器'] },
+            bard: { armor: ['轻甲'], skill: 1, other: '一种乐器' },
+            cleric: { armor: ['轻甲', '中甲', '盾牌'] },
+            druid: { armor: ['轻甲', '盾牌'] },
+            fighter: { armor: ['轻甲', '中甲', '盾牌'], weapons: ['军用武器'] },
+            monk: {},
+            paladin: { armor: ['轻甲', '中甲', '盾牌'], weapons: ['军用武器'] },
+            ranger: { armor: ['轻甲', '中甲', '盾牌'], weapons: ['军用武器'], skill: 1 },
+            rogue: { armor: ['轻甲'], skill: 1, other: '盗贼工具' },
+            sorcerer: {},
+            warlock: { armor: ['轻甲'] },
+            wizard: {},
+        },
         classOverrides: {
             fighter: { skills: ['acrobatics', 'animalHandling', 'athletics', 'history', 'insight', 'intimidation', 'persuasion', 'perception', 'survival'] },
             wizard: { skills: ['arcana', 'history', 'insight', 'investigation', 'medicine', 'nature', 'religion'], weapons: ['简易武器'] },

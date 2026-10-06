@@ -30,7 +30,7 @@
         const conds = char.conditions || []; const has = (c) => conds.includes(c);
         const isCheck = ['ability', 'skill', 'init'].includes(info.kind); const isAttack = info.kind === 'attack'; const isSave = info.kind === 'save' || info.kind === 'death';
         const adv = []; const dis = []; let penalty = 0; let autoFail = '';
-        const level = parseInt(char.level) || 1; const ex = parseInt(char.exhaustion) || 0;
+        const ex = parseInt(char.exhaustion) || 0;
         for (const c of ['中毒', '恐慌']) if (has(c) && (isAttack || isCheck)) dis.push(c);
         for (const c of ['目盲', '倒地', '束缚']) if (has(c) && isAttack) dis.push(c);
         if (has('束缚') && info.kind === 'save' && info.ability === 'DEX') dis.push('束缚');
@@ -41,9 +41,10 @@
             else { if (isCheck && ex >= 1) dis.push(`力竭${ex}级`); if ((isAttack || isSave) && ex >= 3) dis.push(`力竭${ex}级`); }
         }
         if (char.raging && info.ability === 'STR' && (isCheck || info.kind === 'save')) adv.push('狂暴');
-        if (char.classId === 'barbarian' && info.kind === 'save' && info.ability === 'DEX' && level >= 2 && !['目盲', '耳聋', '失能'].some(has)) adv.push('危险感知');
-        if (char.classId === 'barbarian' && info.kind === 'init' && level >= 7) adv.push('野性直觉');
-        if (info.kind === 'death' && char.edition === '2024' && char.subclass === '勇士' && level >= 18) adv.push('幸存者');
+        const barbarian = D.classLevel(char, 'barbarian');
+        if (barbarian >= 2 && info.kind === 'save' && info.ability === 'DEX' && !['目盲', '耳聋', '失能'].some(has)) adv.push('危险感知');
+        if (barbarian >= 7 && info.kind === 'init') adv.push('野性直觉');
+        if (info.kind === 'death' && char.edition === '2024' && (D.subclassEntry(char, '勇士')?.level || 0) >= 18) adv.push('幸存者');
         return { adv, dis, penalty, autoFail };
     };
 
@@ -52,7 +53,7 @@
         if ((parseInt(char.hp) || 0) > 0 || char.dead) return null;
         const rollback = snapshot(char, ['hp', 'deathSaves', 'conditions', 'dead']);
         const ds = { success: 0, fail: 0, ...(char.deathSaves || {}) };
-        const natTwenty = roll === 20 || (char.edition === '2024' && char.subclass === '勇士' && (parseInt(char.level) || 1) >= 18 && roll >= 18);
+        const natTwenty = roll === 20 || (char.edition === '2024' && (D.subclassEntry(char, '勇士')?.level || 0) >= 18 && roll >= 18);
         let log;
         if (natTwenty) {
             char.hp = 1; char.deathSaves = { success: 0, fail: 0 }; removeCondition(char, '昏迷');
@@ -206,14 +207,14 @@
         const slot = p.match(/^(?:法术位|slot)(\d)$/i);
         const ability = ABILITY_BY_NAME[p];
         if (slot) {
-            const lv = slot[1]; const max = D.spellSlots(char)[lv] || 0;
+            const slots = D.spellSlots(char); const lv = slots[slot[1]] ? slot[1] : `p${slot[1]}`; const max = slots[lv] || 0;
             if (!max) return { ok: false };
             char.slotsUsed = char.slotsUsed || {};
             const current = parseInt(char.slotsUsed[lv]) || 0;
             const next = Math.max(0, Math.min(max, evalChange(current, e) ?? current));
             const old = { ...char.slotsUsed }; char.slotsUsed[lv] = next;
             // 指令按“已用数量”计，日志显示剩余数量更直观
-            return { ok: true, log: `${char.name} 的${lv}环法术位：${max - current} ➔ ${max - next}`, rollback: { slotsUsed: old } };
+            return { ok: true, log: `${char.name} 的${D.slotLabel(lv)}法术位：${max - current} ➔ ${max - next}`, rollback: { slotsUsed: old } };
         }
         if (ability) {
             const current = parseInt(char.abilities?.[ability]) || 10;
@@ -253,7 +254,7 @@
             log += `，进入狂暴：力量伤害 +${D.rageDamage(char)}，力量检定和豁免优势，抵抗钝击、穿刺、挥砍伤害`;
         }
         if (r.id === 'secondWind') {
-            const heal = D.rollDice(`1d10+${parseInt(char.level) || 1}`).total;
+            const heal = D.rollDice(`1d10+${D.classLevel(char, 'fighter')}`).total;
             const before = parseInt(char.hp) || 0; char.hp = Math.min(char.maxHp || Infinity, before + heal);
             if (before === 0) { char.deathSaves = { success: 0, fail: 0 }; removeCondition(char, '昏迷'); }
             log += `，回复 ${heal} 点生命（${before} ➔ ${char.hp}）`;
@@ -261,21 +262,24 @@
         return { ok: true, log, rollback };
     };
 
-    // .hd 数量：短休时花费生命骰回复生命（每枚 = 生命骰 + 体质调整值，最少 0）
+    // .hd 数量：短休时花费生命骰回复生命（每枚 = 生命骰 + 体质调整值，最少 0）；兼职有多种生命骰时先用大的
     const spendHitDice = (char, amount) => {
-        const die = D.classInfo(char)?.hitDie; if (!die) return { ok: false };
-        const available = (parseInt(char.level) || 1) - (parseInt(char.hitDiceUsed) || 0);
+        const pool = D.hitDicePool(char); if (!pool.length) return { ok: false };
+        const usedBefore = parseInt(char.hitDiceUsed) || 0;
+        const available = pool.length - usedBefore;
         const n = Math.min(available, Math.max(1, parseInt(amount) || 1));
         if (n <= 0 || char.dead) return { ok: true, log: `${char.name} 没有可用的生命骰`, rollback: null };
         const rollback = snapshot(char, ['hp', 'hitDiceUsed', 'deathSaves', 'conditions']);
         const con = D.abilityMod(char.abilities?.CON);
-        const rolls = Array.from({ length: n }, () => Math.max(0, D.rollDice(`1d${die}`).total + con));
+        const dice = pool.slice(usedBefore, usedBefore + n);
+        const die = [...new Set(dice)].map(d => `d${d}`).join('/');
+        const rolls = dice.map(d => Math.max(0, D.rollDice(`1d${d}`).total + con));
         const heal = rolls.reduce((a, b) => a + b, 0);
         const before = parseInt(char.hp) || 0;
         char.hp = Math.min(char.maxHp || Infinity, before + heal);
         char.hitDiceUsed = (parseInt(char.hitDiceUsed) || 0) + n;
         if (before === 0 && char.hp > 0) { char.deathSaves = { success: 0, fail: 0 }; removeCondition(char, '昏迷'); }
-        return { ok: true, log: `${char.name} 花费 ${n} 枚生命骰（d${die}${D.signed(con)}：${rolls.join('+')}），回复 ${heal} 点生命（${before} ➔ ${char.hp}，剩余生命骰 ${available - n}）`, rollback };
+        return { ok: true, log: `${char.name} 花费 ${n} 枚生命骰（${die}${D.signed(con)}：${rolls.join('+')}），回复 ${heal} 点生命（${before} ➔ ${char.hp}，剩余生命骰 ${available - n}）`, rollback };
     };
 
     // 长休：回满生命与法术位，恢复全部职业资源与生命骰（2014 版恢复一半），力竭 -1
@@ -301,7 +305,10 @@
             else if (r.shortRegain) { used[r.id] = Math.max(0, r.used - r.shortRegain); restored.push(`${r.name} ${r.shortRegain} 次`); }
         }
         char.resourcesUsed = used;
-        if (D.classInfo(char)?.caster === 'pact') { char.slotsUsed = {}; restored.push('契约法术位'); }
+        if (D.classLevel(char, 'warlock')) {
+            char.slotsUsed = Object.fromEntries(Object.entries(char.slotsUsed || {}).filter(([k]) => !k.startsWith('p')));
+            restored.push('契约法术位');
+        }
         const left = (parseInt(char.level) || 1) - (parseInt(char.hitDiceUsed) || 0);
         return { ok: true, log: `${char.name} 完成短休${restored.length ? `，恢复：${restored.join('、')}` : ''}；可用 .hd 花费生命骰回复生命（剩余 ${left} 枚）`, rollback };
     };
@@ -321,7 +328,9 @@
         if (!spell) return card('没有这个法术');
         if (char.raging) return card('狂暴中无法施法');
 
-        const cls = D.classInfo(char); const level = parseInt(char.level) || 1;
+        // 施法职业：法术表里有这个法术的职业（兼职时取第一个），决定施法属性
+        const castClass = D.classEntries(char).map(e => e.classId).find(id => spell.classes.includes(id)) || D.classEntries(char).find(e => D.CLASSES[e.classId].spellAbility)?.classId;
+        const cls = D.CLASSES[castClass]; const level = parseInt(char.level) || 1;
         const ritual = spell.ritual && /仪式|ritual/i.test(rest);
         const slots = D.spellSlots(char);
         const rollback = snapshot(char, ['slotsUsed', 'concentration', 'tempHp', 'mageArmor', 'resourcesUsed']);
@@ -329,18 +338,22 @@
         if (!(char.spellIds || []).includes(spell.id)) notes.push('不在已准备的法术中');
 
         if (spell.level > 0 && !ritual) {
-            if (cls?.caster === 'pact' && spell.level >= 6) {
+            if (castClass === 'warlock' && spell.level >= 6) {
                 const arcanum = D.classResources(char).find(r => r.id === 'arcanum');
                 if (!arcanum?.left) return card('秘法玄奥已用完，需长休恢复');
                 char.resourcesUsed = { ...(char.resourcesUsed || {}), arcanum: arcanum.used + 1 };
                 notes.push('使用秘法玄奥');
             } else {
+                // 契约法术位固定环阶；邪术师法术优先用契约位，其他法术优先用普通位，没有时可以互相借用
                 const wanted = parseInt(rest.match(/(\d)\s*环/)?.[1]) || spell.level;
-                slotLevel = cls?.caster === 'pact' ? Math.max(0, ...Object.keys(slots).map(Number)) : Math.max(spell.level, wanted);
-                const max = slots[slotLevel] || 0; const used = parseInt(char.slotsUsed?.[slotLevel]) || 0;
-                if (slotLevel < spell.level || used >= max) return card(`没有可用的 ${Math.max(slotLevel, spell.level)} 环法术位`);
-                char.slotsUsed = { ...(char.slotsUsed || {}), [slotLevel]: used + 1 };
-                notes.push(`消耗 ${slotLevel} 环法术位（剩余 ${max - used - 1}/${max}）`);
+                const left = (key) => (slots[key] || 0) - (parseInt(char.slotsUsed?.[key]) || 0);
+                const pactKey = Object.keys(slots).find(k => k.startsWith('p') && D.slotLevel(k) >= spell.level && left(k) > 0);
+                const normalKey = Object.keys(slots).filter(k => !k.startsWith('p') && +k >= Math.max(spell.level, wanted) && left(k) > 0).sort((a, b) => a - b)[0];
+                const key = castClass === 'warlock' ? pactKey || normalKey : normalKey || pactKey;
+                if (!key) return card(`没有可用的 ${Math.max(spell.level, wanted)} 环或更高的法术位`);
+                slotLevel = D.slotLevel(key);
+                char.slotsUsed = { ...(char.slotsUsed || {}), [key]: (parseInt(char.slotsUsed?.[key]) || 0) + 1 };
+                notes.push(`消耗${D.slotLabel(key)}法术位（剩余 ${left(key)}/${slots[key]}）`);
             }
         }
         if (ritual) notes.push('仪式施法，不消耗法术位，施法时间 +10 分钟');
@@ -366,7 +379,7 @@
             const dice = a.rays === 'cantrip' ? withUpcast(a.dice) : scaled(a.dice);
             const mods = rollModifiers(char, { kind: 'attack' });
             for (let i = 0; i < rays; i++) {
-                const t = D.d20Test({ mod: D.spellAttack(char) + mods.penalty, adv: mods.adv.length > 0, dis: mods.dis.length > 0 });
+                const t = D.d20Test({ mod: D.spellAttack(char, castClass) + mods.penalty, adv: mods.adv.length > 0, dis: mods.dis.length > 0 });
                 const dmg = D.rollDice(t.crit ? critDamage(dice) : dice).total;
                 if (i === 0) main = t.total;
                 details.push(`${rays > 1 ? `第${i + 1}道 ` : ''}攻击 ${t.total}（d20=${t.roll}${t.mode !== 'normal' ? ` ${t.mode === 'adv' ? '优势' : '劣势'}` : ''}）${t.crit ? ' 重击' : t.fumble ? ' 大失手' : ''}，命中则 ${dmg} ${a.type}`);
@@ -375,7 +388,7 @@
         if (spell.save) {
             const sv = spell.save;
             const dmg = D.rollDice(scaled(sv.dice)).total; main = dmg;
-            details.push(`${D.ABILITIES[sv.ability]}豁免 DC ${D.spellSaveDc(char)}，失败受 ${dmg} ${sv.type} 伤害${sv.half ? '，成功减半' : ''}`);
+            details.push(`${D.ABILITIES[sv.ability]}豁免 DC ${D.spellSaveDc(char, castClass)}，失败受 ${dmg} ${sv.type} 伤害${sv.half ? '，成功减半' : ''}`);
         }
         if (spell.damage) { const dmg = D.rollDice(scaled(spell.damage.dice)).total; main = dmg; details.push(`造成 ${dmg} ${spell.damage.type} 伤害`); }
         if (spell.temp) {
@@ -490,10 +503,11 @@
 
     // 发给 AI 的角色资料
     const profile = (char) => {
-        const cls = D.classInfo(char); const race = D.raceOf(char); const sub = D.subraceOf(char); const bg = D.backgroundOf(char); const ed = D.edition(char.edition);
+        const race = D.raceOf(char); const sub = D.subraceOf(char); const bg = D.backgroundOf(char); const ed = D.edition(char.edition);
         const abilities = Object.entries(D.ABILITIES).map(([k, v]) => `${v}${char.abilities?.[k]}(${D.signed(D.abilityMod(char.abilities?.[k]))})`).join(' ');
         const skills = (char.skillProfs || []).map(id => `${D.SKILLS[id]?.name}${D.signed(D.skillMod(char, id))}${char.expertise?.includes(id) ? '(专精)' : ''}`).join('、');
-        const slots = Object.entries(D.spellSlots(char)).map(([lv, n]) => `${lv}环 ${n - (parseInt(char.slotsUsed?.[lv]) || 0)}/${n}`).join(' ');
+        const slots = Object.entries(D.spellSlots(char)).map(([lv, n]) => `${D.slotLabel(lv)} ${n - (parseInt(char.slotsUsed?.[lv]) || 0)}/${n}`).join(' ');
+        const subclasses = D.classEntries(char).filter(e => e.subclass).map(e => e.subclass).join('、');
         const weapons = (char.weapons || []).map(id => D.weaponAttack(char, id)).filter(Boolean).map(w => `${w.name}(命中${D.signed(w.toHit)}, ${w.damage}${w.type}${w.range ? `, 射程${w.range}` : ''}${w.mastery ? `, 专精:${w.mastery}` : ''}${w.greatWeapon ? ', 巨武器战斗' : ''}${w.proficient ? '' : ', 未熟练'})`).join('、');
         const feats = D.characterFeats(char).map(id => D.FEATS[id]?.name).filter(Boolean);
         const style = D.FIGHTING_STYLES[char.fightingStyle];
@@ -506,18 +520,18 @@
             char.dead ? '已死亡' : (parseInt(char.hp) || 0) === 0 ? `濒死(死亡豁免 成功${char.deathSaves?.success || 0}/失败${char.deathSaves?.fail || 0})` : '',
         ].filter(Boolean).join('、');
         const story = Object.values(char.backstory || {}).filter(Boolean).join(' / ');
-        const hdLeft = (parseInt(char.level) || 1) - (parseInt(char.hitDiceUsed) || 0);
+        const pool = D.hitDicePool(char); const hdLeft = pool.length - (parseInt(char.hitDiceUsed) || 0);
         return [
             `姓名：${char.name} | ${ed.name}`,
-            `${sub?.name || race?.name || '未知种族'} ${cls?.name || '未知职业'}${char.subclass ? `（${char.subclass}）` : ''} ${char.level} 级 | 背景：${bg?.name || '无'} | 阵营：${char.alignment || '未定'}`,
+            `${sub?.name || race?.name || '未知种族'} ${D.classSummary(char) || '未知职业'}${subclasses ? `（${subclasses}）` : ''} | 总等级 ${char.level} | 背景：${bg?.name || '无'} | 阵营：${char.alignment || '未定'}`,
             `属性：${abilities}`,
-            `生命 ${char.hp}/${char.maxHp}${char.tempHp ? ` +临时${char.tempHp}` : ''} | AC ${D.armorClass(char)} | 速度 ${sub?.speed || race?.speed || 30} 尺 | 熟练加值 ${D.signed(D.profBonus(char.level))} | 被动察觉 ${D.passivePerception(char)} | 生命骰 ${hdLeft}/${char.level} (d${cls?.hitDie || '?'})`,
+            `生命 ${char.hp}/${char.maxHp}${char.tempHp ? ` +临时${char.tempHp}` : ''} | AC ${D.armorClass(char)} | 速度 ${sub?.speed || race?.speed || 30} 尺 | 熟练加值 ${D.signed(D.profBonus(char.level))} | 被动察觉 ${D.passivePerception(char)} | 生命骰 ${hdLeft}/${pool.length} (${D.hitDiceText(pool) || '?'})`,
             `豁免熟练：${Object.keys(D.ABILITIES).filter(a => D.saveProficient(char, a)).map(a => D.ABILITIES[a]).join('、') || '无'} | 技能熟练：${skills || '无'}`,
             weapons && `武器：${weapons}${crit < 20 ? ` | 暴击范围 ${crit}-20` : ''}${sneak ? ` | 偷袭 ${sneak}d6` : ''}`,
             features && `职业能力：${features}`,
             resources && `职业资源：${resources}`,
             (feats.length || style) && `专长：${feats.join('、') || '无'}${style ? ` | 战斗风格：${style.name}（${style.desc}）` : ''}`,
-            slots && `法术位：${slots} | 法术豁免 DC ${D.spellSaveDc(char)}，法术攻击 ${D.signed(D.spellAttack(char))}`,
+            slots && `法术位：${slots} | ${D.casterSummary(char)}`,
             spellList(char) && `已准备法术：${spellList(char)}`,
             char.spells && `法术备注：${char.spells}`,
             char.features && `专长与其他：${char.features}`,

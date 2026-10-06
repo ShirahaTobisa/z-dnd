@@ -848,8 +848,8 @@
                             </div>
                             <div>
                                 <label class="ws-label">子职业 Subclass</label>
-                                <select v-model="hero.subclass" class="select select-bordered select-sm w-full ws-field" :disabled="!cls || hero.level < derived.subclassLevel">
-                                    <option value="">{{ cls && hero.level < derived.subclassLevel ? `${derived.subclassLevel} 级解锁` : '选择子职业...' }}</option>
+                                <select v-model="hero.subclass" class="select select-bordered select-sm w-full ws-field" :disabled="!cls || primaryLevel < derived.subclassLevel">
+                                    <option value="">{{ cls && primaryLevel < derived.subclassLevel ? `${cls.name} ${derived.subclassLevel} 级解锁` : '选择子职业...' }}</option>
                                     <option v-for="s in cls?.subclasses || []" :key="s.name" :value="s.name">{{ s.name }}</option>
                                 </select>
                             </div>
@@ -876,6 +876,32 @@
                                     <input type="number" min="0" v-model.number="hero.xp" class="input input-bordered input-sm w-full ws-field font-mono" />
                                 </div>
                                 <div v-if="derived.xpLevel > hero.level" class="col-span-2 ws-hint text-mystic-green">经验足够升到 {{ derived.xpLevel }} 级 <button class="btn btn-xs btn-ghost text-mystic-green" @click="hero.level = derived.xpLevel">升级</button></div>
+                            </div>
+                            <div v-if="cls" class="ws-box space-y-2 text-xs">
+                                <div class="flex items-center justify-between gap-2">
+                                    <span class="ws-label mb-0">兼职 Multiclass</span>
+                                    <button class="btn btn-xs btn-ghost text-mystic-gold" :disabled="primaryLevel < 2" :title="primaryLevel < 2 ? '先提高总等级，再分给兼职职业' : ''" @click="addMulticlass">+ 兼职一个职业</button>
+                                </div>
+                                <div v-for="(m, i) in hero.multiclass" :key="i" class="space-y-1">
+                                    <div class="flex flex-wrap items-center gap-1.5">
+                                        <select v-model="m.classId" class="select select-bordered select-xs ws-field">
+                                            <option v-for="(c, id) in classes" :key="id" :value="id" :disabled="id === hero.classId || hero.multiclass.some((o, j) => j !== i && o.classId === id)">{{ c.name }} · d{{ c.hitDie }}</option>
+                                        </select>
+                                        <input type="number" min="1" v-model.number="m.level" class="input input-bordered input-xs w-12 ws-field font-mono text-center" />
+                                        <span class="text-slate-500">级</span>
+                                        <select v-model="m.subclass" class="select select-bordered select-xs ws-field flex-1 min-w-[6rem]" :disabled="m.level < subclassUnlock(m.classId)">
+                                            <option value="">{{ m.level < subclassUnlock(m.classId) ? `${subclassUnlock(m.classId)} 级解锁子职业` : '选择子职业...' }}</option>
+                                            <option v-for="sc in classes[m.classId].subclasses" :key="sc.name" :value="sc.name">{{ sc.name }}</option>
+                                        </select>
+                                        <button class="btn btn-xs btn-ghost text-slate-500 hover:text-red-400" @click="hero.multiclass.splice(i, 1)">×</button>
+                                    </div>
+                                    <div v-if="multiclassGainText(m.classId)" class="text-slate-500 pl-1">兼职获得：{{ multiclassGainText(m.classId) }}</div>
+                                </div>
+                                <template v-if="hero.multiclass.length">
+                                    <div class="text-slate-400">{{ classSummary }}（总等级 {{ hero.level }}，熟练加值按总等级）</div>
+                                    <div v-for="w in multiclassIssues" :key="w" class="text-amber-400">⚠ 兼职前置未满足：{{ w }}</div>
+                                </template>
+                                <div class="ws-hint">兼职等级从总等级里扣，剩下的归起始职业（现在 {{ primaryLevel }} 级）。豁免熟练只来自起始职业；升级时先提高总等级，再给想升的职业加 1 级。</div>
                             </div>
                             <div class="grid grid-cols-3 gap-2">
                                 <div>
@@ -985,21 +1011,20 @@
                 <div class="ws-box">
                     <div class="ws-label">生命骰 · 死亡豁免 · 力竭</div>
                     <div class="flex flex-wrap gap-x-4 gap-y-2 text-sm text-slate-300 items-center">
-                        <span>生命骰 {{ hero.level }}d{{ cls?.hitDie || '?' }}，已用 <input v-model.number="hero.hitDiceUsed" type="number" min="0" class="w-10 bg-dark-900 rounded text-center font-mono" /></span>
+                        <span>生命骰 {{ hitDiceText || '?' }}，已用 <input v-model.number="hero.hitDiceUsed" type="number" min="0" class="w-10 bg-dark-900 rounded text-center font-mono" /></span>
                         <span>死亡豁免 成功 <input v-model.number="hero.deathSaves.success" type="number" min="0" max="3" class="w-8 bg-dark-900 rounded text-center font-mono" /> 失败 <input v-model.number="hero.deathSaves.fail" type="number" min="0" max="3" class="w-8 bg-dark-900 rounded text-center font-mono" /></span>
                         <span>力竭 <input v-model.number="hero.exhaustion" type="number" min="0" max="6" class="w-8 bg-dark-900 rounded text-center font-mono" /></span>
                     </div>
                 </div>
             </div>
 
-            <div v-if="cls?.caster" class="ws-box">
-                <div class="ws-label">施法 Spellcasting · {{ abilityNames[cls.spellAbility] }}</div>
+            <div v-if="hasCaster" class="ws-box">
+                <div class="ws-label">施法 Spellcasting</div>
                 <div class="flex flex-wrap gap-3 items-center text-sm text-slate-300">
-                    <span>法术豁免 DC <b class="font-mono text-mystic-gold">{{ derived.dc }}</b></span>
-                    <span>法术攻击 <b class="font-mono text-mystic-gold">{{ signed(derived.atk) }}</b></span>
+                    <span class="font-mono text-mystic-gold">{{ casterSummary }}</span>
                     <span v-if="!Object.keys(derived.slots).length" class="text-slate-500">本等级还没有法术位</span>
                     <span v-for="(count, lv) in derived.slots" :key="lv" class="px-2 py-0.5 rounded bg-dark-900/60 border border-dark-700">
-                        {{ lv }} 环 已用 <input v-model.number="hero.slotsUsed[lv]" type="number" min="0" :max="count" class="w-8 bg-transparent text-center font-mono" /> / {{ count }}
+                        {{ slotLabel(lv) }} 已用 <input v-model.number="hero.slotsUsed[lv]" type="number" min="0" :max="count" class="w-8 bg-transparent text-center font-mono" /> / {{ count }}
                     </span>
                 </div>
             </div>
@@ -1092,25 +1117,25 @@
                                     <option v-for="(fs, id) in fightingStyles" :key="id" :value="id">{{ fs.name }} — {{ fs.desc }}</option>
                                 </select>
                             </div>
-                            <div v-for="lv in asiLevels" :key="lv" class="flex flex-wrap items-center gap-1.5">
-                                <span class="font-mono text-[10px] text-slate-500 w-8">{{ lv }}级</span>
-                                <select :value="hero.asi[lv]?.mode || ''" @change="setAsiMode(lv, $event.target.value)" class="select select-bordered select-xs ws-field">
+                            <div v-for="a in asiLevels" :key="a.key" class="flex flex-wrap items-center gap-1.5">
+                                <span class="font-mono text-[10px] text-slate-500 min-w-[2rem]">{{ hero.multiclass.length ? a.source : '' }}{{ a.level }}级</span>
+                                <select :value="hero.asi[a.key]?.mode || ''" @change="setAsiMode(a.key, $event.target.value)" class="select select-bordered select-xs ws-field">
                                     <option value="">未选择</option>
                                     <option value="asi">属性值提升</option>
                                     <option value="feat">专长</option>
                                 </select>
-                                <template v-if="hero.asi[lv]?.mode === 'asi'">
-                                    <select v-for="k in ['a1', 'a2']" :key="k" v-model="hero.asi[lv][k]" class="select select-bordered select-xs ws-field">
+                                <template v-if="hero.asi[a.key]?.mode === 'asi'">
+                                    <select v-for="k in ['a1', 'a2']" :key="k" v-model="hero.asi[a.key][k]" class="select select-bordered select-xs ws-field">
                                         <option value="">+1</option>
                                         <option v-for="(n, ab) in abilityNames" :key="ab" :value="ab">{{ n }} +1</option>
                                     </select>
                                 </template>
-                                <template v-else-if="hero.asi[lv]?.mode === 'feat'">
-                                    <select v-model="hero.asi[lv].feat" class="select select-bordered select-xs ws-field flex-1 min-w-[7rem]">
+                                <template v-else-if="hero.asi[a.key]?.mode === 'feat'">
+                                    <select v-model="hero.asi[a.key].feat" class="select select-bordered select-xs ws-field flex-1 min-w-[7rem]">
                                         <option value="">选择专长...</option>
-                                        <option v-for="f in featOptions(lv)" :key="f.id" :value="f.id">{{ f.name }}</option>
+                                        <option v-for="f in featOptions(a.level)" :key="f.id" :value="f.id">{{ f.name }}</option>
                                     </select>
-                                    <select v-model="hero.asi[lv].fa" class="select select-bordered select-xs ws-field" title="多数专长附带一项属性 +1">
+                                    <select v-model="hero.asi[a.key].fa" class="select select-bordered select-xs ws-field" title="多数专长附带一项属性 +1">
                                         <option value="">无属性</option>
                                         <option v-for="(n, ab) in abilityNames" :key="ab" :value="ab">{{ n }} +1</option>
                                     </select>
@@ -1122,15 +1147,16 @@
                             </div>
                             <div v-if="hero.level > 1" class="space-y-1">
                                 <div class="flex items-center gap-2">
-                                    <span class="text-slate-400">生命骰 d{{ cls.hitDie }}（2 级起，留空取平均 {{ cls.hitDie / 2 + 1 }}）</span>
+                                    <span class="text-slate-400">生命骰掷骰（留空取平均值）</span>
                                     <span class="flex-1"></span>
                                     <button class="btn btn-xs btn-ghost text-mystic-gold" @click="rollHp">掷骰补齐</button>
-                                    <button class="btn btn-xs btn-ghost text-slate-400" @click="hero.hpRolls = {}">全部取平均</button>
+                                    <button class="btn btn-xs btn-ghost text-slate-400" @click="clearHpRolls">全部取平均</button>
                                 </div>
-                                <div class="flex flex-wrap gap-1">
-                                    <label v-for="lv in hero.level - 1" :key="lv" class="flex flex-col items-center">
-                                        <span class="text-[9px] text-slate-600">{{ lv + 1 }}</span>
-                                        <input type="number" min="1" :max="cls.hitDie" v-model.number="hero.hpRolls[lv + 1]" :placeholder="cls.hitDie / 2 + 1" class="input input-bordered input-xs w-10 px-1 text-center ws-field font-mono" />
+                                <div v-for="row in hpRollRows" :key="row.name" class="flex flex-wrap items-end gap-1">
+                                    <span class="text-[10px] text-slate-500 w-14 shrink-0">{{ row.name }} d{{ row.die }}</span>
+                                    <label v-for="lv in row.levels" :key="lv" class="flex flex-col items-center">
+                                        <span class="text-[9px] text-slate-600">{{ lv }}</span>
+                                        <input type="number" min="1" :max="row.die" v-model.number="row.rolls[lv]" :placeholder="row.die / 2 + 1" class="input input-bordered input-xs w-10 px-1 text-center ws-field font-mono" />
                                     </label>
                                 </div>
                             </div>
@@ -1138,9 +1164,9 @@
                     </template>
                     <div class="ws-label">其他特性备注</div>
                     <textarea v-model="hero.features" class="textarea textarea-bordered h-16 ws-field text-sm" placeholder="种族特性细节、魔法物品、其他记录..."></textarea>
-                    <template v-if="cls?.caster">
+                    <template v-if="hasCaster">
                         <div class="flex items-center justify-between gap-2">
-                            <div class="ws-label mb-0">法术 Spells <span class="normal-case font-normal text-slate-600">最高 {{ spellStats.maxLevel }} 环 · DC {{ derived.dc }} · 攻击 {{ signed(derived.atk) }}</span></div>
+                            <div class="ws-label mb-0">法术 Spells <span class="normal-case font-normal text-slate-600">最高 {{ spellStats.maxLevel }} 环 · {{ casterSummary }}</span></div>
                             <button class="btn btn-xs btn-outline border-indigo-700 text-indigo-300 hover:bg-indigo-900/40 font-serif" @click="showSpellModal = true">选择法术</button>
                         </div>
                         <div class="text-[11px] font-serif" :class="spellStats.cantrips > spellStats.cantripMax || spellStats.spells > spellStats.spellMax ? 'text-red-400' : 'text-slate-400'">
@@ -1618,7 +1644,7 @@
         <div class="modal-box bg-dark-900 border border-dark-700 shadow-2xl max-w-3xl max-h-[85vh] flex flex-col p-0">
             <div class="p-4 border-b border-dark-700 flex justify-between items-center bg-dark-800/50 gap-3">
                 <div>
-                    <h3 class="font-bold text-lg text-indigo-300 font-serif">{{ cls?.name }}法术表</h3>
+                    <h3 class="font-bold text-lg text-indigo-300 font-serif">{{ classSummary }} 法术表</h3>
                     <div class="text-xs text-slate-400 font-serif">戏法 {{ spellStats.cantrips }}/{{ spellStats.cantripMax }} · {{ spellStats.label }} {{ spellStats.spells }}/{{ spellStats.spellMax }} · 最高 {{ spellStats.maxLevel }} 环</div>
                 </div>
                 <button class="btn btn-sm btn-circle btn-ghost text-slate-500 hover:text-white" @click="showSpellModal = false">✕</button>
@@ -2584,7 +2610,7 @@
             const granted = computed(() => DND.grantedSkills(hero));
             const derived = computed(() => ({
                 ac: DND.armorClass(hero), init: DND.initiativeMod(hero), prof: DND.profBonus(hero.level), pp: DND.passivePerception(hero),
-                dc: DND.spellSaveDc(hero), atk: DND.spellAttack(hero), slots: DND.spellSlots(hero), speed: subrace.value?.speed || race.value?.speed || 30,
+                slots: DND.spellSlots(hero), speed: subrace.value?.speed || race.value?.speed || 30,
                 xpLevel: DND.levelFromXp(hero.xp), subclassLevel: DND.subclassLevel(hero),
             }));
             const skillChoices = computed(() => DND.skillChoices(hero).map(c => ({
@@ -2594,6 +2620,32 @@
             // 武器库：按当前版本数据列出，熟练的排在前面
             const weaponList = computed(() => Object.keys(DND.WEAPONS).map(id => ({ id, ...DND.weaponData(hero, id), proficient: DND.weaponProficient(hero, id) })).sort((a, b) => b.proficient - a.proficient));
             const featureList = computed(() => DND.classFeatures(hero).filter(f => f.name !== '选择子职业'));
+
+            // 兼职
+            const entries = computed(() => DND.classEntries(hero));
+            const primaryLevel = computed(() => entries.value[0]?.level || hero.level);
+            const classSummary = computed(() => DND.classSummary(hero));
+            const multiclassIssues = computed(() => DND.multiclassIssues(hero));
+            const hitDiceText = computed(() => DND.hitDiceText(DND.hitDicePool(hero)));
+            const hasCaster = computed(() => entries.value.some(e => DND.CLASSES[e.classId].caster));
+            const casterSummary = computed(() => DND.casterSummary(hero));
+            const slotLabel = DND.slotLabel;
+            const subclassUnlock = (classId) => DND.subclassLevel(hero, classId);
+            const multiclassGainText = (classId) => {
+                const g = ed.value.multiclassGains?.[classId] || {};
+                return [...(g.armor || []), ...(g.weapons || []), g.skill && `${g.skill} 项技能`, g.other].filter(Boolean).join('、');
+            };
+            // 兼一个还没兼的职业，等级先从起始职业里拿 1 级
+            const addMulticlass = () => {
+                const id = Object.keys(DND.CLASSES).find(c => c !== hero.classId && !hero.multiclass.some(m => m.classId === c));
+                if (id && primaryLevel.value > 1) hero.multiclass.push({ classId: id, subclass: '', level: 1, hpRolls: {} });
+            };
+            // 生命骰掷骰记录：起始职业 2 级起记在 hpRolls，兼职职业 1 级起记在各自条目里
+            const hpRollRows = computed(() => entries.value.map((e, i) => {
+                const levels = Array.from({ length: e.level }, (_, k) => k + 1).filter(lv => i > 0 || lv > 1);
+                return { name: DND.CLASSES[e.classId].name, die: DND.CLASSES[e.classId].hitDie, levels, rolls: i === 0 ? hero.hpRolls : hero.multiclass[i - 1].hpRolls };
+            }).filter(r => r.levels.length));
+            const clearHpRolls = () => { hero.hpRolls = {}; hero.multiclass.forEach(m => { m.hpRolls = {}; }); };
             const resourceList = computed(() => DND.classResources(hero));
 
             // 成长：战斗风格、属性提升/专长、生命骰
@@ -2604,7 +2656,7 @@
             // 史诗恩惠只在 2024 版 19 级可选
             const featOptions = (lv) => Object.entries(DND.FEATS).filter(([, f]) => f.cat !== 'epic' || (hero.edition === '2024' && lv >= 19)).map(([id, f]) => ({ id, ...f }));
             const setAsiMode = (lv, mode) => { if (mode) hero.asi[lv] = mode === 'asi' ? { mode, a1: '', a2: '' } : { mode, feat: '', fa: '' }; else delete hero.asi[lv]; };
-            const rollHp = () => { for (let lv = 2; lv <= hero.level; lv++) if (!hero.hpRolls[lv]) hero.hpRolls[lv] = DND.rollDice(`1d${cls.value.hitDie}`).total; };
+            const rollHp = () => hpRollRows.value.forEach(row => row.levels.forEach(lv => { if (!row.rolls[lv]) row.rolls[lv] = DND.rollDice(`1d${row.die}`).total; }));
             const isSaveProf = (ab) => DND.saveProficient(hero, ab);
 
             // 起始装备：武器、护甲、盾牌、物品清单与金币（职业 + 背景）
@@ -2695,7 +2747,12 @@
             // 选项变化后：清掉不再有效的选择，重算最终属性、生命值上限，补上自带技能
             const refreshCharacter = () => {
                 const edition = ed.value;
-                if (hero.spellIds.some(id => !DND.SPELLS[id]?.classes.includes(hero.classId))) hero.spellIds = hero.spellIds.filter(id => DND.SPELLS[id]?.classes.includes(hero.classId));
+                // 兼职条目放不下时修剪；各职业子职业要已解锁且属于该职业
+                const fitted = DND.fitMulticlass(hero);
+                if (JSON.stringify(fitted) !== JSON.stringify(hero.multiclass)) hero.multiclass = fitted;
+                hero.multiclass.forEach(m => { if (m.subclass && (m.level < DND.subclassLevel(hero, m.classId) || !DND.CLASSES[m.classId].subclasses.some(s => s.name === m.subclass))) m.subclass = ''; });
+                const myClasses = DND.classEntries(hero).map(e => e.classId);
+                if (hero.spellIds.some(id => !DND.SPELLS[id]?.classes.some(c => myClasses.includes(c)))) hero.spellIds = hero.spellIds.filter(id => DND.SPELLS[id]?.classes.some(c => myClasses.includes(c)));
                 if (hero.race && !edition.races[hero.race]) hero.race = '';
                 if (hero.background && !edition.backgrounds[hero.background]) hero.background = '';
                 const r = race.value;
@@ -2703,7 +2760,7 @@
                 if (!r?.subraces && hero.subrace) hero.subrace = '';
                 const sizes = r?.sizes || (r?.size ? [r.size] : []);
                 if (sizes.length && !sizes.includes(hero.size)) hero.size = sizes[0];
-                if (hero.subclass && (!cls.value?.subclasses.some(s => s.name === hero.subclass) || hero.level < derived.value.subclassLevel)) hero.subclass = '';
+                if (hero.subclass && (!cls.value?.subclasses.some(s => s.name === hero.subclass) || primaryLevel.value < derived.value.subclassLevel)) hero.subclass = '';
                 for (const ab in hero.bonusPicks) if (!bonusRule.value.abilities.includes(ab)) delete hero.bonusPicks[ab];
 
                 hero.abilities = DND.finalAbilities(hero);
@@ -2714,7 +2771,7 @@
                 }
                 granted.value.forEach(s => { if (!hero.skillProfs.includes(s)) hero.skillProfs.push(s); });
             };
-            watch(() => [hero.edition, hero.race, hero.subrace, hero.classId, hero.subclass, hero.background, hero.level, JSON.stringify(hero.baseAbilities), JSON.stringify(hero.bonusPicks), JSON.stringify(hero.asi), JSON.stringify(hero.hpRolls)], refreshCharacter);
+            watch(() => [hero.edition, hero.race, hero.subrace, hero.classId, hero.subclass, hero.background, hero.level, JSON.stringify(hero.baseAbilities), JSON.stringify(hero.bonusPicks), JSON.stringify(hero.asi), JSON.stringify(hero.hpRolls), JSON.stringify(hero.multiclass)], refreshCharacter);
 
             // 属性雷达图（六边形，满值 20）
             const radarPoint = (i, radius) => {
@@ -2759,8 +2816,9 @@
 3. skillProfs 只填职业可选的技能（数量按职业规定），种族和背景自带的技能程序会自动补上。
 4. 武器、护甲要符合职业熟练；有战斗风格的职业在 fightingStyle 填 ${Object.entries(DND.FIGHTING_STYLES).map(([id, f]) => `${id}=${f.name}`).join(', ')} 之一；features 写其他特性备注；施法职业在 spellNames 里用中文法术名列出戏法和已准备法术（数量按职业规定，非施法职业留空数组）。
 5. avatar_prompt 是 NovelAI 格式的英文外貌提示词。
+6. 用户要求兼职时，classId 填起始职业，multiclass 填兼职职业，如 [{"classId":"wizard","level":2}]；level 是总等级，兼职等级从中扣除。不要求兼职就填 []。
 JSON 结构：
-{"name":"","gender":"","age":"","alignment":"守序善良等九种之一","race":"","subrace":"","classId":"","background":"","level":1,
+{"name":"","gender":"","age":"","alignment":"守序善良等九种之一","race":"","subrace":"","classId":"","multiclass":[],"background":"","level":1,
 "genMethod":"standard","baseAbilities":{"STR":15,"DEX":14,"CON":13,"INT":12,"WIS":10,"CHA":8},"bonusPicks":{},
 "skillProfs":[],"weapons":[],"armor":"","shield":false,"gold":10,"inventory":"","features":"","fightingStyle":"","spellNames":[],
 "backstory":{"appearance":"","personality":"","ideals":"","bonds":"","flaws":"","story":""},"avatar_prompt":""}`;
@@ -3182,6 +3240,7 @@ return {
     imageGenArtistPresetOptions, isImageGenArtistCustom, applyImageGenArtistPreset, onAvatarLoad, onAvatarError, settings, showToast,
     radarLabels, radarGrid, radarStatsPoints, showWeaponModal,
     abilityNames, editionList, alignments, weaponProps, backstoryFields, ed, cls, race, subrace, bg, granted, derived, skillChoices, weaponRows, weaponList, featureList, resourceList,
+    primaryLevel, classSummary, multiclassIssues, hitDiceText, hasCaster, casterSummary, slotLabel, subclassUnlock, multiclassGainText, addMulticlass, hpRollRows, clearHpRolls,
     fightingStyles, hasStyle, asiLevels, feats, featOptions, setAsiMode, rollHp, startingGear, takeStartingGear, isSaveProf,
     showSpellModal, spellLevelFilter, spellSearch, chosenSpells, spellStats, spellOptions, spellMech, toggleSpell,
     saveMod, skillMod, fixedBonus, bonusRule, abilityHint, applyStandardArray, resetPointBuy, rollAbilities, changeGenMethod,

@@ -1,5 +1,5 @@
 // D&D 5e 共用规则：两个版本通用的数据表与计算。版本差异写在 edition-2014.js / edition-2024.js。
-// 角色数据结构见 newCharacter()。
+// 角色数据结构见 newCharacter()。兼职：classId/subclass 是起始职业，multiclass 是之后兼的职业，level 是角色总等级。
 (function (root) {
     const ABILITIES = { STR: '力量', DEX: '敏捷', CON: '体质', INT: '智力', WIS: '感知', CHA: '魅力' };
 
@@ -107,6 +107,12 @@
     const CRIT_RANGE = { '勇士': [[3, 19], [15, 18]] };
     const DRACONIC_AC = { '2014': (c) => 13 + abilityMod(c.abilities?.DEX), '2024': (c) => 10 + abilityMod(c.abilities?.DEX) + abilityMod(c.abilities?.CHA) };
 
+    // 兼职前置：数组里每项都要 ≥13，嵌套数组表示任选其一
+    const MULTICLASS_REQ = {
+        barbarian: ['STR'], bard: ['CHA'], cleric: ['WIS'], druid: ['WIS'], fighter: [['STR', 'DEX']], monk: ['DEX', 'WIS'],
+        paladin: ['STR', 'CHA'], ranger: ['DEX', 'WIS'], rogue: ['DEX'], sorcerer: ['CHA'], warlock: ['CHA'], wizard: ['INT'],
+    };
+
     const CONDITIONS = ['目盲', '魅惑', '耳聋', '力竭', '恐慌', '擒抱', '失能', '隐形', '麻痹', '石化', '中毒', '倒地', '束缚', '震慑', '昏迷'];
 
     const XP_TABLE = [0, 300, 900, 2700, 6500, 14000, 23000, 34000, 48000, 64000, 85000, 100000, 120000, 140000, 165000, 195000, 225000, 265000, 305000, 355000];
@@ -176,6 +182,34 @@
     // 职业数据 = 共用数据 + 版本覆盖
     const classInfo = (char) => CLASSES[char.classId] && { ...CLASSES[char.classId], ...(edition(char.edition).classOverrides?.[char.classId] || {}) };
 
+    // —— 兼职 ——
+    // 所有职业条目：[{ classId, subclass, level }]，起始职业在最前，等级 = 总等级减去兼职等级
+    const classEntries = (char) => {
+        if (!char.classId) return [];
+        const extra = (char.multiclass || []).filter(e => CLASSES[e.classId] && e.classId !== char.classId).map(e => ({ ...e, level: Math.max(1, parseInt(e.level) || 1) }));
+        const primary = Math.max(1, clampLevel(char.level) - extra.reduce((sum, e) => sum + e.level, 0));
+        return [{ classId: char.classId, subclass: char.subclass, level: primary, primary: true }, ...extra];
+    };
+    // 把某个职业当成单职业角色来算（职业能力、资源、法术表都按该职业自己的等级）
+    const classView = (char, e) => ({ ...char, classId: e.classId, subclass: e.subclass, level: e.level, multiclass: [] });
+    const classLevel = (char, classId) => classEntries(char).filter(e => e.classId === classId).reduce((sum, e) => sum + e.level, 0);
+    const subclassEntry = (char, name) => classEntries(char).find(e => e.subclass === name);
+    const isMulticlass = (char) => classEntries(char).length > 1;
+    // 「战士 3 / 法师 2」；单职业只写职业名
+    const classSummary = (char) => {
+        const list = classEntries(char);
+        return list.length > 1 ? list.map(e => `${CLASSES[e.classId].name} ${e.level}`).join(' / ') : (classInfo(char)?.name || '');
+    };
+    // 生命骰池，从大到小，如 [10, 10, 6]
+    const hitDicePool = (char) => classEntries(char).flatMap(e => Array(e.level).fill(CLASSES[e.classId].hitDie)).sort((a, b) => b - a);
+    const hitDiceText = (pool) => Object.entries(pool.reduce((m, d) => ({ ...m, [d]: (m[d] || 0) + 1 }), {})).sort((a, b) => b[0] - a[0]).map(([d, n]) => `d${d}×${n}`).join(' + ');
+    // 没满足兼职前置的提示：起始职业和每个兼职职业都要满足
+    const multiclassIssues = (char) => {
+        if (!isMulticlass(char)) return [];
+        return classEntries(char).flatMap(e => (MULTICLASS_REQ[e.classId] || []).filter(req => ![].concat(req).some(ab => (parseInt(char.abilities?.[ab]) || 0) >= 13))
+            .map(req => `${CLASSES[e.classId].name}需要${[].concat(req).map(ab => ABILITIES[ab]).join('或')} 13`));
+    };
+
     // 豁免熟练：职业自带 + 坚韧专长选的属性
     const saveProficient = (char, ability) => !!classInfo(char)?.saves.includes(ability) || asiRecords(char).some(r => r.mode === 'feat' && r.feat === 'resilient' && r.fa === ability);
     const saveMod = (char, ability) => abilityMod(char.abilities?.[ability]) + (saveProficient(char, ability) ? profBonus(char.level) : 0);
@@ -196,38 +230,43 @@
         let ac;
         if (armor) ac = armor.base + (armor.type === 'light' ? dex : armor.type === 'medium' ? Math.min(dex, 2) : 0);
         else {
-            const unarmored = classInfo(char)?.unarmored;
-            // 武僧无甲防御不能持盾；龙族血脉有天生护甲
+            // 无甲防御只取最先获得的那个（起始职业优先）；武僧的不能持盾；龙族血脉有天生护甲
+            const ua = classEntries(char).find(e => CLASSES[e.classId].unarmored);
             const options = [10 + dex];
-            if (unarmored && !(char.classId === 'monk' && char.shield)) options.push(10 + unarmored.reduce((sum, ab) => sum + abilityMod(char.abilities?.[ab]), 0));
-            if (char.subclass === '龙族血脉') options.push(DRACONIC_AC[char.edition]?.(char) || 0);
+            if (ua && !(ua.classId === 'monk' && char.shield)) options.push(10 + CLASSES[ua.classId].unarmored.reduce((sum, ab) => sum + abilityMod(char.abilities?.[ab]), 0));
+            if (subclassEntry(char, '龙族血脉')) options.push(DRACONIC_AC[char.edition]?.(char) || 0);
             if (char.mageArmor) options.push(13 + dex);
             ac = Math.max(...options);
         }
         return ac + (char.shield ? 2 : 0) + (armor && char.fightingStyle === 'defense' ? 1 : 0);
     };
 
-    // 1 级取生命骰最大值，之后每级取平均值（向上取整）；再加上种族、子职业的每级生命加值
+    // 1 级取起始职业生命骰最大值，之后每级取掷骰记录或平均值（每级至少 1 点）；再加上种族、子职业的每级生命加值
+    // 掷骰记录：起始职业记在 hpRolls[等级]，兼职职业记在该条目的 hpRolls[该职业等级]
     const maxHp = (char) => {
-        const cls = classInfo(char); if (!cls) return 0;
+        const entries = classEntries(char); if (!entries.length) return 0;
         const level = clampLevel(char.level); const con = abilityMod(char.abilities?.CON);
-        const perLevel = (raceOf(char)?.hpPerLevel || 0) + (subraceOf(char)?.hpPerLevel || 0) + (char.subclass === '龙族血脉' ? 1 : 0);
-        // 2 级起每级取掷骰记录，没有记录取平均值；每级至少 1 点
-        let total = cls.hitDie + con;
-        for (let lv = 2; lv <= level; lv++) total += Math.max(1, (parseInt(char.hpRolls?.[lv]) || cls.hitDie / 2 + 1) + con);
-        return Math.max(level, total + perLevel * level + (hasFeat(char, 'tough') ? 2 * level : 0));
+        const perLevel = (raceOf(char)?.hpPerLevel || 0) + (subraceOf(char)?.hpPerLevel || 0);
+        let total = 0;
+        entries.forEach((e, i) => {
+            const die = CLASSES[e.classId].hitDie; const rolls = e.primary ? char.hpRolls : e.hpRolls;
+            for (let lv = 1; lv <= e.level; lv++) total += i === 0 && lv === 1 ? die + con : Math.max(1, (parseInt(rolls?.[lv]) || die / 2 + 1) + con);
+        });
+        const draconic = subclassEntry(char, '龙族血脉')?.level || 0;
+        return Math.max(level, total + perLevel * level + draconic + (hasFeat(char, 'tough') ? 2 * level : 0));
     };
 
     // 按等级分段取值：steps([[1, 2], [3, 3]]) → 1~2 级为 2，3 级起为 3，低于首段为 0
     const steps = (pairs) => (level) => pairs.reduce((v, [lv, n]) => (level >= lv ? n : v), 0);
-    const critRange = (char) => steps(CRIT_RANGE[char.subclass] || [])(clampLevel(char.level)) || 20;
-    const rageDamage = (char) => (char.classId === 'barbarian' ? steps([[1, 2], [9, 3], [16, 4]])(clampLevel(char.level)) : 0);
-    const sneakAttackDice = (char) => (char.classId === 'rogue' ? Math.ceil(clampLevel(char.level) / 2) : 0);
+    const critRange = (char) => Math.min(20, ...classEntries(char).map(e => steps(CRIT_RANGE[e.subclass] || [])(e.level) || 20));
+    const rageDamage = (char) => steps([[1, 2], [9, 3], [16, 4]])(classLevel(char, 'barbarian'));
+    const sneakAttackDice = (char) => Math.ceil(classLevel(char, 'rogue') / 2);
 
     // 武器熟练：职业的武器类别或具体武器名，加上种族武器训练
     const weaponProficient = (char, weaponId) => {
         const w = weaponData(char, weaponId); if (!w) return false;
-        const list = [...(classInfo(char)?.weapons || []), ...(raceOf(char)?.weapons || []), ...(subraceOf(char)?.weapons || [])];
+        const gains = edition(char.edition).multiclassGains || {};
+        const list = [...(classInfo(char)?.weapons || []), ...classEntries(char).slice(1).flatMap(e => gains[e.classId]?.weapons || []), ...(raceOf(char)?.weapons || []), ...(subraceOf(char)?.weapons || [])];
         if (list.includes(w.name) || (w.cat === 'simple' && list.includes('简易武器'))) return true;
         if (w.cat !== 'martial') return false;
         return list.includes('军用武器')
@@ -235,28 +274,35 @@
             || (list.includes('轻型军用武器') && w.props.includes('light'));
     };
 
-    // 职业与子职业特性：[{ level, name, desc, source }]，只列到当前等级
-    const classFeatures = (char) => {
+    // 职业与子职业特性：[{ level, name, desc, source, classId }]，level 是该职业的等级，只列到当前等级
+    const singleClassFeatures = (char) => {
         const ed = edition(char.edition); const cls = classInfo(char); const level = clampLevel(char.level);
         if (!cls) return [];
         const desc = (name) => { const key = name.replace(/（.*?）/g, ''); return ed.featureDesc?.[key] ?? root.DND.FEATURE_DESC?.[key] ?? ''; };
         const list = [];
         const add = (table, source) => Object.entries(table || {}).forEach(([lv, names]) => {
-            if (+lv <= level) names.split('、').forEach(name => list.push({ level: +lv, name, desc: desc(name), source }));
+            if (+lv <= level) names.split('、').forEach(name => list.push({ level: +lv, name, desc: desc(name), source, classId: char.classId }));
         });
         add(ed.classFeatures?.[char.classId], cls.name);
         if (char.subclass) add(ed.subclassFeatures?.[char.subclass], char.subclass);
         return list.sort((a, b) => a.level - b.level);
     };
+    const classFeatures = (char) => classEntries(char).flatMap(e => singleClassFeatures(classView(char, e)));
 
     // —— 法术 ——
     const CANTRIPS_KNOWN = {
         bard: [[1, 2], [4, 3], [10, 4]], cleric: [[1, 3], [4, 4], [10, 5]], druid: [[1, 2], [4, 3], [10, 4]],
         sorcerer: [[1, 4], [4, 5], [10, 6]], warlock: [[1, 2], [4, 3], [10, 4]], wizard: [[1, 3], [4, 4], [10, 5]],
     };
-    const cantripsKnown = (char) => steps(CANTRIPS_KNOWN[char.classId] || [])(clampLevel(char.level));
-    // 可准备或已知的 1 环以上法术数：{ count, label }
+    // 兼职时各职业分别按自己的等级算，再加起来
+    const cantripsKnown = (char) => classEntries(char).reduce((sum, e) => sum + steps(CANTRIPS_KNOWN[e.classId] || [])(e.level), 0);
     const spellsAllowed = (char) => {
+        const list = classEntries(char).map(e => singleSpellsAllowed(classView(char, e))).filter(a => a.count);
+        const labels = [...new Set(list.map(a => a.label))];
+        return { count: list.reduce((sum, a) => sum + a.count, 0), label: labels.length > 1 ? '已知和已准备法术' : labels[0] || '' };
+    };
+    // 可准备或已知的 1 环以上法术数：{ count, label }
+    const singleSpellsAllowed = (char) => {
         const ed = edition(char.edition); const level = clampLevel(char.level);
         const known = ed.spellsKnown?.[char.classId]; const prepared = ed.spellsPrepared?.[char.classId];
         if (known) return { count: known[level - 1], label: '已知法术' };
@@ -266,43 +312,62 @@
         if (prepared === 'half') return { count: level < 2 ? 0 : Math.max(1, mod + Math.floor(level / 2)), label: '已准备法术' };
         return { count: 0, label: '' };
     };
-    // 能学的最高环阶：法术位最高环，邪术师另含秘法玄奥（11 级 6 环起）
-    const maxSpellLevel = (char) => {
-        const top = Math.max(0, ...Object.keys(spellSlots(char)).map(Number));
+    // 能学的最高环阶：按各职业自己的等级算（兼职后合并的法术位环阶更高也不能学更高环的法术），邪术师另含秘法玄奥
+    const singleMaxSpellLevel = (char) => {
+        const top = Math.max(0, ...Object.keys(spellSlots(char)).map(slotLevel));
         return char.classId === 'warlock' ? Math.max(top, steps([[11, 6], [13, 7], [15, 8], [17, 9]])(clampLevel(char.level))) : top;
     };
-    const classSpells = (char) => Object.values(root.DND.SPELLS || {}).filter(s => s.classes.includes(char.classId) && s.level <= maxSpellLevel(char));
+    const maxSpellLevel = (char) => Math.max(0, ...classEntries(char).map(e => singleMaxSpellLevel(classView(char, e))));
+    const classSpells = (char) => Object.values(root.DND.SPELLS || {}).filter(s => classEntries(char).some(e => s.classes.includes(e.classId) && s.level <= singleMaxSpellLevel(classView(char, e))));
 
     // 职业资源：[{ id, name, max, used, left, recharge, shortRegain }]，max 为 99 表示不限次数
+    // 兼职时各职业资源分别按职业等级算；同名资源（如牧师和圣武士的引导神力）不叠加次数，取多的那个
     const classResources = (char) => {
-        const level = clampLevel(char.level);
-        return (edition(char.edition).resources?.[char.classId] || []).map(d => {
-            const max = typeof d.max === 'function' ? d.max(level, char) : d.max;
-            const recharge = typeof d.recharge === 'function' ? d.recharge(level) : d.recharge;
-            const used = Math.min(max, parseInt(char.resourcesUsed?.[d.id]) || 0);
-            return { ...d, max, recharge, used, left: max - used };
-        }).filter(r => r.max > 0);
+        const out = {};
+        classEntries(char).forEach(e => (edition(char.edition).resources?.[e.classId] || []).forEach(d => {
+            const max = typeof d.max === 'function' ? d.max(e.level, char) : d.max;
+            const recharge = typeof d.recharge === 'function' ? d.recharge(e.level) : d.recharge;
+            if (max > (out[d.id]?.max || 0)) out[d.id] = { ...d, max, recharge };
+        }));
+        return Object.values(out).map(r => { const used = Math.min(r.max, parseInt(char.resourcesUsed?.[r.id]) || 0); return { ...r, used, left: r.max - used }; });
     };
 
-    // 返回 { 环阶: 数量 }
+    // 返回 { 环阶: 数量 }；邪术师的契约法术位单独记为 p环阶（如 p3），短休恢复
+    // 兼职时：只有一个职业能施法就用它自己的表；多个施法职业按施法者等级合计（全施法者算满，半施法者 2014 版向下、2024 版向上取一半）
+    const slotLevel = (key) => parseInt(String(key).replace('p', '')) || 0;
+    const slotLabel = (key) => (String(key).startsWith('p') ? `契约${slotLevel(key)}环` : `${key}环`);
     const spellSlots = (char) => {
-        const cls = classInfo(char); const level = clampLevel(char.level);
-        if (!cls?.caster) return {};
-        if (cls.caster === 'pact') { const [count, slotLevel] = PACT_SLOTS[level - 1]; return { [slotLevel]: count }; }
-        let row;
-        if (cls.caster === 'full') row = FULL_SLOTS[level - 1];
-        else row = level < edition(char.edition).halfCasterStart ? [] : FULL_SLOTS[Math.ceil(level / 2) - 1];
-        return Object.fromEntries(row.map((n, i) => [i + 1, n]));
+        const entries = classEntries(char); const ed = edition(char.edition);
+        const out = {};
+        const casters = entries.filter(e => ['full', 'half'].includes(CLASSES[e.classId].caster));
+        let row = [];
+        if (casters.length === 1) {
+            const e = casters[0];
+            row = CLASSES[e.classId].caster === 'full' ? FULL_SLOTS[e.level - 1] : e.level < ed.halfCasterStart ? [] : FULL_SLOTS[Math.ceil(e.level / 2) - 1];
+        } else if (casters.length > 1) {
+            const half = (lv) => (char.edition === '2024' ? Math.ceil(lv / 2) : Math.floor(lv / 2));
+            const casterLevel = casters.reduce((sum, e) => sum + (CLASSES[e.classId].caster === 'full' ? e.level : half(e.level)), 0);
+            row = FULL_SLOTS[Math.min(20, casterLevel) - 1] || [];
+        }
+        row.forEach((n, i) => { out[i + 1] = n; });
+        const pact = classLevel(char, 'warlock');
+        if (pact) { const [count, lv] = PACT_SLOTS[Math.min(20, pact) - 1]; out[`p${lv}`] = count; }
+        return out;
     };
 
-    const spellSaveDc = (char) => {
-        const ab = classInfo(char)?.spellAbility;
+    // 施法属性按施法的职业取；不指定时取第一个施法职业
+    const casterClass = (char, classId) => CLASSES[classId]?.spellAbility ? classId : classEntries(char).find(e => CLASSES[e.classId].spellAbility)?.classId;
+    const spellSaveDc = (char, classId) => {
+        const ab = CLASSES[casterClass(char, classId)]?.spellAbility;
         return ab ? 8 + profBonus(char.level) + abilityMod(char.abilities?.[ab]) : null;
     };
-    const spellAttack = (char) => {
-        const ab = classInfo(char)?.spellAbility;
+    const spellAttack = (char, classId) => {
+        const ab = CLASSES[casterClass(char, classId)]?.spellAbility;
         return ab ? profBonus(char.level) + abilityMod(char.abilities?.[ab]) : null;
     };
+    // 「法师 DC 14 · 攻击 +6」，兼职多个施法职业时用「；」分开
+    const casterSummary = (char) => [...new Set(classEntries(char).map(e => e.classId).filter(id => CLASSES[id].spellAbility))]
+        .map(id => `${isMulticlass(char) ? `${CLASSES[id].name} ` : ''}DC ${spellSaveDc(char, id)} · 攻击 ${signed(spellAttack(char, id))}`).join('；');
 
     // 武器攻击：灵巧武器取力量和敏捷中较高的，远程用敏捷
     const weaponAttack = (char, weaponId) => {
@@ -319,10 +384,12 @@
     const initiativeMod = (char) => abilityMod(char.abilities?.DEX) + (hasFeat(char, 'alert') ? (char.edition === '2024' ? profBonus(char.level) : 5) : 0);
 
     // —— 成长：属性值提升 / 专长 ——
-    // char.asi = { 等级: { mode: 'asi', a1, a2 } | { mode: 'feat', feat, fa } }，只计入当前等级以内的记录
-    const asiRecords = (char) => Object.entries(char.asi || {}).filter(([lv]) => +lv <= clampLevel(char.level)).map(([lv, r]) => ({ level: +lv, ...r }));
-    // 可以做属性提升或选专长的等级（含 2024 版 19 级史诗恩惠）
-    const asiLevels = (char) => classFeatures(char).filter(f => f.name === '属性值提升' || f.name === '史诗恩惠').map(f => f.level);
+    // char.asi = { 键: { mode: 'asi', a1, a2 } | { mode: 'feat', feat, fa } }；起始职业的键是等级（如 "4"），兼职职业是「职业:等级」（如 "wizard:4"）
+    // 可以做属性提升或选专长的位置（含 2024 版 19 级史诗恩惠）：[{ key, level, source }]
+    const asiLevels = (char) => classFeatures(char).filter(f => f.name === '属性值提升' || f.name === '史诗恩惠')
+        .map(f => ({ key: f.classId === char.classId ? String(f.level) : `${f.classId}:${f.level}`, level: f.level, source: CLASSES[f.classId].name }));
+    // 只计入当前等级已经拿到的记录
+    const asiRecords = (char) => { const keys = asiLevels(char).map(a => a.key); return Object.entries(char.asi || {}).filter(([k]) => keys.includes(k)).map(([k, r]) => ({ key: k, ...r })); };
     // 已获得的专长：成长中选的 + 2024 背景送的起源专长
     const characterFeats = (char) => [...new Set([...asiRecords(char).filter(r => r.mode === 'feat' && r.feat).map(r => r.feat), backgroundOf(char)?.featId].filter(Boolean))];
     const hasFeat = (char, id) => characterFeats(char).includes(id);
@@ -333,7 +400,7 @@
     const raceOf = (char) => edition(char.edition).races[char.race];
     const subraceOf = (char) => raceOf(char)?.subraces?.[char.subrace];
     const backgroundOf = (char) => edition(char.edition).backgrounds[char.background];
-    const subclassLevel = (char) => { const ed = edition(char.edition); return ed.subclassLevel[char.classId] || ed.defaultSubclassLevel; };
+    const subclassLevel = (char, classId = char.classId) => { const ed = edition(char.edition); return ed.subclassLevel[classId] || ed.defaultSubclassLevel; };
     const pointBuyCost = (base) => Object.values(base).reduce((sum, v) => sum + (POINT_BUY.cost[v] ?? Infinity), 0);
 
     // 最终属性 = 基础值 + 种族/子种族固定加值 + 自选加值（2014 半精灵、2024 背景），上限 20
@@ -357,13 +424,15 @@
             cls && { source: cls.name, count: cls.skillCount, options: cls.skills },
             race?.skillChoice && { source: race.name, count: race.skillChoice, options: race.skillOptions || ALL_SKILLS },
             bg?.skillChoice && { source: bg.name, count: bg.skillChoice, options: ALL_SKILLS },
+            ...classEntries(char).slice(1).filter(e => edition(char.edition).multiclassGains?.[e.classId]?.skill)
+                .map(e => ({ source: `兼职${CLASSES[e.classId].name}`, count: 1, options: CLASSES[e.classId].skills })),
         ].filter(Boolean);
     };
 
     const newCharacter = (editionId = '2024') => ({
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         edition: editionId, name: '', gender: '', age: '', alignment: '', avatar: null, avatar_prompt: '',
-        race: '', subrace: '', size: '', classId: '', subclass: '', background: '', level: 1, xp: 0,
+        race: '', subrace: '', size: '', classId: '', subclass: '', multiclass: [], background: '', level: 1, xp: 0,
         genMethod: 'standard', baseAbilities: { STR: 15, DEX: 14, CON: 13, INT: 12, WIS: 10, CHA: 8 }, bonusPicks: {},
         abilities: { STR: 15, DEX: 14, CON: 13, INT: 12, WIS: 10, CHA: 8 },
         skillProfs: [], expertise: [],
@@ -376,12 +445,23 @@
         history: [], badges: [],
     });
 
+    // 兼职条目：去掉无效和重复的职业；起始职业至少保留 1 级，放不下时从最后一个兼职开始减
+    const fitMulticlass = (char) => {
+        const seen = new Set([char.classId]);
+        let room = clampLevel(char.level) - 1;
+        return (char.multiclass || []).filter(e => CLASSES[e?.classId] && !seen.has(e.classId) && seen.add(e.classId))
+            .map(e => ({ classId: e.classId, subclass: e.subclass || '', level: Math.max(1, parseInt(e.level) || 1), hpRolls: e.hpRolls || {} }))
+            .map(e => { const level = Math.min(e.level, room); room -= level; return { ...e, level }; })
+            .filter(e => e.level > 0);
+    };
+
     // 补齐缺失字段，并重算由选项决定的数值（最终属性、生命值上限）
     const normalizeCharacter = (data) => {
         const base = newCharacter(data?.edition);
         const char = { ...base, ...data, backstory: { ...base.backstory, ...(data?.backstory || {}) }, deathSaves: { ...base.deathSaves, ...(data?.deathSaves || {}) } };
         if (!editions[char.edition]) char.edition = '2024';
         char.level = clampLevel(char.level);
+        char.multiclass = fitMulticlass(char);
         if (char.baseAbilities) char.abilities = finalAbilities(char);
         char.skillProfs = [...new Set([...(char.skillProfs || []), ...grantedSkills(char)])].filter(id => SKILLS[id]);
         char.weapons = (char.weapons || []).filter(id => WEAPONS[id]);
@@ -393,5 +473,5 @@
         return char;
     };
 
-    root.DND = { ABILITIES, SKILLS, ALL_SKILLS, CLASSES, ARMOR, WEAPONS, CONDITIONS, XP_TABLE, STANDARD_ARRAY, POINT_BUY, editions, edition, classInfo, weaponData, signed, abilityMod, profBonus, levelFromXp, rollDice, d20Test, saveProficient, saveMod, skillMod, passivePerception, armorClass, maxHp, spellSlots, spellSaveDc, spellAttack, weaponAttack, weaponProficient, initiativeMod, steps, critRange, rageDamage, sneakAttackDice, classFeatures, classResources, asiRecords, asiLevels, characterFeats, hasFeat, hasFightingStyle, cantripsKnown, spellsAllowed, maxSpellLevel, classSpells, raceOf, subraceOf, backgroundOf, subclassLevel, pointBuyCost, finalAbilities, grantedSkills, skillChoices, newCharacter, normalizeCharacter };
+    root.DND = { ABILITIES, SKILLS, ALL_SKILLS, CLASSES, ARMOR, WEAPONS, CONDITIONS, XP_TABLE, STANDARD_ARRAY, POINT_BUY, editions, edition, classInfo, casterSummary, classEntries, classLevel, subclassEntry, isMulticlass, classSummary, hitDicePool, hitDiceText, multiclassIssues, fitMulticlass, MULTICLASS_REQ, slotLevel, slotLabel, weaponData, signed, abilityMod, profBonus, levelFromXp, rollDice, d20Test, saveProficient, saveMod, skillMod, passivePerception, armorClass, maxHp, spellSlots, spellSaveDc, spellAttack, weaponAttack, weaponProficient, initiativeMod, steps, critRange, rageDamage, sneakAttackDice, classFeatures, classResources, asiRecords, asiLevels, characterFeats, hasFeat, hasFightingStyle, cantripsKnown, spellsAllowed, maxSpellLevel, classSpells, raceOf, subraceOf, backgroundOf, subclassLevel, pointBuyCost, finalAbilities, grantedSkills, skillChoices, newCharacter, normalizeCharacter };
 })(typeof window !== 'undefined' ? window : globalThis);

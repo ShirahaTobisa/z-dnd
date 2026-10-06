@@ -8,6 +8,21 @@
         halfCasterStart: 2,
         subclassLevel: { cleric: 1, sorcerer: 1, warlock: 1, druid: 2, wizard: 2 },
         defaultSubclassLevel: 3,
+        // 兼职获得的熟练（armor 只用于显示）；skill 表示可从该职业技能表选 1 项
+        multiclassGains: {
+            barbarian: { armor: ['盾牌'], weapons: ['简易武器', '军用武器'] },
+            bard: { armor: ['轻甲'], skill: 1, other: '一种乐器' },
+            cleric: { armor: ['轻甲', '中甲', '盾牌'] },
+            druid: { armor: ['轻甲', '中甲', '盾牌'] },
+            fighter: { armor: ['轻甲', '中甲', '盾牌'], weapons: ['简易武器', '军用武器'] },
+            monk: { weapons: ['简易武器', '短剑'] },
+            paladin: { armor: ['轻甲', '中甲', '盾牌'], weapons: ['简易武器', '军用武器'] },
+            ranger: { armor: ['轻甲', '中甲', '盾牌'], weapons: ['简易武器', '军用武器'], skill: 1 },
+            rogue: { armor: ['轻甲'], skill: 1, other: '盗贼工具' },
+            sorcerer: {},
+            warlock: { armor: ['轻甲'], weapons: ['简易武器'] },
+            wizard: {},
+        },
         // bonuses：固定加值；bonusChoice：自选加值；skills：赠送技能熟练；skillChoice：自选技能数量
         races: {
             dwarf: { name: '矮人', size: '中型', speed: 25, darkvision: 60, bonuses: { CON: 2 }, traits: ['矮人韧性', '战斗训练', '石工知识'], weapons: ['战斧', '手斧', '轻锤', '战锤'],

@@ -2394,7 +2394,7 @@
                                             </div>
                                         </div>
                                         <div v-if="heroStats.slots.length" class="flex flex-wrap gap-1.5 text-[10px] font-mono">
-                                            <span v-for="sl in heroStats.slots" :key="sl.level" class="px-1.5 py-0.5 rounded bg-indigo-900/20 border border-indigo-900/40 text-indigo-300">{{ sl.level }}环 {{ sl.left }}/{{ sl.max }}</span>
+                                            <span v-for="sl in heroStats.slots" :key="sl.level" class="px-1.5 py-0.5 rounded bg-indigo-900/20 border border-indigo-900/40 text-indigo-300">{{ sl.label }} {{ sl.left }}/{{ sl.max }}</span>
                                         </div>
                                         <div v-if="activeHero.conditions?.length || activeHero.exhaustion" class="flex flex-wrap gap-1.5 text-[10px]">
                                             <span v-for="c in activeHero.conditions" :key="c" class="px-1.5 py-0.5 rounded bg-red-900/30 border border-red-800/50 text-red-300">{{ c }}</span>
@@ -5351,16 +5351,16 @@
                 };
 
                 const activeHero = Vue.computed(() => cocState.investigators[cocState.activeInvestigatorIndex]);
-                const heroTitle = (c) => `${DND.subraceOf(c)?.name || DND.raceOf(c)?.name || ''} ${DND.classInfo(c)?.name || ''} ${c.level || 1} 级`.trim();
+                // 兼职时写成「人类 战士 2 / 法师 3」，单职业写「人类 战士 5 级」
+                const heroTitle = (c) => `${DND.subraceOf(c)?.name || DND.raceOf(c)?.name || ''} ${DND.classSummary(c)}${DND.isMulticlass(c) ? '' : ` ${c.level || 1} 级`}`.trim();
                 // 侧栏展示用的角色数据
                 const heroStats = Vue.computed(() => {
                     const c = activeHero.value;
                     if (!c) return null;
-                    const cls = DND.classInfo(c);
                     return {
                         title: heroTitle(c),
                         badges: [{ label: 'AC', value: DND.armorClass(c) }, { label: '先攻', value: DND.signed(DND.initiativeMod(c)) }, { label: '熟练', value: DND.signed(DND.profBonus(c.level)) }, { label: '被动察觉', value: DND.passivePerception(c) }],
-                        slots: Object.entries(DND.spellSlots(c)).map(([level, max]) => ({ level, max, left: max - (parseInt(c.slotsUsed?.[level]) || 0) })),
+                        slots: Object.entries(DND.spellSlots(c)).map(([level, max]) => ({ level, label: DND.slotLabel(level), max, left: max - (parseInt(c.slotsUsed?.[level]) || 0) })),
                         abilities: Object.entries(DND.ABILITIES).map(([key, name]) => ({ key, name, score: c.abilities?.[key], mod: DND.signed(DND.abilityMod(c.abilities?.[key])), save: DND.signed(DND.saveMod(c, key)), saveProf: DND.saveProficient(c, key) })),
                         skills: Object.entries(DND.SKILLS).map(([id, sk]) => ({ id, name: sk.name, prof: c.skillProfs?.includes(id), mod: DND.signed(DND.skillMod(c, id)) })).sort((a, b) => b.prof - a.prof),
                         weapons: (c.weapons || []).map(id => DND.weaponAttack(c, id)).filter(Boolean),
@@ -5371,9 +5371,9 @@
                             ...DND.characterFeats(c).filter(id => DND.FEATS[id]).map(id => ({ name: DND.FEATS[id].name, desc: DND.FEATS[id].desc, source: '专长' })),
                             ...(DND.FIGHTING_STYLES[c.fightingStyle] ? [{ ...DND.FIGHTING_STYLES[c.fightingStyle], source: '战斗风格' }] : []),
                         ],
-                        hitDice: `${(c.level || 1) - (parseInt(c.hitDiceUsed) || 0)}/${c.level || 1}`,
+                        hitDice: (() => { const pool = DND.hitDicePool(c); return `${pool.length - (parseInt(c.hitDiceUsed) || 0)}/${pool.length}${DND.isMulticlass(c) ? `（${DND.hitDiceText(pool)}）` : ''}`; })(),
                         spells: (c.spellIds || []).map(id => DND.SPELLS[id]).filter(Boolean).sort((a, b) => a.level - b.level),
-                        spellInfo: DND.classInfo(c)?.caster ? `DC ${DND.spellSaveDc(c)} · 攻击 ${DND.signed(DND.spellAttack(c))}` : '',
+                        spellInfo: DND.casterSummary(c),
                     };
                 });
                 const cocState = reactive({ combat: DND.combat.create(), mode: null, isCoj: false, module: null, tempModuleText: '', investigators: [], activeInvestigatorIndex: -1, gameState: 'idle', log: [], systemPrompt: '', pendingRolls: [], isGameEnded: false });
