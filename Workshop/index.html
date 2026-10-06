@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="../assets/css/tailwind.css">
     <script src="../assets/js/app-runtime.js"></script>
     <script src="../assets/js/dnd/rules.js"></script>
+    <script src="../assets/js/dnd/features.js"></script>
     <script src="../assets/js/dnd/edition-2014.js"></script>
     <script src="../assets/js/dnd/edition-2024.js"></script>
     <link href="../assets/vendor/daisyui.full.css" rel="stylesheet" type="text/css" />
@@ -1044,7 +1045,7 @@
                         <thead><tr class="text-slate-500"><th>武器</th><th>命中</th><th>伤害</th><th v-if="hero.edition === '2024'">专精</th><th></th></tr></thead>
                         <tbody>
                             <tr v-for="(w, idx) in weaponRows" :key="idx" class="border-b border-dark-700/30">
-                                <td class="font-bold text-slate-300">{{ w.name }}</td>
+                                <td class="font-bold text-slate-300">{{ w.name }}<span v-if="!w.proficient" class="text-[10px] text-amber-500 font-normal"> 未熟练</span><span v-if="w.range" class="text-[10px] text-slate-500 font-normal"> {{ w.range }}尺</span></td>
                                 <td class="font-mono text-mystic-gold">{{ signed(w.toHit) }}</td>
                                 <td class="font-mono text-slate-300">{{ w.damage }} {{ w.type }}</td>
                                 <td v-if="hero.edition === '2024'" class="text-slate-400">{{ w.mastery }}</td>
@@ -1062,8 +1063,23 @@
                     <textarea v-model="hero.inventory" class="textarea textarea-bordered h-24 ws-field text-sm" placeholder="背包里的东西、工具、消耗品..."></textarea>
                 </div>
                 <div class="flex flex-col gap-2">
-                    <div class="ws-label">职业能力与专长 Features</div>
-                    <textarea v-model="hero.features" class="textarea textarea-bordered h-28 ws-field text-sm" placeholder="职业能力、种族特性、专长..."></textarea>
+                    <div class="ws-label">职业能力 Class Features <span class="normal-case font-normal text-slate-600">（按等级自动列出）</span></div>
+                    <div v-if="featureList.length" class="ws-box max-h-56 overflow-y-auto custom-scrollbar space-y-1.5">
+                        <div v-for="f in featureList" :key="f.level + f.name + f.source" class="text-xs leading-snug">
+                            <span class="font-mono text-[10px] text-slate-600 mr-1">{{ f.level }}级</span>
+                            <span class="font-bold text-mystic-gold">{{ f.name }}</span>
+                            <span v-if="f.source !== cls?.name" class="text-[10px] text-mystic-green"> · {{ f.source }}</span>
+                            <div class="text-[11px] text-slate-400 pl-8">{{ f.desc }}</div>
+                        </div>
+                    </div>
+                    <div v-else class="ws-hint">选好职业后显示</div>
+                    <div v-if="resourceList.length" class="flex flex-wrap gap-1.5">
+                        <span v-for="r in resourceList" :key="r.id" class="px-2 py-0.5 rounded border border-amber-800/50 bg-amber-900/10 text-xs text-amber-200">
+                            {{ r.name }} {{ r.max === 99 ? '不限' : r.max }}<span class="text-[10px] text-slate-500"> · {{ r.recharge === 'short' ? '短休' : '长休' }}恢复</span>
+                        </span>
+                    </div>
+                    <div class="ws-label">专长与其他 Feats</div>
+                    <textarea v-model="hero.features" class="textarea textarea-bordered h-20 ws-field text-sm" placeholder="专长、战斗风格选择、种族特性的细节..."></textarea>
                     <div class="ws-label">法术 Spells</div>
                     <textarea v-model="hero.spells" class="textarea textarea-bordered h-24 ws-field text-sm" placeholder="戏法与已准备的法术..."></textarea>
                 </div>
@@ -1535,12 +1551,12 @@
                 <table class="table table-xs w-full">
                     <thead class="bg-dark-900/50 text-slate-500"><tr><th class="pl-4">名称</th><th>伤害</th><th class="hidden sm:table-cell">特性</th><th v-if="hero.edition === '2024'">专精</th><th class="pr-4"></th></tr></thead>
                     <tbody>
-                        <tr v-for="(w, id) in weapons" :key="id" class="hover:bg-dark-700/30 border-b border-dark-800/50">
-                            <td class="pl-4 font-bold text-slate-300">{{ w.name }}</td>
+                        <tr v-for="w in weaponList" :key="w.id" class="hover:bg-dark-700/30 border-b border-dark-800/50" :class="{ 'opacity-60': !w.proficient }">
+                            <td class="pl-4 font-bold text-slate-300">{{ w.name }}<div class="text-[10px] font-normal" :class="w.proficient ? 'text-mystic-green' : 'text-amber-500'">{{ w.cat === 'simple' ? '简易' : '军用' }} · {{ w.proficient ? '熟练' : '未熟练' }}</div></td>
                             <td class="font-mono text-mystic-gold">{{ w.damage }}{{ w.versatile ? ` / ${w.versatile}` : '' }} {{ w.type }}</td>
-                            <td class="hidden sm:table-cell text-slate-500">{{ w.props.map(p => weaponProps[p]).join('、') }}</td>
-                            <td v-if="hero.edition === '2024'" class="text-slate-400">{{ ed.weaponMastery?.[id] }}</td>
-                            <td class="pr-4 text-right"><button @click="hero.weapons.push(id); showWeaponModal = false" class="btn btn-xs btn-ghost text-mystic-gold border border-mystic-gold/30">添加</button></td>
+                            <td class="hidden sm:table-cell text-slate-500">{{ w.props.map(p => weaponProps[p]).join('、') }}{{ w.range ? ` · ${w.range}尺` : '' }}</td>
+                            <td v-if="hero.edition === '2024'" class="text-slate-400">{{ ed.weaponMastery?.[w.id] }}</td>
+                            <td class="pr-4 text-right"><button @click="hero.weapons.push(w.id); showWeaponModal = false" class="btn btn-xs btn-ghost text-mystic-gold border border-mystic-gold/30">添加</button></td>
                         </tr>
                     </tbody>
                 </table>
@@ -2449,7 +2465,7 @@
             const abilityNames = DND.ABILITIES;
             const editionList = Object.values(DND.editions);
             const alignments = ['守序善良', '中立善良', '混乱善良', '守序中立', '绝对中立', '混乱中立', '守序邪恶', '中立邪恶', '混乱邪恶'];
-            const weaponProps = { finesse: '灵巧', light: '轻型', thrown: '投掷', ranged: '远程', heavy: '重型', twoHanded: '双手' };
+            const weaponProps = { finesse: '灵巧', light: '轻型', thrown: '投掷', ranged: '远程', heavy: '重型', twoHanded: '双手', reach: '触及', loading: '装填' };
             const backstoryFields = { appearance: '外貌', personality: '性格特点', ideals: '理想', bonds: '羁绊', flaws: '缺点', story: '背景故事' };
 
             const ed = computed(() => DND.edition(hero.edition));
@@ -2467,6 +2483,10 @@
                 ...c, picked: hero.skillProfs.filter(s => c.options.includes(s) && !granted.value.includes(s)).length,
             })));
             const weaponRows = computed(() => hero.weapons.map(id => DND.weaponAttack(hero, id)).filter(Boolean));
+            // 武器库：按当前版本数据列出，熟练的排在前面
+            const weaponList = computed(() => Object.keys(DND.WEAPONS).map(id => ({ id, ...DND.weaponData(hero, id), proficient: DND.weaponProficient(hero, id) })).sort((a, b) => b.proficient - a.proficient));
+            const featureList = computed(() => DND.classFeatures(hero).filter(f => f.name !== '选择子职业'));
+            const resourceList = computed(() => DND.classResources(hero));
             const saveMod = (ab) => DND.saveMod(hero, ab);
             const skillMod = (id) => DND.skillMod(hero, id);
 
@@ -3007,10 +3027,10 @@ return {
     options, isAvatarLoading, handleImageUpload, openAvatarModal, regenerateAvatar, showAvatarModal, tempAvatarPrompt, saveAvatarPromptOnly,
     imageGenArtistPresetOptions, isImageGenArtistCustom, applyImageGenArtistPreset, onAvatarLoad, onAvatarError, settings, showToast,
     radarLabels, radarGrid, radarStatsPoints, showWeaponModal,
-    abilityNames, editionList, alignments, weaponProps, backstoryFields, ed, cls, race, subrace, bg, granted, derived, skillChoices, weaponRows,
+    abilityNames, editionList, alignments, weaponProps, backstoryFields, ed, cls, race, subrace, bg, granted, derived, skillChoices, weaponRows, weaponList, featureList, resourceList,
     saveMod, skillMod, fixedBonus, bonusRule, abilityHint, applyStandardArray, resetPointBuy, rollAbilities, changeGenMethod,
     toggleSkill, toggleExpertise, toggleCondition,
-    classes: DND.CLASSES, skills: DND.SKILLS, armors: DND.ARMOR, weapons: DND.WEAPONS, conditions: DND.CONDITIONS,
+    classes: DND.CLASSES, skills: DND.SKILLS, armors: DND.ARMOR, conditions: DND.CONDITIONS,
     signed: DND.signed, abilityMod: DND.abilityMod
 };
 }

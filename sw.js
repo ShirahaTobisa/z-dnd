@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'z-coc-shell-v7';
+const CACHE_VERSION = 'z-coc-shell-v8';
 const APP_SHELL = [
     './',
     './index.html',
@@ -9,6 +9,7 @@ const APP_SHELL = [
     './favicon.svg',
     './assets/css/tailwind.css',
     './assets/js/dnd/rules.js',
+    './assets/js/dnd/features.js',
     './assets/js/dnd/edition-2014.js',
     './assets/js/dnd/edition-2024.js',
     './assets/js/dnd/commands.js',

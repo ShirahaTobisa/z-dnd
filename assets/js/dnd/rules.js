@@ -32,15 +32,15 @@
         barbarian: { name: '野蛮人', description: '凭怒火战斗的原始勇士，血厚、抗打，适合冲在最前面。', hitDie: 12, saves: ['STR', 'CON'], skillCount: 2, skills: ['animalHandling', 'athletics', 'intimidation', 'nature', 'perception', 'survival'], armor: ['轻甲', '中甲', '盾牌'], weapons: ['简易武器', '军用武器'], caster: null, unarmored: ['DEX', 'CON'], features: {}, subclasses: [{ name: '狂战士道途', srd: true, description: '', features: {} }] },
         bard: { name: '吟游诗人', description: '用音乐和话语施展魔法的多面手，擅长社交、辅助和各种技能。', hitDie: 8, saves: ['DEX', 'CHA'], skillCount: 3, skills: ALL_SKILLS, armor: ['轻甲'], weapons: ['简易武器'], caster: 'full', spellAbility: 'CHA', features: {}, subclasses: [{ name: '逸闻学院', srd: true, description: '', features: {} }] },
         cleric: { name: '牧师', description: '侍奉神祇的神术施法者，能治疗、守护队友，也能惩戒敌人。', hitDie: 8, saves: ['WIS', 'CHA'], skillCount: 2, skills: ['history', 'insight', 'medicine', 'persuasion', 'religion'], armor: ['轻甲', '中甲', '盾牌'], weapons: ['简易武器'], caster: 'full', spellAbility: 'WIS', features: {}, subclasses: [{ name: '生命领域', srd: true, description: '', features: {} }] },
-        druid: { name: '德鲁伊', description: '守护自然的施法者，能调用自然之力，还能变成野兽。', hitDie: 8, saves: ['INT', 'WIS'], skillCount: 2, skills: ['arcana', 'animalHandling', 'insight', 'medicine', 'nature', 'perception', 'religion', 'survival'], armor: ['轻甲', '中甲', '盾牌'], weapons: ['简易武器'], caster: 'full', spellAbility: 'WIS', features: {}, subclasses: [{ name: '大地结社', srd: true, description: '', features: {} }] },
+        druid: { name: '德鲁伊', description: '守护自然的施法者，能调用自然之力，还能变成野兽。', hitDie: 8, saves: ['INT', 'WIS'], skillCount: 2, skills: ['arcana', 'animalHandling', 'insight', 'medicine', 'nature', 'perception', 'religion', 'survival'], armor: ['轻甲', '中甲', '盾牌'], weapons: ['木棍', '匕首', '飞镖', '标枪', '硬头锤', '长棍', '弯刀', '镰刀', '投石索', '矛'], caster: 'full', spellAbility: 'WIS', features: {}, subclasses: [{ name: '大地结社', srd: true, description: '', features: {} }] },
         fighter: { name: '战士', description: '精通各种武器和护甲的战斗专家，稳定可靠，上手最容易。', hitDie: 10, saves: ['STR', 'CON'], skillCount: 2, skills: ['acrobatics', 'animalHandling', 'athletics', 'history', 'insight', 'intimidation', 'perception', 'survival'], armor: ['全部护甲', '盾牌'], weapons: ['简易武器', '军用武器'], caster: null, features: {}, subclasses: [{ name: '勇士', srd: true, description: '', features: {} }] },
         monk: { name: '武僧', description: '修炼身心的武者，不穿甲也很灵活，用拳脚和内气战斗。', hitDie: 8, saves: ['STR', 'DEX'], skillCount: 2, skills: ['acrobatics', 'athletics', 'history', 'insight', 'religion', 'stealth'], armor: [], weapons: ['简易武器', '短剑'], caster: null, unarmored: ['DEX', 'WIS'], features: {}, subclasses: [{ name: '散打宗', srd: true, description: '', features: {} }] },
         paladin: { name: '圣武士', description: '立下神圣誓言的战士，近战强悍，还能治疗和施展神圣斩击。', hitDie: 10, saves: ['WIS', 'CHA'], skillCount: 2, skills: ['athletics', 'insight', 'intimidation', 'medicine', 'persuasion', 'religion'], armor: ['全部护甲', '盾牌'], weapons: ['简易武器', '军用武器'], caster: 'half', spellAbility: 'CHA', features: {}, subclasses: [{ name: '奉献之誓', srd: true, description: '', features: {} }] },
         ranger: { name: '游侠', description: '荒野中的猎手和追踪者，擅长远程攻击、侦察和野外生存。', hitDie: 10, saves: ['STR', 'DEX'], skillCount: 3, skills: ['animalHandling', 'athletics', 'insight', 'investigation', 'nature', 'perception', 'stealth', 'survival'], armor: ['轻甲', '中甲', '盾牌'], weapons: ['简易武器', '军用武器'], caster: 'half', spellAbility: 'WIS', features: {}, subclasses: [{ name: '猎人', srd: true, description: '', features: {} }] },
         rogue: { name: '游荡者', description: '靠技巧和偷袭取胜的专家，擅长潜行、开锁和找准要害。', hitDie: 8, saves: ['DEX', 'INT'], skillCount: 4, skills: ['acrobatics', 'athletics', 'deception', 'insight', 'intimidation', 'investigation', 'perception', 'performance', 'persuasion', 'sleightOfHand', 'stealth'], armor: ['轻甲'], weapons: ['简易武器', '手弩', '长剑', '刺剑', '短剑'], caster: null, features: {}, subclasses: [{ name: '盗贼', srd: true, description: '', features: {} }] },
-        sorcerer: { name: '术士', description: '天生拥有魔力的施法者，法术不多但能用超魔改变法术效果。', hitDie: 6, saves: ['CON', 'CHA'], skillCount: 2, skills: ['arcana', 'deception', 'insight', 'intimidation', 'persuasion', 'religion'], armor: [], weapons: ['匕首', '飞镖', '投石索', '木棍', '轻弩'], caster: 'full', spellAbility: 'CHA', features: {}, subclasses: [{ name: '龙族血脉', srd: true, description: '', features: {} }] },
+        sorcerer: { name: '术士', description: '天生拥有魔力的施法者，法术不多但能用超魔改变法术效果。', hitDie: 6, saves: ['CON', 'CHA'], skillCount: 2, skills: ['arcana', 'deception', 'insight', 'intimidation', 'persuasion', 'religion'], armor: [], weapons: ['匕首', '飞镖', '投石索', '长棍', '轻弩'], caster: 'full', spellAbility: 'CHA', features: {}, subclasses: [{ name: '龙族血脉', srd: true, description: '', features: {} }] },
         warlock: { name: '邪术师', description: '与强大存在订下契约换取力量的施法者，法术位少但短休就能恢复。', hitDie: 8, saves: ['WIS', 'CHA'], skillCount: 2, skills: ['arcana', 'deception', 'history', 'intimidation', 'investigation', 'nature', 'religion'], armor: ['轻甲'], weapons: ['简易武器'], caster: 'pact', spellAbility: 'CHA', features: {}, subclasses: [{ name: '邪魔宗主', srd: true, description: '', features: {} }] },
-        wizard: { name: '法师', description: '靠钻研学会魔法的学者，法术种类最多，变化最丰富。', hitDie: 6, saves: ['INT', 'WIS'], skillCount: 2, skills: ['arcana', 'history', 'insight', 'investigation', 'medicine', 'religion'], armor: [], weapons: ['匕首', '飞镖', '投石索', '木棍', '轻弩'], caster: 'full', spellAbility: 'INT', features: {}, subclasses: [{ name: '塑能学派', srd: true, description: '', features: {} }] },
+        wizard: { name: '法师', description: '靠钻研学会魔法的学者，法术种类最多，变化最丰富。', hitDie: 6, saves: ['INT', 'WIS'], skillCount: 2, skills: ['arcana', 'history', 'insight', 'investigation', 'medicine', 'religion'], armor: [], weapons: ['匕首', '飞镖', '投石索', '长棍', '轻弩'], caster: 'full', spellAbility: 'INT', features: {}, subclasses: [{ name: '塑能学派', srd: true, description: '', features: {} }] },
     };
 
     // type: light 轻甲 / medium 中甲（敏捷最多 +2）/ heavy 重甲（不加敏捷）
@@ -59,28 +59,53 @@
         plate: { name: '板甲', base: 18, type: 'heavy' },
     };
 
-    // props: finesse 灵巧 / light 轻型 / thrown 投掷 / ranged 远程 / heavy 重型 / twoHanded 双手；versatile 为双手伤害
+    // SRD 武器表。cat: simple 简易 / martial 军用；range 为“常规/最远”射程（尺）
+    // props: finesse 灵巧 / light 轻型 / thrown 投掷 / ranged 远程 / heavy 重型 / twoHanded 双手 / reach 触及 / loading 装填；versatile 为双手伤害
     const WEAPONS = {
-        club: { name: '木棍', damage: '1d4', type: '钝击', props: ['light'] },
-        dagger: { name: '匕首', damage: '1d4', type: '穿刺', props: ['finesse', 'light', 'thrown'] },
-        handaxe: { name: '手斧', damage: '1d6', type: '挥砍', props: ['light', 'thrown'] },
-        javelin: { name: '标枪', damage: '1d6', type: '穿刺', props: ['thrown'] },
-        mace: { name: '硬头锤', damage: '1d6', type: '钝击', props: [] },
-        quarterstaff: { name: '长棍', damage: '1d6', type: '钝击', props: [], versatile: '1d8' },
-        spear: { name: '矛', damage: '1d6', type: '穿刺', props: ['thrown'], versatile: '1d8' },
-        lightCrossbow: { name: '轻弩', damage: '1d8', type: '穿刺', props: ['ranged', 'twoHanded'] },
-        shortbow: { name: '短弓', damage: '1d6', type: '穿刺', props: ['ranged', 'twoHanded'] },
-        sling: { name: '投石索', damage: '1d4', type: '钝击', props: ['ranged'] },
-        battleaxe: { name: '战斧', damage: '1d8', type: '挥砍', props: [], versatile: '1d10' },
-        greataxe: { name: '巨斧', damage: '1d12', type: '挥砍', props: ['heavy', 'twoHanded'] },
-        greatsword: { name: '巨剑', damage: '2d6', type: '挥砍', props: ['heavy', 'twoHanded'] },
-        longsword: { name: '长剑', damage: '1d8', type: '挥砍', props: [], versatile: '1d10' },
-        rapier: { name: '刺剑', damage: '1d8', type: '穿刺', props: ['finesse'] },
-        scimitar: { name: '弯刀', damage: '1d6', type: '挥砍', props: ['finesse', 'light'] },
-        shortsword: { name: '短剑', damage: '1d6', type: '穿刺', props: ['finesse', 'light'] },
-        warhammer: { name: '战锤', damage: '1d8', type: '钝击', props: [], versatile: '1d10' },
-        longbow: { name: '长弓', damage: '1d8', type: '穿刺', props: ['ranged', 'heavy', 'twoHanded'] },
+        club: { name: '木棍', cat: 'simple', damage: '1d4', type: '钝击', props: ['light'] },
+        dagger: { name: '匕首', cat: 'simple', damage: '1d4', type: '穿刺', props: ['finesse', 'light', 'thrown'], range: '20/60' },
+        greatclub: { name: '巨棒', cat: 'simple', damage: '1d8', type: '钝击', props: ['twoHanded'] },
+        handaxe: { name: '手斧', cat: 'simple', damage: '1d6', type: '挥砍', props: ['light', 'thrown'], range: '20/60' },
+        javelin: { name: '标枪', cat: 'simple', damage: '1d6', type: '穿刺', props: ['thrown'], range: '30/120' },
+        lightHammer: { name: '轻锤', cat: 'simple', damage: '1d4', type: '钝击', props: ['light', 'thrown'], range: '20/60' },
+        mace: { name: '硬头锤', cat: 'simple', damage: '1d6', type: '钝击', props: [] },
+        quarterstaff: { name: '长棍', cat: 'simple', damage: '1d6', type: '钝击', props: [], versatile: '1d8' },
+        sickle: { name: '镰刀', cat: 'simple', damage: '1d4', type: '挥砍', props: ['light'] },
+        spear: { name: '矛', cat: 'simple', damage: '1d6', type: '穿刺', props: ['thrown'], range: '20/60', versatile: '1d8' },
+        lightCrossbow: { name: '轻弩', cat: 'simple', damage: '1d8', type: '穿刺', props: ['ranged', 'loading', 'twoHanded'], range: '80/320' },
+        dart: { name: '飞镖', cat: 'simple', damage: '1d4', type: '穿刺', props: ['finesse', 'thrown'], range: '20/60' },
+        shortbow: { name: '短弓', cat: 'simple', damage: '1d6', type: '穿刺', props: ['ranged', 'twoHanded'], range: '80/320' },
+        sling: { name: '投石索', cat: 'simple', damage: '1d4', type: '钝击', props: ['ranged'], range: '30/120' },
+        battleaxe: { name: '战斧', cat: 'martial', damage: '1d8', type: '挥砍', props: [], versatile: '1d10' },
+        flail: { name: '链枷', cat: 'martial', damage: '1d8', type: '钝击', props: [] },
+        glaive: { name: '长柄刀', cat: 'martial', damage: '1d10', type: '挥砍', props: ['heavy', 'reach', 'twoHanded'] },
+        greataxe: { name: '巨斧', cat: 'martial', damage: '1d12', type: '挥砍', props: ['heavy', 'twoHanded'] },
+        greatsword: { name: '巨剑', cat: 'martial', damage: '2d6', type: '挥砍', props: ['heavy', 'twoHanded'] },
+        halberd: { name: '戟', cat: 'martial', damage: '1d10', type: '挥砍', props: ['heavy', 'reach', 'twoHanded'] },
+        lance: { name: '骑枪', cat: 'martial', damage: '1d12', type: '穿刺', props: ['reach'] },
+        longsword: { name: '长剑', cat: 'martial', damage: '1d8', type: '挥砍', props: [], versatile: '1d10' },
+        maul: { name: '巨锤', cat: 'martial', damage: '2d6', type: '钝击', props: ['heavy', 'twoHanded'] },
+        morningstar: { name: '钉头锤', cat: 'martial', damage: '1d8', type: '穿刺', props: [] },
+        pike: { name: '长矛', cat: 'martial', damage: '1d10', type: '穿刺', props: ['heavy', 'reach', 'twoHanded'] },
+        rapier: { name: '刺剑', cat: 'martial', damage: '1d8', type: '穿刺', props: ['finesse'] },
+        scimitar: { name: '弯刀', cat: 'martial', damage: '1d6', type: '挥砍', props: ['finesse', 'light'] },
+        shortsword: { name: '短剑', cat: 'martial', damage: '1d6', type: '穿刺', props: ['finesse', 'light'] },
+        trident: { name: '三叉戟', cat: 'martial', damage: '1d6', type: '穿刺', props: ['thrown'], range: '20/60', versatile: '1d8' },
+        warPick: { name: '战镐', cat: 'martial', damage: '1d8', type: '穿刺', props: [] },
+        warhammer: { name: '战锤', cat: 'martial', damage: '1d8', type: '钝击', props: [], versatile: '1d10' },
+        whip: { name: '鞭', cat: 'martial', damage: '1d4', type: '挥砍', props: ['finesse', 'reach'] },
+        blowgun: { name: '吹箭筒', cat: 'martial', damage: '1', type: '穿刺', props: ['ranged', 'loading'], range: '25/100' },
+        handCrossbow: { name: '手弩', cat: 'martial', damage: '1d6', type: '穿刺', props: ['ranged', 'light', 'loading'], range: '30/120' },
+        heavyCrossbow: { name: '重弩', cat: 'martial', damage: '1d10', type: '穿刺', props: ['ranged', 'heavy', 'loading', 'twoHanded'], range: '100/400' },
+        longbow: { name: '长弓', cat: 'martial', damage: '1d8', type: '穿刺', props: ['ranged', 'heavy', 'twoHanded'], range: '150/600' },
     };
+
+    // 武器数据 = 通用数据 + 版本覆盖（2024 版部分武器数值有变）
+    const weaponData = (char, id) => WEAPONS[id] && { ...WEAPONS[id], ...(editions[char?.edition]?.weaponOverrides?.[id] || {}) };
+
+    // 子职业对数值的直接影响：勇士暴击范围，龙族血脉的生命与天生护甲
+    const CRIT_RANGE = { '勇士': [[3, 19], [15, 18]] };
+    const DRACONIC_AC = { '2014': (c) => 13 + abilityMod(c.abilities?.DEX), '2024': (c) => 10 + abilityMod(c.abilities?.DEX) + abilityMod(c.abilities?.CHA) };
 
     const CONDITIONS = ['目盲', '魅惑', '耳聋', '力竭', '恐慌', '擒抱', '失能', '隐形', '麻痹', '石化', '中毒', '倒地', '束缚', '震慑', '昏迷'];
 
@@ -172,19 +197,63 @@
         if (armor) ac = armor.base + (armor.type === 'light' ? dex : armor.type === 'medium' ? Math.min(dex, 2) : 0);
         else {
             const unarmored = classInfo(char)?.unarmored;
-            // 武僧无甲防御不能持盾
-            ac = unarmored && !(char.classId === 'monk' && char.shield)
-                ? 10 + unarmored.reduce((sum, ab) => sum + abilityMod(char.abilities?.[ab]), 0)
-                : 10 + dex;
+            // 武僧无甲防御不能持盾；龙族血脉有天生护甲
+            const options = [10 + dex];
+            if (unarmored && !(char.classId === 'monk' && char.shield)) options.push(10 + unarmored.reduce((sum, ab) => sum + abilityMod(char.abilities?.[ab]), 0));
+            if (char.subclass === '龙族血脉') options.push(DRACONIC_AC[char.edition]?.(char) || 0);
+            ac = Math.max(...options);
         }
         return ac + (char.shield ? 2 : 0);
     };
 
-    // 1 级取生命骰最大值，之后每级取平均值（向上取整）
+    // 1 级取生命骰最大值，之后每级取平均值（向上取整）；再加上种族、子职业的每级生命加值
     const maxHp = (char) => {
         const cls = classInfo(char); if (!cls) return 0;
         const level = clampLevel(char.level); const con = abilityMod(char.abilities?.CON);
-        return Math.max(level, cls.hitDie + con + (level - 1) * (cls.hitDie / 2 + 1 + con));
+        const perLevel = (raceOf(char)?.hpPerLevel || 0) + (subraceOf(char)?.hpPerLevel || 0) + (char.subclass === '龙族血脉' ? 1 : 0);
+        return Math.max(level, cls.hitDie + con + (level - 1) * (cls.hitDie / 2 + 1 + con) + perLevel * level);
+    };
+
+    // 按等级分段取值：steps([[1, 2], [3, 3]]) → 1~2 级为 2，3 级起为 3，低于首段为 0
+    const steps = (pairs) => (level) => pairs.reduce((v, [lv, n]) => (level >= lv ? n : v), 0);
+    const critRange = (char) => steps(CRIT_RANGE[char.subclass] || [])(clampLevel(char.level)) || 20;
+    const rageDamage = (char) => (char.classId === 'barbarian' ? steps([[1, 2], [9, 3], [16, 4]])(clampLevel(char.level)) : 0);
+    const sneakAttackDice = (char) => (char.classId === 'rogue' ? Math.ceil(clampLevel(char.level) / 2) : 0);
+
+    // 武器熟练：职业的武器类别或具体武器名，加上种族武器训练
+    const weaponProficient = (char, weaponId) => {
+        const w = weaponData(char, weaponId); if (!w) return false;
+        const list = [...(classInfo(char)?.weapons || []), ...(raceOf(char)?.weapons || []), ...(subraceOf(char)?.weapons || [])];
+        if (list.includes(w.name) || (w.cat === 'simple' && list.includes('简易武器'))) return true;
+        if (w.cat !== 'martial') return false;
+        return list.includes('军用武器')
+            || (list.includes('灵巧或轻型军用武器') && (w.props.includes('finesse') || w.props.includes('light')))
+            || (list.includes('轻型军用武器') && w.props.includes('light'));
+    };
+
+    // 职业与子职业特性：[{ level, name, desc, source }]，只列到当前等级
+    const classFeatures = (char) => {
+        const ed = edition(char.edition); const cls = classInfo(char); const level = clampLevel(char.level);
+        if (!cls) return [];
+        const desc = (name) => { const key = name.replace(/（.*?）/g, ''); return ed.featureDesc?.[key] ?? root.DND.FEATURE_DESC?.[key] ?? ''; };
+        const list = [];
+        const add = (table, source) => Object.entries(table || {}).forEach(([lv, names]) => {
+            if (+lv <= level) names.split('、').forEach(name => list.push({ level: +lv, name, desc: desc(name), source }));
+        });
+        add(ed.classFeatures?.[char.classId], cls.name);
+        if (char.subclass) add(ed.subclassFeatures?.[char.subclass], char.subclass);
+        return list.sort((a, b) => a.level - b.level);
+    };
+
+    // 职业资源：[{ id, name, max, used, left, recharge, shortRegain }]，max 为 99 表示不限次数
+    const classResources = (char) => {
+        const level = clampLevel(char.level);
+        return (edition(char.edition).resources?.[char.classId] || []).map(d => {
+            const max = typeof d.max === 'function' ? d.max(level, char) : d.max;
+            const recharge = typeof d.recharge === 'function' ? d.recharge(level) : d.recharge;
+            const used = Math.min(max, parseInt(char.resourcesUsed?.[d.id]) || 0);
+            return { ...d, max, recharge, used, left: max - used };
+        }).filter(r => r.max > 0);
     };
 
     // 返回 { 环阶: 数量 }
@@ -209,10 +278,11 @@
 
     // 武器攻击：灵巧武器取力量和敏捷中较高的，远程用敏捷
     const weaponAttack = (char, weaponId) => {
-        const w = WEAPONS[weaponId]; if (!w) return null;
+        const w = weaponData(char, weaponId); if (!w) return null;
         const str = abilityMod(char.abilities?.STR); const dex = abilityMod(char.abilities?.DEX);
         const mod = w.props.includes('ranged') ? dex : w.props.includes('finesse') ? Math.max(str, dex) : str;
-        return { name: w.name, toHit: mod + profBonus(char.level), damage: `${w.damage}${mod ? signed(mod) : ''}`, type: w.type, mastery: edition(char.edition).weaponMastery?.[weaponId] || null };
+        const proficient = weaponProficient(char, weaponId);
+        return { id: weaponId, name: w.name, toHit: mod + (proficient ? profBonus(char.level) : 0), proficient, damage: `${w.damage}${mod ? signed(mod) : ''}`, type: w.type, range: w.range || '', melee: !w.props.includes('ranged'), usesStr: mod === str && !w.props.includes('ranged'), finesseOrRanged: w.props.includes('finesse') || w.props.includes('ranged'), mastery: edition(char.edition).weaponMastery?.[weaponId] || null };
     };
 
     const initiativeMod = (char) => abilityMod(char.abilities?.DEX);
@@ -256,7 +326,8 @@
         skillProfs: [], expertise: [],
         hp: 0, maxHp: 0, tempHp: 0, hitDiceUsed: 0, armor: '', shield: false, acOverride: null,
         weapons: [], slotsUsed: {}, spells: '', features: '', inventory: '', gold: 0,
-        conditions: [], exhaustion: 0, deathSaves: { success: 0, fail: 0 },
+        conditions: [], exhaustion: 0, deathSaves: { success: 0, fail: 0 }, dead: false,
+        resourcesUsed: {}, raging: false, concentration: '',
         backstory: { appearance: '', personality: '', ideals: '', bonds: '', flaws: '', story: '' },
         history: [], badges: [],
     });
@@ -276,5 +347,5 @@
         return char;
     };
 
-    root.DND = { ABILITIES, SKILLS, ALL_SKILLS, CLASSES, ARMOR, WEAPONS, CONDITIONS, XP_TABLE, STANDARD_ARRAY, POINT_BUY, editions, edition, classInfo, signed, abilityMod, profBonus, levelFromXp, rollDice, d20Test, saveMod, skillMod, passivePerception, armorClass, maxHp, spellSlots, spellSaveDc, spellAttack, weaponAttack, initiativeMod, raceOf, subraceOf, backgroundOf, subclassLevel, pointBuyCost, finalAbilities, grantedSkills, skillChoices, newCharacter, normalizeCharacter };
+    root.DND = { ABILITIES, SKILLS, ALL_SKILLS, CLASSES, ARMOR, WEAPONS, CONDITIONS, XP_TABLE, STANDARD_ARRAY, POINT_BUY, editions, edition, classInfo, weaponData, signed, abilityMod, profBonus, levelFromXp, rollDice, d20Test, saveMod, skillMod, passivePerception, armorClass, maxHp, spellSlots, spellSaveDc, spellAttack, weaponAttack, weaponProficient, initiativeMod, steps, critRange, rageDamage, sneakAttackDice, classFeatures, classResources, raceOf, subraceOf, backgroundOf, subclassLevel, pointBuyCost, finalAbilities, grantedSkills, skillChoices, newCharacter, normalizeCharacter };
 })(typeof window !== 'undefined' ? window : globalThis);

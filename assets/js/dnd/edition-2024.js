@@ -10,13 +10,17 @@
         defaultSubclassLevel: 3,
         classOverrides: {
             fighter: { skills: ['acrobatics', 'animalHandling', 'athletics', 'history', 'insight', 'intimidation', 'persuasion', 'perception', 'survival'] },
-            wizard: { skills: ['arcana', 'history', 'insight', 'investigation', 'medicine', 'nature', 'religion'] },
+            wizard: { skills: ['arcana', 'history', 'insight', 'investigation', 'medicine', 'nature', 'religion'], weapons: ['简易武器'] },
+            sorcerer: { weapons: ['简易武器'] },
+            druid: { weapons: ['简易武器'] },
+            monk: { weapons: ['简易武器', '轻型军用武器'] },
+            rogue: { weapons: ['简易武器', '灵巧或轻型军用武器'] },
         },
         // sizes 有多个时由玩家选择
         races: {
             aasimar: { name: '阿斯莫', sizes: ['中型', '小型'], speed: 30, darkvision: 60, traits: ['天界抗性', '治愈之手', '持光者', '天界启示'] },
             dragonborn: { name: '龙裔', sizes: ['中型'], speed: 30, darkvision: 60, traits: ['龙族血统', '吐息武器', '伤害抗性', '龙翼飞行'] },
-            dwarf: { name: '矮人', sizes: ['中型'], speed: 30, darkvision: 120, traits: ['矮人韧性', '矮人坚韧', '石工知识'] },
+            dwarf: { name: '矮人', sizes: ['中型'], speed: 30, darkvision: 120, traits: ['矮人韧性', '矮人坚韧', '石工知识'], hpPerLevel: 1 },
             elf: { name: '精灵', sizes: ['中型'], speed: 30, darkvision: 60, skillChoice: 1, skillOptions: ['insight', 'perception', 'survival'], traits: ['精灵血系', '精类血统', '敏锐感官', '出神'] },
             gnome: { name: '侏儒', sizes: ['小型'], speed: 30, darkvision: 60, traits: ['侏儒狡黠', '侏儒血系'] },
             goliath: { name: '歌利亚', sizes: ['中型'], speed: 35, traits: ['巨人血统', '巨化', '强健体格'] },
@@ -33,12 +37,100 @@
             soldier: { name: '士兵', abilities: ['STR', 'DEX', 'CON'], skills: ['athletics', 'intimidation'], feat: '凶蛮打击者' },
             custom: { name: '自定义背景', abilityChoice: 3, skillChoice: 2 },
         },
+        weaponOverrides: {
+            trident: { damage: '1d8', versatile: '1d10' },
+            warPick: { versatile: '1d10' },
+            lance: { props: ['heavy', 'reach', 'twoHanded'] },
+        },
         weaponMastery: {
             club: '缓速', dagger: '迅击', handaxe: '烦扰', javelin: '缓速', mace: '削弱', quarterstaff: '掀翻', spear: '削弱',
             lightCrossbow: '缓速', shortbow: '烦扰', sling: '缓速', battleaxe: '掀翻', greataxe: '劈砍', greatsword: '擦伤',
             longsword: '削弱', rapier: '烦扰', scimitar: '迅击', shortsword: '烦扰', warhammer: '推离', longbow: '缓速',
+            greatclub: '推离', lightHammer: '迅击', sickle: '迅击', dart: '烦扰', flail: '削弱', glaive: '擦伤', halberd: '劈砍',
+            lance: '掀翻', maul: '掀翻', morningstar: '削弱', pike: '推离', trident: '掀翻', warPick: '削弱', whip: '缓速',
+            blowgun: '烦扰', handCrossbow: '烦扰', heavyCrossbow: '推离',
         },
         exhaustion: '每级力竭：d20 检定减去 2×力竭等级，速度减少 5×力竭等级 尺；达到 6 级死亡；长休后降低 1 级',
+        longRestHitDice: 'all',
+        // 各职业特性：{ 等级: '特性、特性' }，说明见 features.js
+        classFeatures: {
+            barbarian: { 1: '狂暴、无甲防御、武器专精', 2: '危险感知、鲁莽攻击', 3: '选择子职业、原初知识', 4: '属性值提升', 5: '额外攻击、快速移动', 7: '野性直觉、本能突袭', 8: '属性值提升', 9: '野蛮打击', 11: '坚韧狂暴', 12: '属性值提升', 13: '野蛮打击改进', 15: '持久狂暴', 16: '属性值提升', 17: '野蛮打击改进', 18: '不屈之力', 19: '史诗恩惠', 20: '原初斗士' },
+            bard: { 1: '诗人激励、施法', 2: '专精、万事通', 3: '选择子职业', 4: '属性值提升', 5: '激励之源', 7: '反迷惑', 8: '属性值提升', 9: '专精', 10: '魔法奥秘', 12: '属性值提升', 16: '属性值提升', 18: '卓越激励', 19: '史诗恩惠', 20: '力量之言' },
+            cleric: { 1: '施法、神圣使命', 2: '引导神力、神圣火花、驱散不死', 3: '选择子职业', 4: '属性值提升', 5: '灼烧不死', 7: '受祝打击', 8: '属性值提升', 10: '神圣干预', 12: '属性值提升', 14: '受祝打击改进', 16: '属性值提升', 19: '史诗恩惠', 20: '神圣干预改进' },
+            druid: { 1: '施法、德鲁伊语、原初秩序', 2: '野性变身、野性伙伴', 3: '选择子职业', 4: '属性值提升', 5: '野性复苏', 7: '元素之怒', 8: '属性值提升', 12: '属性值提升', 15: '元素之怒改进', 16: '属性值提升', 18: '野兽法术', 19: '史诗恩惠', 20: '大德鲁伊' },
+            fighter: { 1: '战斗风格、回气、武器专精', 2: '动作如潮、战术心智', 3: '选择子职业', 4: '属性值提升', 5: '额外攻击、战术转移', 6: '属性值提升', 8: '属性值提升', 9: '不屈、战术大师', 11: '额外攻击（三次攻击）', 12: '属性值提升', 13: '不屈（两次）、战术研究', 14: '属性值提升', 16: '属性值提升', 17: '动作如潮（两次）、不屈（三次）', 19: '史诗恩惠', 20: '额外攻击（四次攻击）' },
+            monk: { 1: '武艺、无甲防御', 2: '武僧专注、无甲移动、不可思议的代谢', 3: '选择子职业、偏转攻击', 4: '属性值提升、轻身坠', 5: '额外攻击、震慑拳', 6: '强化徒手攻击', 7: '反射闪避', 8: '属性值提升', 9: '杂技移动', 10: '强化专注、自我恢复', 12: '属性值提升', 13: '偏转能量', 14: '训练有素的生存者', 15: '完美专注', 16: '属性值提升', 18: '高等防御', 19: '史诗恩惠', 20: '身心合一' },
+            paladin: { 1: '圣疗、施法、武器专精', 2: '战斗风格、圣武士之击', 3: '引导神力、选择子职业', 4: '属性值提升', 5: '额外攻击、忠诚坐骑', 6: '守护灵光', 8: '属性值提升', 9: '斥退之敌', 10: '勇气灵光', 11: '光耀打击', 12: '属性值提升', 14: '恢复之触', 16: '属性值提升', 18: '灵光扩展', 19: '史诗恩惠' },
+            ranger: { 1: '施法、宿敌、武器专精', 2: '熟练探索者、战斗风格', 3: '选择子职业', 4: '属性值提升', 5: '额外攻击', 6: '迅捷行者', 8: '属性值提升', 9: '专精', 10: '坚韧', 12: '属性值提升', 13: '不懈猎手', 14: '自然面纱', 16: '属性值提升', 17: '精准猎手', 18: '野性感官', 19: '史诗恩惠', 20: '灭敌者' },
+            rogue: { 1: '专精、偷袭、盗贼黑话、武器专精', 2: '灵巧动作', 3: '选择子职业、稳定瞄准', 4: '属性值提升', 5: '狡诈打击、直觉闪避', 6: '专精', 7: '反射闪避、可靠才能', 8: '属性值提升', 10: '属性值提升', 11: '狡诈打击改进', 12: '属性值提升', 14: '致命打击', 15: '圆滑心智', 16: '属性值提升', 18: '飘忽不定', 19: '史诗恩惠', 20: '好运' },
+            sorcerer: { 1: '施法、天生术法', 2: '魔力泉源、超魔法', 3: '选择子职业', 4: '属性值提升', 5: '术法复苏', 7: '化身术法', 8: '属性值提升', 10: '超魔法', 12: '属性值提升', 16: '属性值提升', 17: '超魔法', 19: '史诗恩惠', 20: '奥术升华' },
+            warlock: { 1: '魔能祈唤、契约魔法', 2: '魔法诡计', 3: '选择子职业', 4: '属性值提升', 8: '属性值提升', 9: '联络宗主', 11: '秘法玄奥（6 环）', 12: '属性值提升', 13: '秘法玄奥（7 环）', 15: '秘法玄奥（8 环）', 16: '属性值提升', 17: '秘法玄奥（9 环）', 19: '史诗恩惠', 20: '秘法大师' },
+            wizard: { 1: '施法、仪式学者、奥术回想', 2: '学者', 3: '选择子职业', 4: '属性值提升', 5: '记忆法术', 8: '属性值提升', 12: '属性值提升', 16: '属性值提升', 18: '法术精通', 19: '史诗恩惠', 20: '招牌法术' },
+        },
+        subclassFeatures: {
+            '狂战士道途': { 3: '狂乱', 6: '无念狂暴', 10: '报复', 14: '威慑之姿' },
+            '逸闻学院': { 3: '额外熟练、刻薄言语', 6: '魔法发现', 14: '无双技艺' },
+            '生命领域': { 3: '生命门徒、生命领域法术、保全生命', 6: '神佑治疗者', 17: '至高治疗' },
+            '大地结社': { 3: '大地法术、大地之助', 6: '自然恢复', 10: '自然守护', 14: '自然庇护' },
+            '勇士': { 3: '精通重击、卓越运动员', 7: '额外战斗风格', 10: '英勇勇士', 15: '高等重击', 18: '幸存者' },
+            '散打宗': { 3: '散打技', 6: '全身之体', 11: '疾步', 17: '颤动掌' },
+            '奉献之誓': { 3: '誓言法术、神圣武器', 7: '奉献灵光', 15: '守护打击', 20: '神圣光环' },
+            '猎人': { 3: '猎人知识、猎人猎物', 7: '防御战术', 11: '高等猎人猎物', 15: '高等猎人防御' },
+            '盗贼': { 3: '快手、攀爬者', 9: '至高潜行', 13: '使用魔法装置', 17: '盗贼反射' },
+            '龙族血脉': { 3: '龙族韧性、龙族法术', 6: '元素亲和', 14: '龙翼', 18: '龙伴' },
+            '邪魔宗主': { 3: '黑暗祝福、宗主法术', 6: '黑暗者之运', 10: '邪魔抗性', 14: '投入地狱' },
+            '塑能学派': { 3: '塑能学者、强效戏法', 6: '塑造法术', 10: '强化塑能', 14: '超限施法' },
+        },
+        // 职业资源：shortRegain 表示短休只恢复这么多次，长休全部恢复
+        resources: (() => {
+            const { steps, abilityMod } = root.DND;
+            const chaMod = (lv, c) => Math.max(1, abilityMod(c.abilities?.CHA));
+            return {
+                barbarian: [{ id: 'rage', name: '狂暴', max: steps([[1, 2], [3, 3], [6, 4], [12, 5], [17, 6]]), recharge: 'long', shortRegain: 1 }],
+                bard: [{ id: 'inspiration', name: '诗人激励', max: chaMod, recharge: (lv) => (lv >= 5 ? 'short' : 'long') }],
+                cleric: [{ id: 'channel', name: '引导神力', max: steps([[2, 2], [6, 3], [18, 4]]), recharge: 'long', shortRegain: 1 }],
+                druid: [{ id: 'wildShape', name: '野性变身', max: steps([[2, 2], [6, 3], [17, 4]]), recharge: 'long', shortRegain: 1 }],
+                fighter: [
+                    { id: 'secondWind', name: '回气', max: steps([[1, 2], [4, 3], [10, 4]]), recharge: 'long', shortRegain: 1 },
+                    { id: 'actionSurge', name: '动作如潮', max: steps([[2, 1], [17, 2]]), recharge: 'short' },
+                    { id: 'indomitable', name: '不屈', max: steps([[9, 1], [13, 2], [17, 3]]), recharge: 'long' },
+                ],
+                monk: [
+                    { id: 'focus', name: '专注点', max: (lv) => (lv >= 2 ? lv : 0), recharge: 'short' },
+                    { id: 'metabolism', name: '不可思议的代谢', max: steps([[2, 1]]), recharge: 'long' },
+                ],
+                paladin: [
+                    { id: 'layOnHands', name: '圣疗池', max: (lv) => lv * 5, recharge: 'long' },
+                    { id: 'freeSmite', name: '免费至圣斩', max: steps([[2, 1]]), recharge: 'long' },
+                    { id: 'channel', name: '引导神力', max: steps([[3, 2], [11, 3]]), recharge: 'long', shortRegain: 1 },
+                ],
+                ranger: [{ id: 'favoredEnemy', name: '免费猎人印记', max: steps([[1, 2], [5, 3], [9, 4], [13, 5], [17, 6]]), recharge: 'long' }],
+                rogue: [{ id: 'strokeOfLuck', name: '好运', max: steps([[20, 1]]), recharge: 'short' }],
+                sorcerer: [
+                    { id: 'innateSorcery', name: '天生术法', max: 2, recharge: 'long' },
+                    { id: 'sorceryPoints', name: '术法点', max: (lv) => (lv >= 2 ? lv : 0), recharge: 'long' },
+                ],
+                warlock: [
+                    { id: 'magicalCunning', name: '魔法诡计', max: steps([[2, 1]]), recharge: 'long' },
+                    { id: 'contactPatron', name: '联络宗主', max: steps([[9, 1]]), recharge: 'long' },
+                    { id: 'arcanum', name: '秘法玄奥', max: steps([[11, 1], [13, 2], [15, 3], [17, 4]]), recharge: 'long' },
+                ],
+                wizard: [{ id: 'arcaneRecovery', name: '奥术回想', max: 1, recharge: 'long' }],
+            };
+        })(),
+        featureDesc: {
+            '宿敌': '始终准备猎人印记，每长休可免费施展若干次。',
+            '狂乱': '狂暴中使用鲁莽攻击时，第一次命中额外造成若干 d6 伤害（骰数等于狂暴伤害加值）。',
+            '无念狂暴': '狂暴时不会被魅惑或恐慌，进入狂暴时解除这两种状态。',
+            '神圣干预': '向神祈求干预，可不消耗法术位施展一个 5 环以下的牧师法术。',
+            '神圣干预改进': '神圣干预可施展祈愿术等高环法术。',
+            '大德鲁伊': '投先攻时若没有野性变身次数则恢复一次，并可把野性变身换成法术位。',
+            '灭敌者': '猎人印记的伤害骰改为 d10。',
+            '卓越激励': '投先攻时若诗人激励已用完，恢复两次。',
+            '金刚之魂': '所有豁免熟练，失败时可消耗专注点重骰。',
+            '幸存者': '死亡豁免掷出 18 以上即视为 20；生命不满一半时每回合开始回复生命。',
+            '秘法大师': '花 1 分钟恢复全部契约法术位，长休一次。',
+        },
         attribution: 'This work includes material from the System Reference Document 5.2 ("SRD 5.2") by Wizards of the Coast LLC, available at https://www.dndbeyond.com/srd. The SRD 5.2 is licensed under the Creative Commons Attribution 4.0 International License, available at https://creativecommons.org/licenses/by/4.0/legalcode.',
     };
 })(typeof window !== 'undefined' ? window : globalThis);
