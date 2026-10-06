@@ -643,23 +643,30 @@
             <div class="max-w-6xl mx-auto">
                 <!-- Section Navigation -->
                 <div class="flex justify-center mb-8">
-                    <div class="library-segmented flex bg-dark-900/50 p-1.5 rounded-2xl border border-dark-800 backdrop-blur-sm relative">
+                    <div class="library-segmented grid grid-cols-3 bg-dark-900/50 p-1.5 rounded-2xl border border-dark-800 backdrop-blur-sm relative">
                         <!-- Sliding Background -->
                         <div class="library-index-slider absolute top-1.5 bottom-1.5 rounded-xl transition-all duration-300 ease-out bg-dark-800 border"
-                             :class="libraryState.currentSection === 'reading' ? 'left-1.5 w-[calc(50%-6px)] border-purple-500/30 shadow-[0_0_15px_rgba(168,85,247,0.15)]' : 'left-[50%] w-[calc(50%-6px)] border-red-500/30 shadow-[0_0_15px_rgba(220,38,38,0.15)]'">
+                             :class="{ reading: 'left-1.5 border-purple-500/30 shadow-[0_0_15px_rgba(168,85,247,0.15)]', restricted: 'left-[33.333%] border-red-500/30 shadow-[0_0_15px_rgba(220,38,38,0.15)]', external: 'left-[66.666%] border-amber-500/30 shadow-[0_0_15px_rgba(245,158,11,0.15)]' }[libraryState.currentSection]"
+                             style="width: calc(33.333% - 4px)">
                         </div>
 
                         <button @click="libraryState.currentSection = 'reading'; fetchLibraryModules()"
-                                class="relative z-10 px-8 py-2.5 rounded-xl font-bold transition-colors flex items-center gap-2"
+                                class="relative z-10 px-4 sm:px-8 py-2.5 rounded-xl font-bold transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
                                 :class="libraryState.currentSection === 'reading' ? 'text-purple-400' : 'text-slate-500 hover:text-slate-300'">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
                             阅览室
                         </button>
                         <button @click="libraryState.currentSection = 'restricted'; fetchLibraryModules()"
-                                class="relative z-10 px-8 py-2.5 rounded-xl font-bold transition-colors flex items-center gap-2"
+                                class="relative z-10 px-4 sm:px-8 py-2.5 rounded-xl font-bold transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
                                 :class="libraryState.currentSection === 'restricted' ? 'text-red-400' : 'text-slate-500 hover:text-slate-300'">
                             禁书区
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                        </button>
+                        <button @click="libraryState.currentSection = 'external'; fetchLibraryModules()"
+                                class="relative z-10 px-4 sm:px-8 py-2.5 rounded-xl font-bold transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
+                                :class="libraryState.currentSection === 'external' ? 'text-amber-400' : 'text-slate-500 hover:text-slate-300'">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0zM3.6 9h16.8M3.6 15h16.8M12 3a15 15 0 010 18M12 3a15 15 0 000 18"></path></svg>
+                            找模组
                         </button>
                     </div>
                 </div>
@@ -668,13 +675,14 @@
                 <div class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 animate-fade-in" :key="libraryState.currentSection">
                     <div class="text-slate-500 text-sm font-serif italic hidden md:block">
                         <template v-if="libraryState.currentSection === 'reading'">“知识是危险的，但无知更加致命。”</template>
-                        <template v-else>“有些秘密注定不该被揭开...”</template>
+                        <template v-else-if="libraryState.currentSection === 'restricted'">“有些秘密注定不该被揭开...”</template>
+                        <template v-else>模组来自魔都 TRPG 中文模组站，下载后用「贡献藏书」导入即可开团</template>
                     </div>
                     
                     <div class="flex gap-3 w-full md:w-auto">
                         <div class="relative flex-1 md:w-72">
                             <input v-model="libraryState.searchQuery" @keyup.enter="fetchLibraryModules"
-                                   :placeholder="libraryState.currentSection === 'reading' ? '搜索公开典籍...' : '搜索秘传典籍...'"
+                                   :placeholder="{ reading: '搜索公开典籍...', restricted: '搜索秘传典籍...', external: '搜索 DND 模组名...' }[libraryState.currentSection]"
                                    class="w-full bg-dark-900 border border-dark-700 rounded-lg px-4 py-2.5 text-sm text-slate-300 outline-none transition-colors"
                                    :class="libraryState.currentSection === 'reading' ? 'focus:border-purple-500' : 'focus:border-red-500'">
                             <button @click="fetchLibraryModules" aria-label="搜索藏书" class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 transition-colors"
@@ -688,13 +696,48 @@
                             贡献藏书
                         </button>
                         
+                        <template v-else-if="libraryState.currentSection === 'external'">
+                            <a v-for="site in forumSites" :key="site.url" :href="site.url" target="_blank" rel="noopener" :title="site.desc" class="px-4 py-2.5 bg-amber-900/20 text-amber-400 border border-amber-500/40 rounded-lg hover:bg-amber-900/40 font-bold text-sm whitespace-nowrap transition-colors">{{ site.name }}</a>
+                        </template>
                         <button v-else @click="libraryState.showAlchemyTable = true" class="px-5 py-2.5 bg-red-900/30 text-red-400 border border-red-500/50 shadow-[0_0_15px_rgba(220,38,38,0.2)] rounded-lg hover:bg-red-900/50 font-bold text-sm flex items-center gap-2 whitespace-nowrap transition-all hover:scale-105 active:scale-95">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
                             扎克托的炼金写字台
                         </button>
                     </div>
                 </div>
+                <!-- 外部模组（魔都模组站） -->
+                <template v-if="libraryState.currentSection === 'external'">
+                    <div v-if="libraryState.loading" class="text-center py-20 text-amber-400 animate-pulse">正在翻找模组...</div>
+                    <div v-else-if="!external.list.length" class="text-center py-20 border border-dashed border-dark-700 rounded bg-dark-900/30 text-slate-500 font-serif italic">没有找到相关模组</div>
+                    <template v-else>
+                        <div class="text-xs text-slate-500 mb-3">共 {{ external.total }} 个 DND 模组</div>
+                        <div class="library-module-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            <div v-for="m in external.list" :key="m.keyId" class="library-module-card bg-dark-900 border border-dark-700 hover:border-amber-500/50 rounded-lg overflow-hidden flex flex-col transition-colors">
+                                <div class="p-5 flex-1">
+                                    <div class="flex items-center gap-2 mb-1 text-[10px]">
+                                        <span class="px-1.5 py-0.5 rounded bg-amber-900/30 text-amber-400 border border-amber-500/30 font-bold">{{ m.original ? '原创' : '搬运' }}</span>
+                                        <span class="text-slate-600">{{ m.releaseDate }}</span>
+                                    </div>
+                                    <h3 class="text-lg font-bold text-slate-200 font-serif line-clamp-1" :title="m.title">{{ m.title }}</h3>
+                                    <div class="flex flex-wrap gap-x-3 gap-y-1 my-2 text-xs text-slate-500">
+                                        <span>{{ m.article || '佚名' }}</span>
+                                        <span v-if="m.freeLevel">{{ m.freeLevel }} 级</span>
+                                        <span v-if="m.minAmount">{{ m.minAmount }}-{{ m.maxAmount || '?' }} 人</span>
+                                        <span v-if="m.minDuration">约 {{ m.minDuration }}-{{ m.maxDuration || '?' }} 小时</span>
+                                    </div>
+                                    <p class="text-sm text-slate-400 line-clamp-4 leading-relaxed">{{ m.summary || '暂无简介...' }}</p>
+                                </div>
+                                <div class="p-4 border-t border-dark-800 bg-dark-950/30 flex gap-2 text-xs font-bold">
+                                    <a :href="m.page" target="_blank" rel="noopener" class="flex-1 py-2 text-center rounded border border-amber-500/30 text-amber-400 hover:bg-amber-900/30">查看详情</a>
+                                    <a v-if="m.url" :href="m.url" target="_blank" rel="noopener noreferrer" class="flex-1 py-2 text-center rounded border border-mystic-green/30 text-mystic-green hover:bg-mystic-green/10">下载模组</a>
+                                </div>
+                            </div>
+                        </div>
+                        <button v-if="external.page < external.totalPages" @click="fetchExternalModules(true)" :disabled="external.loadingMore" class="mt-6 w-full py-3 rounded-lg border border-dark-700 text-slate-400 hover:text-amber-400 hover:border-amber-500/40 text-sm disabled:opacity-50">{{ external.loadingMore ? '加载中...' : '加载更多' }}</button>
+                    </template>
+                </template>
                 <!-- Module List -->
+                <template v-else>
                 <div v-if="libraryState.loading" class="text-center py-20 text-purple-400 animate-pulse">
                     正在从书架上取书...
                 </div>
@@ -776,6 +819,7 @@
                         </div>
                     </div>
                 </div>
+                </template>
             </div>
         </div>
 
@@ -1205,7 +1249,39 @@
                 };
 
                 // Library Functions
+                // 外部找模组：魔都 TRPG 中文模组站的公开列表（只取 DND 类，不保留作者联系方式）
+                const CNMODS = 'https://www.cnmods.net';
+                const forumSites = [
+                    { name: '魔都模组站', url: `${CNMODS}/web/`, desc: '中文 TRPG 模组站，可免费下载' },
+                    { name: '纯美苹果园', url: 'https://www.goddessfantasy.net/', desc: '中文跑团论坛，有 DND 资料与模组译文，需要注册登录' },
+                ];
+                const external = reactive({ list: [], page: 0, totalPages: 0, total: 0, loadingMore: false });
+                const htmlToText = (html) => new DOMParser().parseFromString(String(html || ''), 'text/html').body.textContent.replace(/\s+/g, ' ').trim();
+                const fetchExternalModules = async (more = false) => {
+                    if (more) external.loadingMore = true; else libraryState.loading = true;
+                    try {
+                        const page = more ? external.page + 1 : 1;
+                        const qs = new URLSearchParams({ page, pageSize: 12, moduleType: 'DND', title: libraryState.searchQuery.trim() });
+                        const res = await fetch(`${CNMODS}/prod-api/index/moduleListPage.do?${qs}`);
+                        const data = (await res.json())?.data || {};
+                        const items = (data.list || []).map(m => ({
+                            keyId: m.keyId, title: m.title, article: m.article, freeLevel: m.freeLevel, original: m.original, releaseDate: m.releaseDate,
+                            minAmount: m.minAmount, maxAmount: m.maxAmount, minDuration: m.minDuration, maxDuration: m.maxDuration,
+                            summary: htmlToText(m.opinion), page: `${CNMODS}/web/moduleDetail?keyId=${encodeURIComponent(m.keyId)}`,
+                            url: /^https?:\/\//i.test(m.url || '') ? m.url : '',
+                        }));
+                        external.list = more ? [...external.list, ...items] : items;
+                        Object.assign(external, { page, totalPages: data.totalPages || 0, total: data.totalElements || 0 });
+                    } catch (err) {
+                        console.error('External modules error:', err);
+                        showToast('暂时连不上魔都模组站，请稍后再试', 'error');
+                    } finally {
+                        libraryState.loading = false; external.loadingMore = false;
+                    }
+                };
+
                 const fetchLibraryModules = async () => {
+                    if (libraryState.currentSection === 'external') return fetchExternalModules();
                     libraryState.loading = true;
                     try {
                         const ownerToken = libraryState.currentSection === 'restricted' ? ensureLibraryIdentity() : '';
@@ -1570,7 +1646,7 @@
 
                 return {
                     user, libraryState, toasts,
-                    fetchLibraryModules, uploadToLibrary, handleLibraryFileUpload, handleAlchemyFileUpload, useLibraryModule,
+                    fetchLibraryModules, forumSites, external, fetchExternalModules, uploadToLibrary, handleLibraryFileUpload, handleAlchemyFileUpload, useLibraryModule,
                     adaptNovelToModule, exportModuleToWord, copyToClipboard, generateModuleSummary,
                     uploadAlchemyResult, exportAlchemyResult, deleteModule, confirmDelete, cancelDelete,
                     showDeleteModal, moduleToDelete

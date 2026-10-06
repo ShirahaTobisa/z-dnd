@@ -2107,10 +2107,17 @@
                                 </div>
                                 <!-- Player Preview (Top Bar) -->
                                 <div v-if="cocState.mode === 'multi' && multiplayerState.members.length > 0" class="hidden md:flex items-center -space-x-2 ml-6 border-l border-dark-700 pl-6 py-1">
-                                    <div v-for="member in multiplayerState.members" :key="member.id" class="w-8 h-8 rounded-full border-2 bg-dark-800 overflow-hidden relative group cursor-help transition-all z-0 hover:z-10 hover:scale-110" :class="member.isHost ? 'border-mystic-gold shadow-[0_0_8px_rgba(212,175,55,0.6)] z-10' : 'border-slate-400'" :title="member.name + (member.isHost ? ' (房主)' : '')">
-                                        <img v-if="member.avatar" :src="member.avatar" :alt="`${member.name || '参与者'}的头像`" class="w-full h-full object-cover">
-                                        <div v-else class="w-full h-full flex items-center justify-center text-xs font-bold text-slate-500">{{ member.name.charAt(0) }}</div>
-                                        <div class="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-dark-950" :class="member.isReady || member.isHost ? 'bg-mystic-green' : 'bg-slate-500'"></div>
+                                    <div v-for="member in multiplayerState.members" :key="member.id" class="relative" @click="toggleMemberMenu(member, $event)">
+                                    <div class="w-8 h-8 rounded-full border-2 bg-dark-800 overflow-hidden relative group cursor-help transition-all z-0 hover:z-10 hover:scale-110" :class="member.isHost ? 'border-mystic-gold shadow-[0_0_8px_rgba(212,175,55,0.6)] z-10' : member.isSpectator ? 'border-slate-600 border-dashed' : 'border-slate-400'" :title="member.name + (member.isHost ? ' (房主)' : '') + (member.isSpectator ? ' (旁观)' : '') + (member.isOffline ? ' (离线)' : '')">
+                                        <img v-if="member.avatar" :src="member.avatar" :alt="`${member.name || '参与者'}的头像`" class="w-full h-full object-cover" :class="{ 'grayscale opacity-50': member.isOffline }">
+                                        <div v-else class="w-full h-full flex items-center justify-center text-xs font-bold text-slate-500" :class="{ 'opacity-50': member.isOffline }">{{ member.name.charAt(0) }}</div>
+                                        <div class="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-dark-950" :class="member.isOffline ? 'bg-red-500' : member.isReady || member.isHost ? 'bg-mystic-green' : 'bg-slate-500'"></div>
+                                    </div>
+                                    <!-- 房主在对局中管理成员 -->
+                                    <teleport to="body"><div v-if="memberMenu?.id === member.id" class="fixed z-[4000] w-28 p-1 rounded-lg bg-dark-900 border border-dark-600 shadow-2xl flex flex-col text-xs" :style="{ left: memberMenu.x + 'px', top: memberMenu.y + 'px' }">
+                                        <button @click="memberMenu = null; setSpectator(member.id, !member.isSpectator)" class="px-3 py-2 text-left text-slate-300 hover:bg-dark-700 rounded">{{ member.isSpectator ? '恢复为玩家' : '移入旁观' }}</button>
+                                        <button @click="memberMenu = null; kickPlayer(member.id)" class="px-3 py-2 text-left text-red-400 hover:bg-red-950/40 rounded">踢出</button>
+                                    </div></teleport>
                                     </div>
                                     <div v-if="multiplayerState.members.length > 5" class="w-8 h-8 rounded-full border-2 border-slate-400 bg-dark-800 flex items-center justify-center text-[10px] text-slate-400 font-bold">+{{ multiplayerState.members.length - 5 }}</div>
                                 </div>
@@ -2345,6 +2352,10 @@
 
                             <!-- Sidebar Info (Desktop & Mobile) -->
                             <div :class="['app-right-sidebar fixed inset-y-0 right-0 z-30 w-72 bg-dark-900 border-l border-dark-800 transform transition-transform duration-300 md:relative md:translate-x-0 flex flex-col shadow-2xl md:shadow-none overflow-y-auto safe-pb', showMobileRightSidebar ? 'translate-x-0' : 'translate-x-full']">
+                                <div v-if="cocState.mode === 'multi' && multiplayerState.isSpectator" class="px-5 pt-4 flex flex-wrap gap-1.5">
+                                    <div class="w-full text-[10px] text-slate-500">👁 旁观中，点名字查看角色卡</div>
+                                    <button v-for="(inv, i) in cocState.investigators" :key="i" @click="cocState.activeInvestigatorIndex = i" class="px-2 py-0.5 rounded border text-xs" :class="cocState.activeInvestigatorIndex === i ? 'border-mystic-gold text-mystic-gold' : 'border-dark-700 text-slate-400 hover:text-slate-200'">{{ inv.name }}</button>
+                                </div>
                                 <div v-if="cocState.activeInvestigatorIndex !== -1 && cocState.investigators[cocState.activeInvestigatorIndex]" class="p-5 space-y-6">
                                     <!-- 头像 & 基础信息 -->
                                     <div class="flex items-center gap-4 pb-4 border-b border-dark-800">
@@ -2524,7 +2535,7 @@
                             </div>
 
                             <div class="max-w-4xl mx-auto flex gap-3">
-                                <textarea v-model="cocInput" ref="cocInputRef" @input="handleInput" @keydown.enter.prevent="sendCocMessage" @keydown.esc="showMentionList = false" :placeholder="isRoundLocked ? '本轮已行动，等待队友...' : '你的行动...'" :disabled="isRoundLocked" class="flex-1 bg-dark-800 rounded-lg px-4 py-3 resize-none border border-dark-700 focus:ring-1 focus:ring-mystic-gold focus:border-mystic-gold focus:bg-dark-900 text-slate-200 placeholder-slate-600 transition-all h-[56px] custom-scrollbar disabled:opacity-50 disabled:cursor-not-allowed"></textarea>
+                                <textarea v-model="cocInput" ref="cocInputRef" @input="handleInput" @keydown.enter.prevent="sendCocMessage" @keydown.esc="showMentionList = false" :placeholder="multiplayerState.isSpectator && cocState.mode === 'multi' ? '旁观中，不能发言' : isRoundLocked ? '本轮已行动，等待队友...' : '你的行动...'" :disabled="isRoundLocked" class="flex-1 bg-dark-800 rounded-lg px-4 py-3 resize-none border border-dark-700 focus:ring-1 focus:ring-mystic-gold focus:border-mystic-gold focus:bg-dark-900 text-slate-200 placeholder-slate-600 transition-all h-[56px] custom-scrollbar disabled:opacity-50 disabled:cursor-not-allowed"></textarea>
                                 <button @click="sendCocMessage" aria-label="发送消息" :disabled="!cocInput.trim() || isGenerating || isRoundLocked" class="w-[56px] h-[56px] bg-dark-800 hover:bg-mystic-gold hover:text-dark-950 text-mystic-gold border border-mystic-gold/50 rounded-lg flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-lg group"><svg class="w-6 h-6 transform rotate-90 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg></button>
                             </div>
                         </div>
@@ -2571,7 +2582,11 @@
                             <input v-model="joinRoomId" placeholder="输入 Room ID..." class="w-full bg-dark-950 border border-dark-700 rounded-lg px-4 py-3 text-slate-200 focus:border-mystic-green focus:ring-1 focus:ring-mystic-green/50 outline-none transition-all font-mono text-center tracking-widest text-lg">
                         </div>
                         
-                        <button @click="joinRoom(joinRoomId)" :disabled="!joinRoomId" class="w-full py-3 bg-dark-800 hover:bg-mystic-green hover:text-dark-950 text-mystic-green border border-mystic-green/30 rounded-lg font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed uppercase tracking-widest shadow-lg">加入房间</button>
+                        <label class="flex items-center gap-2 cursor-pointer select-none text-xs text-slate-400">
+                            <input type="checkbox" v-model="joinAsSpectator" class="checkbox checkbox-xs">
+                            以旁观者身份加入（已开局的房间进入后自动旁观）
+                        </label>
+                        <button @click="joinRoom(joinRoomId, false, joinAsSpectator)" :disabled="!joinRoomId" class="w-full py-3 bg-dark-800 hover:bg-mystic-green hover:text-dark-950 text-mystic-green border border-mystic-green/30 rounded-lg font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed uppercase tracking-widest shadow-lg">加入房间</button>
                         
                         <div class="relative flex items-center py-2">
                             <div class="flex-grow border-t border-dark-700"></div>
@@ -2715,17 +2730,28 @@
                     <div v-if="cocState.mode === 'multi'" class="glass-panel p-6 rounded-lg">
                         <h3 class="font-bold text-slate-200 mb-4 flex items-center font-serif text-lg"><span class="w-1 h-6 bg-blue-500 mr-3"></span> 小队状态</h3>
                         <div class="space-y-2">
-                            <div v-for="member in multiplayerState.members" :key="member.id" class="flex items-center justify-between p-3 bg-dark-800/50 rounded border border-dark-700">
-                                <div class="flex items-center gap-3">
+                            <div v-for="member in multiplayerState.members" :key="member.id" class="flex items-center justify-between gap-2 p-3 bg-dark-800/50 rounded border border-dark-700" :class="{ 'opacity-60': member.isOffline }">
+                                <div class="flex items-center gap-3 flex-wrap">
                                     <div class="w-8 h-8 rounded bg-dark-700 flex items-center justify-center font-bold text-xs text-slate-500">{{ member.name.charAt(0) }}</div>
                                     <span class="font-serif text-slate-300">{{ member.name }}</span>
                                     <span v-if="member.isHost" class="text-[10px] bg-mystic-gold/10 text-mystic-gold border border-mystic-gold/20 px-2 py-0.5 rounded uppercase">房主</span>
+                                    <span v-if="member.isSpectator" class="text-[10px] text-slate-400 border border-slate-600/40 px-2 py-0.5 rounded">👁 旁观</span>
+                                    <span v-if="member.isOffline" class="text-[10px] text-red-400 border border-red-800/40 px-2 py-0.5 rounded">离线</span>
                                 </div>
-                                <div class="flex items-center gap-2">
+                                <div class="flex items-center gap-2 flex-wrap justify-end">
+                                    <template v-if="multiplayerState.isHost && !member.isHost">
+                                        <button v-if="!member.isSpectator" @click="setSpectator(member.id, true)" class="text-[10px] text-slate-300 border border-slate-600/40 px-2 py-1 rounded hover:bg-slate-700">移入旁观</button>
+                                        <button v-else @click="setSpectator(member.id, false)" class="text-[10px] text-mystic-green border border-mystic-green/30 px-2 py-1 rounded hover:bg-mystic-green/20">恢复为玩家</button>
+                                        <button @click="kickPlayer(member.id)" class="text-[10px] text-red-400 border border-red-700/40 px-2 py-1 rounded hover:bg-red-900/40">踢出</button>
+                                    </template>
                                     <span v-if="member.isReady" class="text-xs text-mystic-green font-bold flex items-center gap-1"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> 已准备</span>
-                                    <span v-else class="text-xs text-slate-600 font-mono">准备中...</span>
+                                    <span v-else-if="!member.isSpectator" class="text-xs text-slate-600 font-mono">准备中...</span>
                                 </div>
                             </div>
+                        </div>
+                        <div v-if="multiplayerState.isHost && multiplayerState.kickedMembers.length" class="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-400">
+                            <span class="text-[10px] text-red-400/80">已踢出：</span>
+                            <span v-for="k in multiplayerState.kickedMembers" :key="k.id" class="border border-dark-700 rounded px-2 py-1">{{ k.name }} <button @click="unkickMember(k.id)" class="text-mystic-green hover:underline">取消</button></span>
                         </div>
                     </div>
 
@@ -5359,7 +5385,7 @@
                 const getCotContent = (text) => { const s = ensureString(text); if (!s) return ''; const match = s.match(/<cot>([\s\S]*?)(?:<\/cot>|<cot>|$)/); return match ? match[1] : (s.includes('<cot>') ? s.split('<cot>')[1] || '' : ''); };
                 const removeCot = (text) => { const s = ensureString(text); if (!s) return ''; let clean = s.replace(/<cot>[\s\S]*?(?:<\/cot>|<cot>)/g, '').trim(); if (clean.includes('<cot>')) clean = clean.split('<cot>')[0].trim(); return clean; };
                 const toggleCot = async (index) => { if (cocState.mode === 'multi' && !multiplayerState.isHost && !multiplayerState.cotAuthorizedUsers.includes(multiplayerState.myId || user.uuid)) { if (await showConfirm('您没有权限查看思维链 (CoT)。是否向房主申请权限？', '申请权限')) requestCotAccess(); return; } const msg = cocState.log[index]; if (msg) msg.showCot = !msg.showCot; };
-                const requestCotAccess = () => { if (!multiplayerState.inRoom) return; broadcastMessage({ type: 'request_cot_access', userId: multiplayerState.myId || user.uuid, userName: user.name }); showToast('已发送权限申请', 'info'); };
+                const requestCotAccess = () => { if (!multiplayerState.inRoom || multiplayerState.isSpectator) return; broadcastMessage({ type: 'request_cot_access', userId: multiplayerState.myId || user.uuid, userName: user.name }); showToast('已发送权限申请', 'info'); };
                 const saveApiPreset = () => {
                     if (!settings.customApiUrl) return showToast('请输入 API 地址', 'warning');
                     const name = prompt('为当前配置命名 (例如: DeepSeek-V3):');
@@ -5460,6 +5486,7 @@
                 const isRoundLocked = Vue.computed(() => {
                     if (isGenerating.value) return true;
                     if (cocState.mode === 'multi') {
+                        if (multiplayerState.isSpectator) return true;
                         return multiplayerState.roundActionIds.includes(multiplayerState.myId || user.uuid);
                     }
                     if (cocState.mode === 'single' && hasAiTeammates.value) {
@@ -5472,14 +5499,20 @@
                 const handleInput = (e) => { const val = e.target.value; const cursor = e.target.selectionStart; const lastAt = val.lastIndexOf('@', cursor - 1); if (lastAt !== -1 && (lastAt === 0 || val[lastAt - 1] === ' ' || val[lastAt - 1] === '\n')) { const query = val.substring(lastAt + 1, cursor); if (!query.includes(' ')) { mentionQuery.value = query; showMentionList.value = true; return; } } showMentionList.value = false; };
                 const selectMention = (candidate) => { const val = cocInput.value; const cursor = cocInputRef.value.selectionStart; const lastAt = val.lastIndexOf('@', cursor - 1); if (lastAt !== -1) { const before = val.substring(0, lastAt); const after = val.substring(cursor); cocInput.value = `${before}@${candidate.name} ${after}`; showMentionList.value = false; nextTick(() => { cocInputRef.value.focus(); const newCursorPos = lastAt + 1 + candidate.name.length + 1; cocInputRef.value.setSelectionRange(newCursorPos, newCursorPos); }); } };
 
-                const multiplayerState = reactive({ isConnected: false, inRoom: false, roomId: null, hostToken: '', myId: null, isHost: false, hostAuthorizationFailed: false, members: [], turnStatus: {}, skipStatus: {}, isReady: false, assignments: {}, turnIndex: 0, roundActionIds: [], cotAuthorizedUsers: [], syncReceived: false });
+                const multiplayerState = reactive({ isConnected: false, inRoom: false, roomId: null, hostToken: '', myId: null, isHost: false, hostAuthorizationFailed: false, members: [], turnStatus: {}, skipStatus: {}, isReady: false, assignments: {}, turnIndex: 0, roundActionIds: [], cotAuthorizedUsers: [], syncReceived: false, isSpectator: false, kickedMembers: [] });
                 let joinRetryInterval = null;
                 let joinRetryAttempts = 0;
                 let roomPollTimer = null;
                 let roomLastMessageId = 0;
                 let roomPollInFlight = false;
                 let lastRoomErrorAt = 0;
-                const friends = ref([]); const friendRequests = ref([]); const friendInput = ref(''); const showJoinInput = ref(false); const joinRoomId = ref(''); const savedGames = ref([]);
+                const friends = ref([]); const friendRequests = ref([]); const friendInput = ref(''); const showJoinInput = ref(false); const joinRoomId = ref(''); const joinAsSpectator = ref(false); const memberMenu = ref(null);
+                // 房主点成员头像弹出管理菜单（头部栏会裁掉溢出内容，所以菜单按页面定位）
+                const toggleMemberMenu = (member, e) => {
+                    if (!multiplayerState.isHost || member.isHost || memberMenu.value?.id === member.id) return (memberMenu.value = null);
+                    const r = e.currentTarget.getBoundingClientRect();
+                    memberMenu.value = { id: member.id, x: r.left, y: r.bottom + 4 };
+                }; const savedGames = ref([]);
                 const savesFilter = ref('all');
                 const isSavesEditing = ref(false);
                 const folderOrder = ref([]); // 记录手动排序顺序
@@ -6225,10 +6258,11 @@ const handleAuth = async () => {
 
                 const allPlayersReady = Vue.computed(() => {
                     if (cocState.mode !== 'multi') return true;
-                    // 必须至少有 2 名真人玩家
-                    if (multiplayerState.members.length < 2) return false;
-                    // 所有在场成员必须已准备（房主除外）
-                    const membersReady = multiplayerState.members.every(m => m.isReady || m.isHost);
+                    // 必须至少有 2 名真人玩家（旁观者不算）
+                    const players = playingMembers();
+                    if (players.length < 2) return false;
+                    // 所有玩家必须已准备（房主除外）
+                    const membersReady = players.every(m => m.isReady || m.isHost);
                     if (!membersReady) return false;
                     // 必须至少有一个角色被分配（给真人或AI）
                     const hasAssignments = Object.keys(multiplayerState.assignments).length > 0;
@@ -6348,7 +6382,9 @@ ${buildInvestigatorProfile(inv)}
                             if (uid.startsWith('ai_')) participants.push(uid);
                         });
                     } else {
-                        participants = [...new Set(Object.values(multiplayerState.assignments))];
+                        // 旁观者和离线成员不参与回合判定，免得一桌人干等
+                        const away = multiplayerState.members.filter(m => m.isSpectator || m.isOffline).map(m => m.id);
+                        participants = [...new Set(Object.values(multiplayerState.assignments))].filter(uid => !away.includes(uid));
                         // 房主必须参与回合完成判定
                         const host = multiplayerState.members.find(m => m.isHost);
                         if (host && !participants.includes(host.id)) {
@@ -6813,6 +6849,7 @@ ${buildInvestigatorProfile(inv)}
                 };
                 const deleteInvestigator = async (index) => { if(await showConfirm('删除此冒险者？', '删除角色')) { cocState.investigators.splice(index, 1); if(cocState.activeInvestigatorIndex >= index) cocState.activeInvestigatorIndex = -1; if (cocState.mode === 'multi' && multiplayerState.isHost) { broadcastMessage({ type: 'sync_investigators', investigators: cocState.investigators }); multiplayerState.assignments = {}; broadcastMessage({ type: 'sync_assignments', assignments: {} }); } saveData(); } };
                 const toggleReady = () => {
+                    if (multiplayerState.isSpectator) return showToast('旁观中不需要准备', 'warning');
                     if (!multiplayerState.isReady && cocState.gameState === 'preparing' && cocState.activeInvestigatorIndex === -1) return showToast('请先选择一名冒险者', 'warning');
                     multiplayerState.isReady = !multiplayerState.isReady;
                     // 发送准备状态更新广播
@@ -7052,8 +7089,8 @@ ${chunkLogs}
                 const startCocGame = () => {
                     if (!cocState.module || cocState.investigators.length === 0) return showToast('请先导入模组和冒险者', 'warning');
                     if (cocState.mode === 'multi') {
-                        if (multiplayerState.members.length < 2) return showToast('多人模式至少需要 2 名真人玩家。如果只有您一人，请切换至单人模式', 'warning');
-                        if (!multiplayerState.members.every(m => m.isReady || m.isHost)) return showToast('等待其他玩家准备就绪', 'warning');
+                        if (playingMembers().length < 2) return showToast('多人模式至少需要 2 名真人玩家（旁观者不算）。如果只有您一人，请切换至单人模式', 'warning');
+                        if (!playingMembers().every(m => m.isReady || m.isHost)) return showToast('等待其他玩家准备就绪', 'warning');
                         if (Object.keys(multiplayerState.assignments).length === 0) return showToast('请先为角色分配玩家', 'warning');
                     } else {
                         if (cocState.activeInvestigatorIndex === -1) cocState.activeInvestigatorIndex = 0;
@@ -7245,6 +7282,7 @@ ${buildInvestigatorProfile(inv)}
                 };
 
                 const handleInvestigatorClick = (index) => {
+                    if (cocState.mode === 'multi' && multiplayerState.isSpectator) return showToast('旁观中不能选择角色', 'warning');
                     // 如果正在游戏中，禁止切换角色（除非是房主在管理 AI）
                     if (cocState.gameState === 'playing') {
                         if (cocState.mode === 'multi') {
@@ -7309,7 +7347,7 @@ ${buildInvestigatorProfile(inv)}
                         const myIndex = Object.keys(multiplayerState.assignments).find(k => multiplayerState.assignments[k] === getRoomSessionId());
                         if (myIndex !== undefined) {
                             cocState.activeInvestigatorIndex = parseInt(myIndex);
-                        } else {
+                        } else if (!multiplayerState.isSpectator) {
                             cocState.activeInvestigatorIndex = -1;
                         }
                     }
@@ -7346,6 +7384,7 @@ ${buildInvestigatorProfile(inv)}
                 const sendCocMessage = async (manualContent = null) => {
                     let rawContent = (typeof manualContent === 'string' && manualContent) ? manualContent : cocInput.value.trim();
                     if (!rawContent) return;
+                    if (cocState.mode === 'multi' && multiplayerState.isSpectator) return showToast('旁观中不能发言或掷骰', 'warning');
                     
                     // 开发者模式下，如果是以 /dev 开头的指令，直接作为系统指令发送给 AI
                     if (isDevMode.value && rawContent.startsWith('/dev ')) {
@@ -7410,7 +7449,10 @@ ${buildInvestigatorProfile(inv)}
                     scrollToBottom();
                     
                     if (cocState.mode === 'multi') {
-                        broadcastMessage({ type: 'sync_log_append', message: msg });
+                        const changed = [...new Set((msg.stRollbacks || []).map(r => r.invIndex))].filter(i => cocState.investigators[i]);
+                        const outgoing = !multiplayerState.isHost && changed.length
+                            ? { ...msg, charUpdates: Object.fromEntries(changed.map(i => [i, cocState.investigators[i]])) } : msg;
+                        broadcastMessage({ type: 'sync_log_append', message: outgoing });
                         // 只有非私聊消息才视为行动
                         if (msg.role !== 'whisper' && !multiplayerState.roundActionIds.includes(getRoomSessionId())) {
                             multiplayerState.roundActionIds.push(getRoomSessionId());
@@ -7741,11 +7783,25 @@ ${buildInvestigatorProfile(inv)}
                             user_id: getRoomSessionId()
                         });
                         if (activeRoomId !== multiplayerState.roomId) return;
-                        (data.messages || []).forEach(msg => {
+                        for (const msg of data.messages || []) {
+                            // 处理中途离开了房间（被踢、房间解散）就不再处理后面的消息
+                            if (activeRoomId !== multiplayerState.roomId) return;
                             roomLastMessageId = Math.max(roomLastMessageId, Number(msg.id) || 0);
-                            if (msg.sender_id === getRoomSessionId()) return;
+                            if (msg.sender_id === getRoomSessionId()) continue;
                             if (msg.payload && msg.payload.type) handleBroadcastMessage(msg.payload);
-                        });
+                        }
+                        if (activeRoomId !== multiplayerState.roomId) return;
+                        if (multiplayerState.isHost && Array.isArray(data.presence)) {
+                            const now = Number(data.now) || Math.floor(Date.now() / 1000);
+                            const online = new Set(data.presence.filter(p => now - p.seen_at < 180).map(p => p.user_id));
+                            let changed = false;
+                            multiplayerState.members.forEach(m => {
+                                // 主动退出的人在重新加入前一直算离线
+                                const offline = !m.isHost && (m.hasLeft || !online.has(m.id));
+                                if (offline !== !!m.isOffline) { m.isOffline = offline; changed = true; }
+                            });
+                            if (changed) { broadcastState(); checkAndTriggerRound(); }
+                        }
                         multiplayerState.isConnected = true;
                     } catch (e) {
                         console.error('Room polling failed:', e);
@@ -7807,7 +7863,8 @@ ${buildInvestigatorProfile(inv)}
                         assignmentDetails: multiplayerState.assignmentDetails,
                         turnIndex: multiplayerState.turnIndex,
                         roundActionIds: multiplayerState.roundActionIds,
-                        cotAuthorizedUsers: multiplayerState.cotAuthorizedUsers
+                        cotAuthorizedUsers: multiplayerState.cotAuthorizedUsers,
+                        kickedMembers: multiplayerState.kickedMembers
                     };
                     if (includeLog) payload.log = getRoomLogSnapshot();
                     return payload;
@@ -7828,13 +7885,40 @@ ${buildInvestigatorProfile(inv)}
                         case 'player_joined':
                             if (multiplayerState.isHost) {
                                 const newMember = payload.user;
-                                if (!multiplayerState.members.some(m => m.id === newMember.id)) {
-                                    multiplayerState.members.push({ ...newMember, isHost: false, isReady: false });
-                                    showToast(`${newMember.name} 加入了房间`, 'success');
-                                } else {
+                                if (multiplayerState.kickedMembers.some(k => k.id === newMember.id)) {
+                                    broadcastMessage({ type: 'kick_player', userId: newMember.id });
+                                    break;
+                                }
+                                const existing = multiplayerState.members.find(m => m.id === newMember.id);
+                                if (existing) {
+                                    existing.isOffline = existing.hasLeft = false;
                                     showToast(`${newMember.name} 重新连接`, 'info');
+                                } else {
+                                    // 已开局的房间，新来的人只能旁观
+                                    const isSpectator = cocState.gameState === 'playing' || payload.isSpectator === true;
+                                    multiplayerState.members.push({ ...newMember, isHost: false, isReady: false, isSpectator, isOffline: false });
+                                    showToast(`${newMember.name} ${isSpectator ? '进来旁观' : '加入了房间'}`, 'success');
                                 }
                                 broadcastFullState();
+                            }
+                            break;
+                        case 'player_left': {
+                            const left = multiplayerState.members.find(m => m.id === payload.user?.id);
+                            if (left) { left.isOffline = left.hasLeft = true; showToast(`${left.name} 离开了房间`, 'info'); }
+                            if (multiplayerState.isHost) broadcastState();
+                            break;
+                        }
+                        case 'kick_player':
+                            if (payload.userId === getRoomSessionId()) {
+                                showToast('你已被房主请出房间', 'error');
+                                leaveRoom(true);
+                                currentView.value = 'coc';
+                            }
+                            break;
+                        case 'move_to_spectator':
+                            if (payload.userId === getRoomSessionId()) {
+                                multiplayerState.isSpectator = payload.value;
+                                showToast(payload.value ? '房主把你移到了旁观席' : '房主把你恢复成了玩家', 'info');
                             }
                             break;
                         case 'sync_state':
@@ -7847,7 +7931,11 @@ ${buildInvestigatorProfile(inv)}
                                     else if (cocState.gameState === 'preparing') currentView.value = 'preparing';
                                 }
                                 if (payload.module) cocState.module = payload.module;
-                                if (payload.members) multiplayerState.members = payload.members;
+                                if (payload.members) {
+                                    multiplayerState.members = payload.members;
+                                    multiplayerState.isSpectator = !!payload.members.find(m => m.id === getRoomSessionId())?.isSpectator;
+                                }
+                                if (payload.kickedMembers) multiplayerState.kickedMembers = payload.kickedMembers;
                                 if (payload.investigators) cocState.investigators = payload.investigators;
                                 if (payload.assignments) multiplayerState.assignments = payload.assignments || {};
                                 if (payload.assignmentDetails) multiplayerState.assignmentDetails = payload.assignmentDetails || {};
@@ -7869,6 +7957,15 @@ ${buildInvestigatorProfile(inv)}
                             }
                             break;
                         case 'sync_log_append':
+                             if (payload.message?.charUpdates) {
+                                 const { charUpdates, ...message } = payload.message;
+                                 payload.message = message;
+                                 if (multiplayerState.isHost) {
+                                     Object.entries(charUpdates).forEach(([i, data]) => { if (cocState.investigators[i]) cocState.investigators[i] = data; });
+                                     saveData();
+                                     broadcastMessage({ type: 'sync_investigators', investigators: cocState.investigators });
+                                 }
+                             }
                              cocState.log.push(payload.message);
                              scrollToBottom();
                              break;
@@ -7961,7 +8058,7 @@ ${buildInvestigatorProfile(inv)}
                         case 'room_closed':
                              if (!multiplayerState.isHost) {
                                  showToast('房主已解散房间', 'warning');
-                                 leaveRoom();
+                                 leaveRoom(true);
                                  currentView.value = 'coc';
                              }
                              break;
@@ -8082,7 +8179,8 @@ ${buildInvestigatorProfile(inv)}
                         
                         const joined = await broadcastMessage({
                             type: 'player_joined',
-                            user: { id: getRoomSessionId(), name: user.name, avatar: user.avatar }
+                            user: { id: getRoomSessionId(), name: user.name, avatar: user.avatar },
+                            isSpectator: multiplayerState.isSpectator
                         });
                         if (!joined) throw new Error('Unable to announce room membership');
 
@@ -8138,7 +8236,7 @@ ${buildInvestigatorProfile(inv)}
                     }
                 };
 
-                const joinRoom = async (id = null, asHost = false) => {
+                const joinRoom = async (id = null, asHost = false, asSpectator = false) => {
                     if (!id || isConnecting.value) return;
                     isConnecting.value = true;
                     id = String(id).trim().toUpperCase();
@@ -8146,7 +8244,8 @@ ${buildInvestigatorProfile(inv)}
                     multiplayerState.roomId = id;
                     multiplayerState.isHost = asHost;
                     multiplayerState.myId = user.uuid;
-                    multiplayerState.members = [{ id: user.uuid, name: user.name, avatar: user.avatar, isHost: asHost, isReady: false }];
+                    multiplayerState.isSpectator = asSpectator;
+                    multiplayerState.members = [{ id: user.uuid, name: user.name, avatar: user.avatar, isHost: asHost, isReady: false, isSpectator: asSpectator }];
                     
                     try {
                         await joinRoomChannel(id);
@@ -8159,7 +8258,9 @@ ${buildInvestigatorProfile(inv)}
                     }
                 };
 
-                const leaveRoom = async () => {
+                // silent：被踢出时不再广播离开
+                const leaveRoom = async (silent = false) => {
+                    if (!silent && multiplayerState.inRoom && !multiplayerState.isHost) broadcastMessage({ type: 'player_left', user: { id: getRoomSessionId(), name: user.name } });
                     if (joinRetryInterval) {
                         clearTimeout(joinRetryInterval);
                         joinRetryInterval = null;
@@ -8177,8 +8278,42 @@ ${buildInvestigatorProfile(inv)}
                     multiplayerState.members = [];
                     multiplayerState.assignments = {};
                     multiplayerState.syncReceived = false;
+                    multiplayerState.isSpectator = false;
+                    multiplayerState.kickedMembers = [];
                     clearHostRoomSession(leavingRoomId);
                     showToast('已断开连接', 'info');
+                };
+
+                // —— 房主管理成员 ——
+                const playingMembers = () => multiplayerState.members.filter(m => !m.isSpectator);
+                const releaseAssignment = (id) => {
+                    Object.keys(multiplayerState.assignments).forEach(i => { if (multiplayerState.assignments[i] === id) delete multiplayerState.assignments[i]; });
+                    multiplayerState.roundActionIds = multiplayerState.roundActionIds.filter(uid => uid !== id);
+                };
+                // 移入旁观会释放其角色；恢复为玩家后需要重新选角色
+                const setSpectator = (id, value) => {
+                    const member = multiplayerState.members.find(m => m.id === id);
+                    if (!multiplayerState.isHost || !member) return;
+                    member.isSpectator = value;
+                    member.isReady = false;
+                    if (value) releaseAssignment(id);
+                    broadcastMessage({ type: 'move_to_spectator', userId: id, value });
+                    broadcastFullState();
+                    checkAndTriggerRound();
+                };
+                const kickPlayer = async (id) => {
+                    const member = multiplayerState.members.find(m => m.id === id);
+                    if (!multiplayerState.isHost || !member || !await showConfirm(`把 ${member.name} 请出房间？取消踢出前他无法再进来。`, '踢出')) return;
+                    releaseAssignment(id);
+                    multiplayerState.members = multiplayerState.members.filter(m => m.id !== id);
+                    multiplayerState.kickedMembers.push({ id, name: member.name });
+                    broadcastMessage({ type: 'kick_player', userId: id });
+                    broadcastFullState();
+                    checkAndTriggerRound();
+                };
+                const unkickMember = (id) => {
+                    multiplayerState.kickedMembers = multiplayerState.kickedMembers.filter(k => k.id !== id);
+                    broadcastFullState();
                 };
                 const addFriend = () => { /* ... */ };
                 const acceptFriend = (req) => { /* ... */ };
@@ -8240,13 +8375,13 @@ ${buildInvestigatorProfile(inv)}
                 return {
                     currentView, showMobileMenu, showMobileRightSidebar, mobileSettingsSection, mobileSettingsGroups, mobileSettingsTitle, openMobileSettingsSection, backMobileSettings, user, settings, toasts, confirmState, authState, handleAuth, handleLogout, showBroadcast, dontShowBroadcast, closeBroadcast,
                     kpRulesByCategory, editingRuleId, toggleRuleEdit, resetRule, addKpRule, deleteKpRule,
-                    cocState, cocInput, cocInputRef, cocChatContainer, isGenerating, multiplayerState, showJoinInput, joinRoomId, friends, friendRequests, friendInput,
+                    cocState, cocInput, cocInputRef, cocChatContainer, isGenerating, multiplayerState, showJoinInput, joinRoomId, joinAsSpectator, memberMenu, toggleMemberMenu, friends, friendRequests, friendInput,
                     showMentionList, mentionCandidates, handleInput, selectMention, savedGames, savesFilter, groupedSaves, openFolders, toggleFolder, moveSaveToFolder, renameFolder, 
                     isSavesEditing, toggleSavesEditMode, moveFolder, deleteFolder, editFolderName, promptMoveToFolder, folderManagementState, closeFolderModal, confirmFolderAction, 
                     deleteFolderState, openDeleteFolderModal, closeDeleteFolderModal, confirmDissolveFolder, confirmDeleteAllInFolder, isRoundLocked, hasAiTeammates,
                     selectCocMode, toggleCojMode, exitCocMode, exitCocGame, startCocGame, sendCocMessage, saveGame, deleteSave, loadSave, exportSave, importSave,
                     importCocModule, importSupplementaryImages, saveManualModule, importInvestigator, deleteInvestigator,
-                    initBackend, createRoom, joinRoom, leaveRoom, addFriend, acceptFriend, inviteFriend,
+                    initBackend, createRoom, joinRoom, leaveRoom, setSpectator, kickPlayer, unkickMember, addFriend, acceptFriend, inviteFriend,
                     handleUserAvatarUpload, saveData, renderMarkdown, copyToClipboard,
                     charReviewState, startCharReview, importReviewModule, importReviewInvestigator,
                     toggleReady, allPlayersReady, handleInvestigatorClick, toggleAiPlayer,

@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'z-coc-shell-v10';
+const CACHE_VERSION = 'z-coc-shell-v11';
 const APP_SHELL = [
     './',
     './index.html',
