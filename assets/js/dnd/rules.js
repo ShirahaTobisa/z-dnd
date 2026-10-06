@@ -134,7 +134,7 @@
 
     const randInt = (sides) => Math.floor(Math.random() * sides) + 1;
 
-    // 支持 "2d6+3"、"1d20-1"、"4d6kh3"（取高 3 个）、"2d20kl1"（取低）、纯数字
+    // 支持 "2d6+3"、"1d20-1"、"4d6kh3"（取高 3 个）、"2d20kl1"（取低）、"2d6min3"（每颗至少 3）、"2d6ro2"（≤2 重骰一次）、纯数字
     const rollDice = (expr) => {
         const clean = String(expr || '').replace(/\s+/g, '').toLowerCase();
         const terms = clean.match(/[+-]?[^+-]+/g);
@@ -143,15 +143,16 @@
         for (const term of terms) {
             const sign = term.startsWith('-') ? -1 : 1;
             const body = term.replace(/^[+-]/, '');
-            const m = body.match(/^(\d*)d(\d+)(?:(kh|kl)(\d+))?$/);
+            const m = body.match(/^(\d*)d(\d+)(?:(kh|kl|min|ro)(\d+))?$/);
             if (m) {
                 const count = Math.min(100, parseInt(m[1] || '1')); const sides = parseInt(m[2]);
                 if (!sides) return null;
-                const rolls = Array.from({ length: count }, () => randInt(sides));
+                const n = parseInt(m[4]);
+                const rolls = Array.from({ length: count }, () => { const r = randInt(sides); return m[3] === 'min' ? Math.max(n, r) : m[3] === 'ro' && r <= n ? randInt(sides) : r; });
                 let kept = rolls;
-                if (m[3]) {
+                if (m[3] === 'kh' || m[3] === 'kl') {
                     const sorted = [...rolls].sort((a, b) => (m[3] === 'kh' ? b - a : a - b));
-                    kept = sorted.slice(0, parseInt(m[4]));
+                    kept = sorted.slice(0, n);
                 }
                 const sum = kept.reduce((a, b) => a + b, 0) * sign;
                 total += sum; parts.push({ term, rolls, kept, sum });
@@ -175,10 +176,9 @@
     // 职业数据 = 共用数据 + 版本覆盖
     const classInfo = (char) => CLASSES[char.classId] && { ...CLASSES[char.classId], ...(edition(char.edition).classOverrides?.[char.classId] || {}) };
 
-    const saveMod = (char, ability) => {
-        const prof = classInfo(char)?.saves.includes(ability) ? profBonus(char.level) : 0;
-        return abilityMod(char.abilities?.[ability]) + prof;
-    };
+    // 豁免熟练：职业自带 + 坚韧专长选的属性
+    const saveProficient = (char, ability) => !!classInfo(char)?.saves.includes(ability) || asiRecords(char).some(r => r.mode === 'feat' && r.feat === 'resilient' && r.fa === ability);
+    const saveMod = (char, ability) => abilityMod(char.abilities?.[ability]) + (saveProficient(char, ability) ? profBonus(char.level) : 0);
 
     const skillMod = (char, skillId) => {
         const skill = SKILLS[skillId]; if (!skill) return 0;
@@ -187,7 +187,7 @@
         return abilityMod(char.abilities?.[skill.ability]) + prof;
     };
 
-    const passivePerception = (char) => 10 + skillMod(char, 'perception');
+    const passivePerception = (char) => 10 + skillMod(char, 'perception') + (char.edition === '2014' && hasFeat(char, 'observant') ? 5 : 0);
 
     const armorClass = (char) => {
         if (char.acOverride) return parseInt(char.acOverride);
@@ -204,7 +204,7 @@
             if (char.mageArmor) options.push(13 + dex);
             ac = Math.max(...options);
         }
-        return ac + (char.shield ? 2 : 0);
+        return ac + (char.shield ? 2 : 0) + (armor && char.fightingStyle === 'defense' ? 1 : 0);
     };
 
     // 1 级取生命骰最大值，之后每级取平均值（向上取整）；再加上种族、子职业的每级生命加值
@@ -212,7 +212,10 @@
         const cls = classInfo(char); if (!cls) return 0;
         const level = clampLevel(char.level); const con = abilityMod(char.abilities?.CON);
         const perLevel = (raceOf(char)?.hpPerLevel || 0) + (subraceOf(char)?.hpPerLevel || 0) + (char.subclass === '龙族血脉' ? 1 : 0);
-        return Math.max(level, cls.hitDie + con + (level - 1) * (cls.hitDie / 2 + 1 + con) + perLevel * level);
+        // 2 级起每级取掷骰记录，没有记录取平均值；每级至少 1 点
+        let total = cls.hitDie + con;
+        for (let lv = 2; lv <= level; lv++) total += Math.max(1, (parseInt(char.hpRolls?.[lv]) || cls.hitDie / 2 + 1) + con);
+        return Math.max(level, total + perLevel * level + (hasFeat(char, 'tough') ? 2 * level : 0));
     };
 
     // 按等级分段取值：steps([[1, 2], [3, 3]]) → 1~2 级为 2，3 级起为 3，低于首段为 0
@@ -307,10 +310,24 @@
         const str = abilityMod(char.abilities?.STR); const dex = abilityMod(char.abilities?.DEX);
         const mod = w.props.includes('ranged') ? dex : w.props.includes('finesse') ? Math.max(str, dex) : str;
         const proficient = weaponProficient(char, weaponId);
-        return { id: weaponId, name: w.name, toHit: mod + (proficient ? profBonus(char.level) : 0), proficient, damage: `${w.damage}${mod ? signed(mod) : ''}`, type: w.type, range: w.range || '', melee: !w.props.includes('ranged'), usesStr: mod === str && !w.props.includes('ranged'), finesseOrRanged: w.props.includes('finesse') || w.props.includes('ranged'), mastery: edition(char.edition).weaponMastery?.[weaponId] || null };
+        const ranged = w.props.includes('ranged');
+        const styleHit = ranged && char.fightingStyle === 'archery' ? 2 : 0;
+        const dmgMod = mod + (!ranged && !w.props.includes('twoHanded') && char.fightingStyle === 'dueling' ? 2 : 0);
+        return { id: weaponId, name: w.name, toHit: mod + styleHit + (proficient ? profBonus(char.level) : 0), proficient, damage: `${w.damage}${dmgMod ? signed(dmgMod) : ''}`, greatWeapon: char.fightingStyle === 'greatWeapon' && (w.props.includes('twoHanded') || !!w.versatile) && !ranged, type: w.type, range: w.range || '', melee: !w.props.includes('ranged'), usesStr: mod === str && !w.props.includes('ranged'), finesseOrRanged: w.props.includes('finesse') || w.props.includes('ranged'), mastery: edition(char.edition).weaponMastery?.[weaponId] || null };
     };
 
-    const initiativeMod = (char) => abilityMod(char.abilities?.DEX);
+    const initiativeMod = (char) => abilityMod(char.abilities?.DEX) + (hasFeat(char, 'alert') ? (char.edition === '2024' ? profBonus(char.level) : 5) : 0);
+
+    // —— 成长：属性值提升 / 专长 ——
+    // char.asi = { 等级: { mode: 'asi', a1, a2 } | { mode: 'feat', feat, fa } }，只计入当前等级以内的记录
+    const asiRecords = (char) => Object.entries(char.asi || {}).filter(([lv]) => +lv <= clampLevel(char.level)).map(([lv, r]) => ({ level: +lv, ...r }));
+    // 可以做属性提升或选专长的等级（含 2024 版 19 级史诗恩惠）
+    const asiLevels = (char) => classFeatures(char).filter(f => f.name === '属性值提升' || f.name === '史诗恩惠').map(f => f.level);
+    // 已获得的专长：成长中选的 + 2024 背景送的起源专长
+    const characterFeats = (char) => [...new Set([...asiRecords(char).filter(r => r.mode === 'feat' && r.feat).map(r => r.feat), backgroundOf(char)?.featId].filter(Boolean))];
+    const hasFeat = (char, id) => characterFeats(char).includes(id);
+    // 战斗风格：职业在当前等级是否已获得
+    const hasFightingStyle = (char) => classFeatures(char).some(f => f.name === '战斗风格');
 
     // —— 建角色 ——
     const raceOf = (char) => edition(char.edition).races[char.race];
@@ -323,7 +340,8 @@
     const finalAbilities = (char) => {
         const out = {};
         for (const ab of Object.keys(ABILITIES)) {
-            const v = (parseInt(char.baseAbilities?.[ab]) || 0) + (raceOf(char)?.bonuses?.[ab] || 0) + (subraceOf(char)?.bonuses?.[ab] || 0) + (parseInt(char.bonusPicks?.[ab]) || 0);
+            const growth = asiRecords(char).reduce((sum, r) => sum + (r.mode === 'asi' ? (r.a1 === ab) + (r.a2 === ab) : r.fa === ab ? 1 : 0), 0);
+            const v = (parseInt(char.baseAbilities?.[ab]) || 0) + (raceOf(char)?.bonuses?.[ab] || 0) + (subraceOf(char)?.bonuses?.[ab] || 0) + (parseInt(char.bonusPicks?.[ab]) || 0) + growth;
             out[ab] = Math.min(20, v);
         }
         return out;
@@ -353,6 +371,7 @@
         weapons: [], slotsUsed: {}, spells: '', features: '', inventory: '', gold: 0,
         conditions: [], exhaustion: 0, deathSaves: { success: 0, fail: 0 }, dead: false,
         resourcesUsed: {}, raging: false, concentration: '', mageArmor: false, spellIds: [],
+        asi: {}, fightingStyle: '', hpRolls: {},
         backstory: { appearance: '', personality: '', ideals: '', bonds: '', flaws: '', story: '' },
         history: [], badges: [],
     });
@@ -367,11 +386,12 @@
         char.skillProfs = [...new Set([...(char.skillProfs || []), ...grantedSkills(char)])].filter(id => SKILLS[id]);
         char.weapons = (char.weapons || []).filter(id => WEAPONS[id]);
         if (root.DND.SPELLS) char.spellIds = (char.spellIds || []).filter(id => root.DND.SPELLS[id]);
+        if (root.DND.FIGHTING_STYLES && !root.DND.FIGHTING_STYLES[char.fightingStyle]) char.fightingStyle = '';
         const hp = maxHp(char);
         if (hp && !data?.maxHp) char.hp = hp;
         char.maxHp = hp || parseInt(char.maxHp) || 0;
         return char;
     };
 
-    root.DND = { ABILITIES, SKILLS, ALL_SKILLS, CLASSES, ARMOR, WEAPONS, CONDITIONS, XP_TABLE, STANDARD_ARRAY, POINT_BUY, editions, edition, classInfo, weaponData, signed, abilityMod, profBonus, levelFromXp, rollDice, d20Test, saveMod, skillMod, passivePerception, armorClass, maxHp, spellSlots, spellSaveDc, spellAttack, weaponAttack, weaponProficient, initiativeMod, steps, critRange, rageDamage, sneakAttackDice, classFeatures, classResources, cantripsKnown, spellsAllowed, maxSpellLevel, classSpells, raceOf, subraceOf, backgroundOf, subclassLevel, pointBuyCost, finalAbilities, grantedSkills, skillChoices, newCharacter, normalizeCharacter };
+    root.DND = { ABILITIES, SKILLS, ALL_SKILLS, CLASSES, ARMOR, WEAPONS, CONDITIONS, XP_TABLE, STANDARD_ARRAY, POINT_BUY, editions, edition, classInfo, weaponData, signed, abilityMod, profBonus, levelFromXp, rollDice, d20Test, saveProficient, saveMod, skillMod, passivePerception, armorClass, maxHp, spellSlots, spellSaveDc, spellAttack, weaponAttack, weaponProficient, initiativeMod, steps, critRange, rageDamage, sneakAttackDice, classFeatures, classResources, asiRecords, asiLevels, characterFeats, hasFeat, hasFightingStyle, cantripsKnown, spellsAllowed, maxSpellLevel, classSpells, raceOf, subraceOf, backgroundOf, subclassLevel, pointBuyCost, finalAbilities, grantedSkills, skillChoices, newCharacter, normalizeCharacter };
 })(typeof window !== 'undefined' ? window : globalThis);

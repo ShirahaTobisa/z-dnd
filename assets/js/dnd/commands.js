@@ -106,8 +106,10 @@
             const thrown = /投掷|\bthrow/i.test(rest);
             const rage = char.raging && w.melee && w.usesStr && !thrown ? D.rageDamage(char) : 0;
             if (thrown) extra += ' · 投掷';
-            const dmgExpr = `${level === '重击' ? critDamage(w.damage) : w.damage}${rage ? `+${rage}` : ''}`;
-            extra += ` · 伤害 ${D.rollDice(dmgExpr).total} ${w.type}${rage ? `（含狂暴 +${rage}）` : ''}`;
+            // 巨武器战斗：2024 伤害骰 1、2 当 3；2014 掷出 1、2 重骰一次
+            const gwf = w.greatWeapon ? (char.edition === '2024' ? 'min3' : 'ro2') : '';
+            const dmgExpr = `${level === '重击' ? critDamage(w.damage) : w.damage}${rage ? `+${rage}` : ''}`.replace(/(\d*d\d+)/g, `$1${gwf}`);
+            extra += ` · 伤害 ${D.rollDice(dmgExpr).total} ${w.type}${rage ? `（含狂暴 +${rage}）` : ''}${gwf ? '（巨武器战斗）' : ''}`;
             if (!w.proficient) extra += ' · 未熟练';
             const sneak = D.sneakAttackDice(char);
             if (sneak && w.finesseOrRanged) extra += ` · 满足条件可加偷袭 ${level === '重击' ? sneak * 2 : sneak}d6`;
@@ -395,7 +397,7 @@
     };
 
     // —— 战斗 ——
-    // state: { active, round, turn, order: [{ name, pc, index?, init, hp?, maxHp?, ac }] }
+    // state: { active, round, turn, order: [{ name, pc, index?, init, hp?, maxHp?, ac, monster?, xp? }] }
     const combat = {
         create: () => ({ active: false, round: 0, turn: 0, order: [] }),
         sort(state) {
@@ -413,8 +415,12 @@
             state.order.push(...state.pending || []); delete state.pending;
             state.order.sort((a, b) => b.init - a.init);
         },
-        add(state, { name, hp, ac, init }) {
-            const entry = { name, pc: false, hp: parseInt(hp) || 1, maxHp: parseInt(hp) || 1, ac: parseInt(ac) || 10, init: D.d20Test({ mod: parseInt(init) || 0 }).total };
+        // 怪物库里有的生物，没写的数值自动补上
+        add(state, { name, hp, ac, init, xp }) {
+            const lib = D.findMonster?.(name);
+            const val = (v, fallback) => (v != null && v !== '' ? parseInt(v) || 0 : fallback);
+            const maxHp = val(hp, lib?.hp) || 1;
+            const entry = { name, pc: false, hp: maxHp, maxHp, ac: val(ac, lib?.ac) || 10, init: D.d20Test({ mod: val(init, lib?.init) || 0 }).total, monster: lib?.id, xp: val(xp, lib?.xp) || 0 };
             if (!state.active) { (state.pending ||= []).push(entry); return entry; }
             state.order.push(entry); combat.sort(state);
             return entry;
@@ -435,21 +441,34 @@
                 if (e.pc || e.hp > 0) break;
             }
         },
-        end(state) { Object.assign(state, combat.create()); },
+        // 结束战斗：被击倒怪物的经验平均分给参战角色。返回 { log, changes }
+        end(state, chars = []) {
+            const total = state.order.filter(e => !e.pc && e.hp === 0).reduce((sum, e) => sum + (e.xp || 0), 0);
+            Object.assign(state, combat.create());
+            const each = chars.length ? Math.floor(total / chars.length) : 0;
+            const changes = each ? chars.map(({ char, index }) => {
+                const r = applyStat(char, 'xp', `+${each}`);
+                const up = D.levelFromXp(char.xp) > char.level ? `，可以升到 ${D.levelFromXp(char.xp)} 级` : '';
+                return { char, index, log: r.log + up, rollback: r.rollback };
+            }) : [];
+            return { log: `🏳️ 战斗结束${total ? `，击败敌人共 ${total} 经验${each ? `，每人 +${each}` : ''}` : ''}`, changes };
+        },
     };
 
     // 解析 DM 回复中的战斗指令，按出现顺序执行。chars: [{ char, index }] 参战的玩家角色
-    const COMBAT_RE = /[.。](combat)\s+(start|end|开始|结束)|[.。](monster)\s+(\S+)((?:\s+(?:hp|ac|init)=[+-]?\d+)*)|[.。](dmg|heal)\s+(\S+)\s+(\S+)|[.。](next)\b/gi;
+    const COMBAT_RE = /[.。](combat)\s+(start|end|开始|结束)|[.。](monster)\s+(\S+)((?:\s+(?:hp|ac|init|xp)=[+-]?\d+)*)|[.。](dmg|heal)\s+(\S+)\s+(\S+)|[.。](next)\b/gi;
+    // 返回 { logs, changes }，changes 是结算经验时对角色的改动（可撤回）
     const runCombatCommands = (state, content, chars) => {
-        const logs = [];
+        const logs = []; const changes = [];
         for (const m of String(content || '').matchAll(COMBAT_RE)) {
             if (m[1]) {
                 if (/start|开始/i.test(m[2])) { combat.start(state, chars); logs.push(`⚔️ 战斗开始！先攻顺序：${state.order.map(e => `${e.name}(${e.init})`).join(' → ')}`); }
-                else { combat.end(state); logs.push('🏳️ 战斗结束'); }
+                else { const r = combat.end(state, chars); logs.push(r.log); changes.push(...r.changes); }
             } else if (m[3]) {
-                const spec = Object.fromEntries([...m[5].matchAll(/(hp|ac|init)=([+-]?\d+)/gi)].map(x => [x[1].toLowerCase(), x[2]]));
+                const spec = Object.fromEntries([...m[5].matchAll(/(hp|ac|init|xp)=([+-]?\d+)/gi)].map(x => [x[1].toLowerCase(), x[2]]));
                 const e = combat.add(state, { name: m[4], ...spec });
-                logs.push(`👹 ${e.name} 加入战斗（AC ${e.ac}，生命 ${e.hp}${state.active ? `，先攻 ${e.init}` : ''}）`);
+                const cr = e.monster ? `，CR ${D.MONSTERS[e.monster].cr}` : '';
+                logs.push(`👹 ${e.name} 加入战斗（AC ${e.ac}，生命 ${e.hp}${cr}${state.active ? `，先攻 ${e.init}` : ''}）`);
             } else if (m[6]) {
                 const r = D.rollDice(m[8]);
                 const e = r && combat.damage(state, m[7], m[6].toLowerCase() === 'heal' ? -r.total : r.total);
@@ -459,7 +478,7 @@
                 logs.push(`➡️ 第 ${state.round} 轮，轮到 ${state.order[state.turn]?.name}`);
             }
         }
-        return logs;
+        return { logs, changes };
     };
 
     // 已准备法术按环阶列出：戏法 火焰箭、法师之手；1环 魔法飞弹
@@ -475,7 +494,9 @@
         const abilities = Object.entries(D.ABILITIES).map(([k, v]) => `${v}${char.abilities?.[k]}(${D.signed(D.abilityMod(char.abilities?.[k]))})`).join(' ');
         const skills = (char.skillProfs || []).map(id => `${D.SKILLS[id]?.name}${D.signed(D.skillMod(char, id))}${char.expertise?.includes(id) ? '(专精)' : ''}`).join('、');
         const slots = Object.entries(D.spellSlots(char)).map(([lv, n]) => `${lv}环 ${n - (parseInt(char.slotsUsed?.[lv]) || 0)}/${n}`).join(' ');
-        const weapons = (char.weapons || []).map(id => D.weaponAttack(char, id)).filter(Boolean).map(w => `${w.name}(命中${D.signed(w.toHit)}, ${w.damage}${w.type}${w.range ? `, 射程${w.range}` : ''}${w.mastery ? `, 专精:${w.mastery}` : ''}${w.proficient ? '' : ', 未熟练'})`).join('、');
+        const weapons = (char.weapons || []).map(id => D.weaponAttack(char, id)).filter(Boolean).map(w => `${w.name}(命中${D.signed(w.toHit)}, ${w.damage}${w.type}${w.range ? `, 射程${w.range}` : ''}${w.mastery ? `, 专精:${w.mastery}` : ''}${w.greatWeapon ? ', 巨武器战斗' : ''}${w.proficient ? '' : ', 未熟练'})`).join('、');
+        const feats = D.characterFeats(char).map(id => D.FEATS[id]?.name).filter(Boolean);
+        const style = D.FIGHTING_STYLES[char.fightingStyle];
         const features = D.classFeatures(char).filter(f => f.name !== '选择子职业' && f.name !== '属性值提升').map(f => f.name).join('、');
         const resources = D.classResources(char).map(r => `${r.name} ${r.max === 99 ? '不限' : `${r.left}/${r.max}`}（${r.recharge === 'short' ? '短休' : '长休'}恢复）`).join('、');
         const crit = D.critRange(char); const sneak = D.sneakAttackDice(char);
@@ -490,11 +511,12 @@
             `姓名：${char.name} | ${ed.name}`,
             `${sub?.name || race?.name || '未知种族'} ${cls?.name || '未知职业'}${char.subclass ? `（${char.subclass}）` : ''} ${char.level} 级 | 背景：${bg?.name || '无'} | 阵营：${char.alignment || '未定'}`,
             `属性：${abilities}`,
-            `生命 ${char.hp}/${char.maxHp}${char.tempHp ? ` +临时${char.tempHp}` : ''} | AC ${D.armorClass(char)} | 速度 ${race?.speed || 30} 尺 | 熟练加值 ${D.signed(D.profBonus(char.level))} | 被动察觉 ${D.passivePerception(char)} | 生命骰 ${hdLeft}/${char.level} (d${cls?.hitDie || '?'})`,
-            `豁免熟练：${(cls?.saves || []).map(a => D.ABILITIES[a]).join('、') || '无'} | 技能熟练：${skills || '无'}`,
+            `生命 ${char.hp}/${char.maxHp}${char.tempHp ? ` +临时${char.tempHp}` : ''} | AC ${D.armorClass(char)} | 速度 ${sub?.speed || race?.speed || 30} 尺 | 熟练加值 ${D.signed(D.profBonus(char.level))} | 被动察觉 ${D.passivePerception(char)} | 生命骰 ${hdLeft}/${char.level} (d${cls?.hitDie || '?'})`,
+            `豁免熟练：${Object.keys(D.ABILITIES).filter(a => D.saveProficient(char, a)).map(a => D.ABILITIES[a]).join('、') || '无'} | 技能熟练：${skills || '无'}`,
             weapons && `武器：${weapons}${crit < 20 ? ` | 暴击范围 ${crit}-20` : ''}${sneak ? ` | 偷袭 ${sneak}d6` : ''}`,
             features && `职业能力：${features}`,
             resources && `职业资源：${resources}`,
+            (feats.length || style) && `专长：${feats.join('、') || '无'}${style ? ` | 战斗风格：${style.name}（${style.desc}）` : ''}`,
             slots && `法术位：${slots} | 法术豁免 DC ${D.spellSaveDc(char)}，法术攻击 ${D.signed(D.spellAttack(char))}`,
             spellList(char) && `已准备法术：${spellList(char)}`,
             char.spells && `法术备注：${char.spells}`,

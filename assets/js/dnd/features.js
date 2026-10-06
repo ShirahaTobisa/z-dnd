@@ -1,6 +1,59 @@
 // 职业与子职业能力的简要说明（自行概括，非原书文字）。按能力名称查找，名称中括号内的部分不参与匹配。
 // 两版含义不同的能力，在 edition-*.js 的 featureDesc 中覆盖。
 (function (root) {
+    // 战斗风格：effect 为系统自动计算的效果
+    root.DND.FIGHTING_STYLES = {
+        archery: { name: '箭术', desc: '远程武器攻击检定 +2。', effect: 'rangedHit2' },
+        defense: { name: '防御', desc: '穿着护甲时 AC +1。', effect: 'armorAc1' },
+        dueling: { name: '对决', desc: '只用单手近战武器时伤害 +2。', effect: 'meleeDmg2' },
+        greatWeapon: { name: '巨武器战斗', desc: '双手或可双手武器的伤害骰掷出 1、2 时可以重骰（2024 版视为 3）。' },
+        protection: { name: '守护', desc: '持盾时可用反应让攻击你身边盟友的检定具有劣势。' },
+        twoWeapon: { name: '双武器战斗', desc: '副手攻击的伤害也加上属性调整值。' },
+    };
+
+    // 专长：cat 为 origin 起源 / general 通用 / epic 史诗恩惠；srd: false 为非 SRD 专长（说明为自行概括）
+    root.DND.FEATS = {
+        alert: { name: '警觉', cat: 'origin', desc: '先攻加值提高（2014：+5；2024：加熟练加值），且不会被突袭。' },
+        crafter: { name: '工匠', cat: 'origin', desc: '熟练三种工匠工具，购买装备打折，可快速制作物品。' },
+        healer: { name: '医疗者', cat: 'origin', desc: '使用医疗包时可让伤者花费生命骰回复生命，治疗骰掷出 1 可重骰。' },
+        lucky: { name: '幸运儿', cat: 'origin', desc: '拥有若干幸运点，可让自己的检定具有优势或让攻击你的检定具有劣势。' },
+        magicInitiate: { name: '魔法入门', cat: 'origin', desc: '从一个职业学会两个戏法和一个 1 环法术，该法术每长休可免费施展一次。' },
+        musician: { name: '乐手', cat: 'origin', desc: '熟练三种乐器，休息后演奏可给队友英雄激励。' },
+        savageAttacker: { name: '凶蛮打击者', cat: 'origin', desc: '每回合一次，武器伤害可以掷两次取较高者。' },
+        skilled: { name: '多才多艺', cat: 'origin', desc: '额外熟练三项技能或工具。' },
+        tavernBrawler: { name: '酒馆斗殴者', cat: 'origin', desc: '徒手攻击伤害为 1d4，可推开目标，并熟练简易临时武器。' },
+        tough: { name: '健壮', cat: 'origin', desc: '生命上限每级 +2。', effect: 'hp2' },
+        grappler: { name: '擒抱者', cat: 'general', desc: '对你擒抱的生物攻击具有优势，擒抱更容易成功。' },
+        actor: { name: '演员', cat: 'general', srd: false, desc: '伪装与模仿他人的检定具有优势。' },
+        athlete: { name: '运动员', cat: 'general', srd: false, desc: '倒地后起身更快，攀爬和跳跃更容易。' },
+        crossbowExpert: { name: '弩专家', cat: 'general', srd: false, desc: '忽略弩的装填，近身射击不受劣势。' },
+        defensiveDuelist: { name: '防御决斗者', cat: 'general', srd: false, desc: '持灵巧武器时可用反应提高 AC。' },
+        dualWielder: { name: '双持者', cat: 'general', srd: false, desc: '双持时 AC +1，可双持非轻型武器。' },
+        elementalAdept: { name: '元素专精', cat: 'general', srd: false, desc: '所选元素的法术无视抗性，伤害骰 1 视为 2。' },
+        greatWeaponMaster: { name: '巨武器大师', cat: 'general', srd: false, desc: '用重型武器可换取额外伤害，重击或击倒敌人后可追加攻击。' },
+        heavyArmorMaster: { name: '重甲大师', cat: 'general', srd: false, desc: '穿重甲时受到的物理伤害降低。' },
+        inspiringLeader: { name: '激励领袖', cat: 'general', srd: false, desc: '发表演讲，给队友临时生命。' },
+        keenMind: { name: '敏锐心智', cat: 'general', srd: false, desc: '记忆力过人，研究与回想更快。' },
+        mageSlayer: { name: '法师杀手', cat: 'general', srd: false, desc: '更容易打断和反击身边的施法者。' },
+        mobile: { name: '机动', cat: 'general', srd: false, desc: '速度 +10 尺，攻击过的敌人不能对你借机攻击。' },
+        observant: { name: '观察入微', cat: 'general', srd: false, desc: '被动察觉与被动调查 +5（2024 版改为技能专精与快速搜索）。', effect: 'passive5' },
+        polearmMaster: { name: '长柄武器大师', cat: 'general', srd: false, desc: '用长柄武器可附赠动作用柄端攻击，敌人进入触及范围时可借机攻击。' },
+        resilient: { name: '坚韧', cat: 'general', srd: false, desc: '所选属性 +1，并获得该属性的豁免熟练。', effect: 'saveProf' },
+        ritualCaster: { name: '仪式施法者', cat: 'general', srd: false, desc: '能以仪式方式施展若干仪式法术。' },
+        sentinel: { name: '哨兵', cat: 'general', srd: false, desc: '借机攻击命中会让敌人速度降为 0，敌人撤离也会引发借机攻击。' },
+        sharpshooter: { name: '神射手', cat: 'general', srd: false, desc: '远射不受劣势、无视部分掩护，可换取额外伤害。' },
+        shieldMaster: { name: '盾牌大师', cat: 'general', srd: false, desc: '可用盾推撞敌人，敏捷豁免时用盾保护自己。' },
+        spellSniper: { name: '法术狙击手', cat: 'general', srd: false, desc: '攻击法术射程加倍，并无视部分掩护。' },
+        warCaster: { name: '战争施法者', cat: 'general', srd: false, desc: '维持专注的体质豁免具有优势，可用法术进行借机攻击。' },
+        boonOfCombatProwess: { name: '战斗精通恩惠', cat: 'epic', desc: '每回合一次可把未命中的攻击改为命中。' },
+        boonOfDimensionalTravel: { name: '次元旅行恩惠', cat: 'epic', desc: '攻击或施法后可短距离传送。' },
+        boonOfFate: { name: '命运恩惠', cat: 'epic', desc: '可为附近生物的检定加上或减去 2d4。' },
+        boonOfIrresistibleOffense: { name: '无可抵挡恩惠', cat: 'epic', desc: '物理伤害无视抗性，掷出 20 时额外造成伤害。' },
+        boonOfSpellRecall: { name: '法术回想恩惠', cat: 'epic', desc: '每长休可免费施展一次 4 环以下法术。' },
+        boonOfTheNightSpirit: { name: '夜之灵恩惠', cat: 'epic', desc: '在阴影中可隐形，并获得多种伤害抗性。' },
+        boonOfTruesight: { name: '真视恩惠', cat: 'epic', desc: '获得 60 尺真实视觉。' },
+    };
+
     root.DND.FEATURE_DESC = {
         // 通用
         '选择子职业': '选择一个子职业，获得它在各等级的特性。',
