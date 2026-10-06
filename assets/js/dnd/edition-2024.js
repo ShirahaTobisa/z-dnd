@@ -8,6 +8,13 @@
         halfCasterStart: 1,
         subclassLevel: {},
         defaultSubclassLevel: 3,
+        // 子职业法术：始终准备、不占数量（键为职业等级）
+        alwaysPrepared: {
+            '生命领域': { 3: ['aid', 'bless', 'cureWounds', 'lesserRestoration'], 5: ['massHealingWord', 'revivify'], 7: ['auraOfLife', 'deathWard'], 9: ['greaterRestoration', 'massCureWounds'] },
+            '奉献之誓': { 3: ['protectionFromEvilAndGood', 'shieldOfFaith'], 5: ['aid', 'zoneOfTruth'], 9: ['beaconOfHope', 'dispelMagic'], 13: ['freedomOfMovement', 'guardianOfFaith'], 17: ['commune', 'flameStrike'] },
+            '邪魔宗主': { 3: ['burningHands', 'command', 'scorchingRay', 'suggestion'], 5: ['fireball', 'stinkingCloud'], 7: ['fireShield', 'wallOfFire'], 9: ['geas', 'insectPlague'] },
+            '龙族血脉': { 3: ['alterSelf', 'chromaticOrb', 'command', 'dragonsBreath'], 5: ['fear', 'fly'], 7: ['arcaneEye', 'charmMonster'], 9: ['legendLore', 'summonDragon'] },
+        },
         // 兼职获得的熟练（armor 只用于显示）；skill 表示可从该职业技能表选 1 项
         multiclassGains: {
             barbarian: { armor: ['盾牌'], weapons: ['军用武器'] },

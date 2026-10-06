@@ -331,26 +331,26 @@
     // —— 施法 ——
     // 骰子表达式乘以倍数，用于戏法随等级增强："1d10" × 2 → "2d10"
     const scaleDice = (expr, times) => expr.replace(/(\d*)d(\d+)/g, (m, n, d) => `${(parseInt(n) || 1) * times}d${d}`);
-    const findSpell = (name) => Object.values(D.SPELLS || {}).find(s => s.name === name || s.id === name || s.name.split('/').includes(name));
+    const findSpell = (char, name) => Object.values(D.spellBook(char.edition)).find(s => s.name === name || s.id === name || s.name.split('/').includes(name));
 
     // .cast 法术名 [N环] [仪式] [@目标]：消耗法术位、处理专注，并结算攻击、豁免、治疗等
     // 返回检定卡片，changes = [{ char, log, rollback }] 记录对施法者和目标的改动
     const castSpell = (char, text, party = []) => {
         const m = String(text || '').trim().match(/^[.。]cast\s*(\S+)(.*)$/i);
         if (!m || !char) return null;
-        const spell = findSpell(m[1]); const rest = m[2] || '';
+        const spell = findSpell(char, m[1]); const rest = m[2] || '';
         const card = (level, extra = '', roll = '-') => ({ label: `施放 ${spell?.name || m[1]}`, roll, level, success: null, extra });
         if (!spell) return card('没有这个法术');
         if (char.raging) return card('狂暴中无法施法');
 
         // 施法职业：法术表里有这个法术的职业（兼职时取第一个），决定施法属性
-        const castClass = D.classEntries(char).map(e => e.classId).find(id => spell.classes.includes(id)) || D.classEntries(char).find(e => D.CLASSES[e.classId].spellAbility)?.classId;
+        const castClass = D.spellCastingClass(char, spell);
         const cls = D.CLASSES[castClass]; const level = parseInt(char.level) || 1;
         const ritual = spell.ritual && /仪式|ritual/i.test(rest);
         const slots = D.spellSlots(char);
         const rollback = snapshot(char, ['slotsUsed', 'concentration', 'tempHp', 'mageArmor', 'resourcesUsed']);
         const notes = []; let slotLevel = spell.level;
-        if (!(char.spellIds || []).includes(spell.id)) notes.push('不在已准备的法术中');
+        if (![...(char.spellIds || []), ...D.alwaysPreparedSpells(char)].includes(spell.id)) notes.push('不在已准备的法术中');
 
         if (spell.level > 0 && !ritual) {
             if (castClass === 'warlock' && spell.level >= 6) {
@@ -448,12 +448,12 @@
             state.order.push(...state.pending || []); delete state.pending;
             state.order.sort((a, b) => b.init - a.init);
         },
-        // 怪物库里有的生物，没写的数值自动补上
-        add(state, { name, hp, ac, init, xp }) {
-            const lib = D.findMonster?.(name);
+        // 怪物库里有的生物，没写的数值自动补上；edition 决定用哪版数据
+        add(state, { name, hp, ac, init, xp }, edition) {
+            const lib = D.findMonster?.(name, edition);
             const val = (v, fallback) => (v != null && v !== '' ? parseInt(v) || 0 : fallback);
             const maxHp = val(hp, lib?.hp) || 1;
-            const entry = { name, pc: false, hp: maxHp, maxHp, ac: val(ac, lib?.ac) || 10, init: D.d20Test({ mod: val(init, lib?.init) || 0 }).total, monster: lib?.id, xp: val(xp, lib?.xp) || 0 };
+            const entry = { name, pc: false, hp: maxHp, maxHp, ac: val(ac, lib?.ac) || 10, init: D.d20Test({ mod: val(init, lib?.init) || 0 }).total, monster: lib?.id, edition, xp: val(xp, lib?.xp) || 0 };
             if (!state.active) { (state.pending ||= []).push(entry); return entry; }
             state.order.push(entry); combat.sort(state);
             return entry;
@@ -499,8 +499,9 @@
                 else { const r = combat.end(state, chars); logs.push(r.log); changes.push(...r.changes); }
             } else if (m[3]) {
                 const spec = Object.fromEntries([...m[5].matchAll(/(hp|ac|init|xp)=([+-]?\d+)/gi)].map(x => [x[1].toLowerCase(), x[2]]));
-                const e = combat.add(state, { name: m[4], ...spec });
-                const cr = e.monster ? `，CR ${D.MONSTERS[e.monster].cr}` : '';
+                // 怪物数据跟着参战角色的规则版本走
+                const e = combat.add(state, { name: m[4], ...spec }, chars[0]?.char.edition);
+                const cr = e.monster ? `，CR ${D.monsterBook(e.edition)[e.monster].cr}` : '';
                 logs.push(`👹 ${e.name} 加入战斗（AC ${e.ac}，生命 ${e.hp}${cr}${state.active ? `，先攻 ${e.init}` : ''}）`);
             } else if (m[6]) {
                 const r = D.rollDice(m[8]);
@@ -517,7 +518,7 @@
     // 已准备法术按环阶列出：戏法 火焰箭、法师之手；1环 魔法飞弹
     const spellList = (char) => {
         const groups = {};
-        (char.spellIds || []).map(id => D.SPELLS?.[id]).filter(Boolean).forEach(sp => (groups[sp.level] ||= []).push(sp.name + (sp.concentration ? '(专注)' : '')));
+        [...new Set([...(char.spellIds || []), ...D.alwaysPreparedSpells(char)])].map(id => D.spellBook(char.edition)[id]).filter(Boolean).forEach(sp => (groups[sp.level] ||= []).push(sp.name + (sp.concentration ? '(专注)' : '')));
         return Object.keys(groups).sort((a, b) => a - b).map(lv => `${+lv ? `${lv}环` : '戏法'} ${groups[lv].join('、')}`).join('；');
     };
 

@@ -337,7 +337,15 @@
         return char.classId === 'warlock' ? Math.max(top, steps([[11, 6], [13, 7], [15, 8], [17, 9]])(clampLevel(char.level))) : top;
     };
     const maxSpellLevel = (char) => Math.max(0, ...classEntries(char).map(e => singleMaxSpellLevel(classView(char, e))));
-    const classSpells = (char) => Object.values(root.DND.SPELLS || {}).filter(s => classEntries(char).some(e => s.classes.includes(e.classId) && s.level <= singleMaxSpellLevel(classView(char, e))));
+    // 子职业表里到了等级的法术：table 为 alwaysPrepared（始终准备）或 expandedSpells（加进可选表）
+    const subclassSpellIds = (char, e, table) => Object.entries(edition(char.edition)[table]?.[e.subclass] || {}).filter(([lv]) => +lv <= e.level).flatMap(([, ids]) => ids);
+    // 可选法术：各职业的法术表加上子职业扩展表，环阶不超过该职业能学的
+    const classSpells = (char) => Object.values(root.DND.spellBook?.(char.edition) || {}).filter(s => classEntries(char).some(e => (s.classes.includes(e.classId) || subclassSpellIds(char, e, 'expandedSpells').includes(s.id)) && s.level <= singleMaxSpellLevel(classView(char, e))));
+    // 子职业送的始终准备法术（不占准备数量）
+    const alwaysPreparedSpells = (char) => [...new Set(classEntries(char).flatMap(e => subclassSpellIds(char, e, 'alwaysPrepared')))].filter(id => root.DND.spellBook?.(char.edition)[id]);
+    // 施放某个法术用的职业：法术表、子职业送的或扩展表里有它的职业，都没有就取第一个施法职业
+    const spellCastingClass = (char, spell) => (classEntries(char).find(e => spell.classes.includes(e.classId) || subclassSpellIds(char, e, 'alwaysPrepared').includes(spell.id) || subclassSpellIds(char, e, 'expandedSpells').includes(spell.id))
+        || classEntries(char).find(e => CLASSES[e.classId].spellAbility))?.classId;
 
     // 职业资源：[{ id, name, max, used, left, recharge, shortRegain }]，max 为 99 表示不限次数
     // 兼职时各职业资源分别按职业等级算；同名资源（如牧师和圣武士的引导神力）不叠加次数，取多的那个
@@ -509,7 +517,7 @@
         if (char.baseAbilities) char.abilities = finalAbilities(char);
         char.skillProfs = [...new Set([...(char.skillProfs || []), ...grantedSkills(char)])].filter(id => SKILLS[id]);
         char.weapons = (char.weapons || []).filter(id => WEAPONS[id]);
-        if (root.DND.SPELLS) char.spellIds = (char.spellIds || []).filter(id => root.DND.SPELLS[id]);
+        if (root.DND.spellBook) char.spellIds = (char.spellIds || []).filter(id => root.DND.spellBook(char.edition)[id]);
         if (root.DND.FIGHTING_STYLES && !root.DND.FIGHTING_STYLES[char.fightingStyle]) char.fightingStyle = '';
         const hp = maxHp(char);
         if (hp && !data?.maxHp) char.hp = hp;
@@ -517,5 +525,5 @@
         return char;
     };
 
-    root.DND = { ABILITIES, SKILLS, ALL_SKILLS, CLASSES, ARMOR, WEAPONS, CONDITIONS, XP_TABLE, STANDARD_ARRAY, POINT_BUY, editions, edition, classInfo, isLucky, casterSummary, classEntries, classLevel, subclassEntry, isMulticlass, classSummary, hitDicePool, hitDiceText, multiclassIssues, fitMulticlass, MULTICLASS_REQ, slotLevel, slotLabel, weaponData, signed, abilityMod, profBonus, levelFromXp, rollDice, d20Test, saveProficient, saveMod, skillMod, passivePerception, armorClass, maxHp, spellSlots, spellSaveDc, spellAttack, weaponAttack, weaponProficient, initiativeMod, speed, halfProficiency, auraOfProtection, steps, critRange, rageDamage, sneakAttackDice, classFeatures, classResources, asiRecords, asiLevels, characterFeats, hasFeat, hasFightingStyle, cantripsKnown, spellsAllowed, maxSpellLevel, classSpells, raceOf, subraceOf, backgroundOf, subclassLevel, pointBuyCost, finalAbilities, grantedSkills, skillChoices, newCharacter, normalizeCharacter };
+    root.DND = { ABILITIES, SKILLS, ALL_SKILLS, CLASSES, ARMOR, WEAPONS, CONDITIONS, XP_TABLE, STANDARD_ARRAY, POINT_BUY, editions, edition, classInfo, isLucky, casterSummary, classEntries, classLevel, subclassEntry, isMulticlass, classSummary, hitDicePool, hitDiceText, multiclassIssues, fitMulticlass, MULTICLASS_REQ, slotLevel, slotLabel, weaponData, signed, abilityMod, profBonus, levelFromXp, rollDice, d20Test, saveProficient, saveMod, skillMod, passivePerception, armorClass, maxHp, spellSlots, spellSaveDc, spellAttack, weaponAttack, weaponProficient, initiativeMod, speed, halfProficiency, auraOfProtection, steps, critRange, rageDamage, sneakAttackDice, classFeatures, classResources, asiRecords, asiLevels, characterFeats, hasFeat, hasFightingStyle, cantripsKnown, spellsAllowed, maxSpellLevel, classSpells, alwaysPreparedSpells, spellCastingClass, raceOf, subraceOf, backgroundOf, subclassLevel, pointBuyCost, finalAbilities, grantedSkills, skillChoices, newCharacter, normalizeCharacter };
 })(typeof window !== 'undefined' ? window : globalThis);

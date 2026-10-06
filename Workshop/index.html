@@ -1172,6 +1172,12 @@
                         <div class="text-[11px] font-serif" :class="spellStats.cantrips > spellStats.cantripMax || spellStats.spells > spellStats.spellMax ? 'text-red-400' : 'text-slate-400'">
                             戏法 {{ spellStats.cantrips }}/{{ spellStats.cantripMax }} · {{ spellStats.label }} {{ spellStats.spells }}/{{ spellStats.spellMax }}
                         </div>
+                        <div v-if="alwaysSpells.length" class="flex flex-wrap items-center gap-1.5">
+                            <span class="text-[10px] text-slate-500">子职业法术（始终准备，不占数量）</span>
+                            <span v-for="sp in alwaysSpells" :key="sp.id" :title="sp.desc" class="px-2 py-0.5 rounded border border-mystic-green/40 bg-mystic-green/10 text-xs text-mystic-green">
+                                <span class="text-[10px] font-mono">{{ sp.level || '戏' }}</span> {{ sp.name }}
+                            </span>
+                        </div>
                         <div v-if="chosenSpells.length" class="flex flex-wrap gap-1.5">
                             <span v-for="sp in chosenSpells" :key="sp.id" :title="sp.desc" class="px-2 py-0.5 rounded border border-indigo-800/50 bg-indigo-900/10 text-xs text-indigo-200">
                                 <span class="text-[10px] text-indigo-400 font-mono">{{ sp.level || '戏' }}</span> {{ sp.name }}<span v-if="sp.concentration" class="text-[10px] text-sky-400"> 专注</span>
@@ -2720,7 +2726,9 @@
             const toggleIn = (list, value) => { const i = list.indexOf(value); i === -1 ? list.push(value) : list.splice(i, 1); };
 
             // 法术：已选列表、数量上限、可选法术与机制说明
-            const chosenSpells = computed(() => hero.spellIds.map(id => DND.SPELLS[id]).filter(Boolean).sort((a, b) => a.level - b.level));
+            const book = computed(() => DND.spellBook(hero.edition));
+            const alwaysSpells = computed(() => DND.alwaysPreparedSpells(hero).map(id => book.value[id]).filter(Boolean).sort((a, b) => a.level - b.level));
+            const chosenSpells = computed(() => hero.spellIds.map(id => book.value[id]).filter(Boolean).sort((a, b) => a.level - b.level));
             const spellStats = computed(() => {
                 const allowed = DND.spellsAllowed(hero);
                 return {
@@ -2751,8 +2759,9 @@
                 const fitted = DND.fitMulticlass(hero);
                 if (JSON.stringify(fitted) !== JSON.stringify(hero.multiclass)) hero.multiclass = fitted;
                 hero.multiclass.forEach(m => { if (m.subclass && (m.level < DND.subclassLevel(hero, m.classId) || !DND.CLASSES[m.classId].subclasses.some(s => s.name === m.subclass))) m.subclass = ''; });
-                const myClasses = DND.classEntries(hero).map(e => e.classId);
-                if (hero.spellIds.some(id => !DND.SPELLS[id]?.classes.some(c => myClasses.includes(c)))) hero.spellIds = hero.spellIds.filter(id => DND.SPELLS[id]?.classes.some(c => myClasses.includes(c)));
+                // 只保留当前职业（含子职业扩展表）能选的法术
+                const allowed = new Set(DND.classSpells(hero).map(sp => sp.id));
+                if (hero.spellIds.some(id => !allowed.has(id))) hero.spellIds = hero.spellIds.filter(id => allowed.has(id));
                 if (hero.race && !edition.races[hero.race]) hero.race = '';
                 if (hero.background && !edition.backgrounds[hero.background]) hero.background = '';
                 const r = race.value;
@@ -2843,7 +2852,7 @@ JSON 结构：
                     catch { throw new Error('AI 返回的内容不是有效的角色数据，请重试或换个描述'); }
 
                     const current = JSON.parse(JSON.stringify(hero));
-                    if (Array.isArray(result.spellNames)) result.spellIds = result.spellNames.map(n => Object.values(DND.SPELLS).find(sp => sp.name === n)?.id).filter(Boolean);
+                    if (Array.isArray(result.spellNames)) result.spellIds = result.spellNames.map(n => Object.values(DND.spellBook(result.edition || hero.edition)).find(sp => sp.name === n)?.id).filter(Boolean);
                     Object.assign(hero, DND.normalizeCharacter({
                         ...current, ...result,
                         id: current.id, edition: current.edition, avatar: current.avatar, history: current.history, badges: current.badges,
@@ -3242,7 +3251,7 @@ return {
     abilityNames, editionList, alignments, weaponProps, backstoryFields, ed, cls, race, subrace, bg, granted, derived, skillChoices, weaponRows, weaponList, featureList, resourceList,
     primaryLevel, classSummary, multiclassIssues, hitDiceText, hasCaster, casterSummary, slotLabel, subclassUnlock, multiclassGainText, addMulticlass, hpRollRows, clearHpRolls,
     fightingStyles, hasStyle, asiLevels, feats, featOptions, setAsiMode, rollHp, startingGear, takeStartingGear, isSaveProf,
-    showSpellModal, spellLevelFilter, spellSearch, chosenSpells, spellStats, spellOptions, spellMech, toggleSpell,
+    showSpellModal, spellLevelFilter, spellSearch, chosenSpells, alwaysSpells, spellStats, spellOptions, spellMech, toggleSpell,
     saveMod, skillMod, fixedBonus, bonusRule, abilityHint, applyStandardArray, resetPointBuy, rollAbilities, changeGenMethod,
     toggleSkill, toggleExpertise, toggleCondition,
     classes: DND.CLASSES, skills: DND.SKILLS, armors: DND.ARMOR, conditions: DND.CONDITIONS,

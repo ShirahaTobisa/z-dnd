@@ -5372,7 +5372,7 @@
                             ...(DND.FIGHTING_STYLES[c.fightingStyle] ? [{ ...DND.FIGHTING_STYLES[c.fightingStyle], source: '战斗风格' }] : []),
                         ],
                         hitDice: (() => { const pool = DND.hitDicePool(c); return `${pool.length - (parseInt(c.hitDiceUsed) || 0)}/${pool.length}${DND.isMulticlass(c) ? `（${DND.hitDiceText(pool)}）` : ''}`; })(),
-                        spells: (c.spellIds || []).map(id => DND.SPELLS[id]).filter(Boolean).sort((a, b) => a.level - b.level),
+                        spells: [...new Set([...(c.spellIds || []), ...DND.alwaysPreparedSpells(c)])].map(id => DND.spellBook(c.edition)[id]).filter(Boolean).sort((a, b) => a.level - b.level),
                         spellInfo: DND.casterSummary(c),
                     };
                 });
@@ -7494,7 +7494,7 @@ ${buildInvestigatorProfile(inv)}
                     const c = cocState.combat;
                     if (!c?.active) return '';
                     const order = c.order.map(e => `${e.name}(先攻${e.init}${e.pc ? '' : `，生命${e.hp}/${e.maxHp}`})`).join(' → ');
-                    const briefs = [...new Set(c.order.map(e => e.monster).filter(Boolean))].map(id => DND.monsterBrief(DND.MONSTERS[id]));
+                    const briefs = [...new Set(c.order.filter(e => e.monster).map(e => `${e.edition}|${e.monster}`))].map(k => { const [ed, id] = k.split('|'); return DND.monsterBrief(DND.monsterBook(ed)[id]); });
                     return `\n<combat_status>第 ${c.round} 轮，现在轮到 ${c.order[c.turn]?.name} 行动。先攻顺序：${order}。请严格按此顺序结算，每个角色或敌人行动完毕输出一次 .next，不要跳过或多推。${briefs.length ? `\n怪物数据：${briefs.join('\n')}` : ''}</combat_status>`;
                 };
                 const syncCombat = () => { if (cocState.mode === 'multi' && multiplayerState.isHost) broadcastState(); };

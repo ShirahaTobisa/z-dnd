@@ -328,6 +328,144 @@ brandingSmite|烙印斩|2|塑能|B|自身|1分|c|P|d:2d6:光耀;u:1d6|下一次�
 arcaneHand|魔法巨掌|5|塑能|A|120尺|1分|c|W|a:4d8:力场;u:2d8|召唤一只力场巨手，可以握拳攻击、推撞、抓住或挡住生物。
 reincarnate|转生术|5|变化|1h|触及|I||D||让死去不超过十天的类人生物以随机的新身体复活。
 `;
+    // 2024 版（SRD 5.2）与上面不同的法术：整行覆盖；新增法术也写在这里
+    const RAW_2024 = `
+acidSplash|酸液飞溅|0|塑能|A|60尺|I||SW|s:DEX:1d6:强酸|向一或两个相邻生物泼洒酸液。
+chillTouch|颤栗之触|0|死灵|A|触及|I||SKW|a:1d10:黯蚀|近战法术攻击，目标到你下回合结束前无法回复生命。
+dancingLights|舞光术|0|幻术|A|120尺|1分|c|BSW||制造至多四团可移动的光点。
+message|传讯术|0|变化|A|120尺|1轮||BDSW||与远处的生物低声传话。
+poisonSpray|毒气喷射|0|死灵|A|30尺|I||DSKW|s:CON:1d12:毒素|向目标喷出毒雾。
+produceFlame|燃火术|0|咒法|B|自身|10分||D|a:1d8:火焰|手中生出火焰照明，也可投掷出去攻击。
+shillelagh|橡棍术|0|变化|B|自身|1分||D||木棍或长棍改用施法属性攻击，伤害骰为 d8（5、11、17 级提升），可改为力场伤害。
+spareTheDying|维生术|0|死灵|A|15尺|I||CD||稳定一名生命为 0 的生物。
+trueStrike|克敌机先|0|预言|A|自身|I||BSKW||用施法属性代替力量或敏捷进行一次武器攻击，可改为光耀伤害；5 级起额外光耀伤害。
+viciousMockery|恶言相加|0|惑控|A|60尺|I||B|s:WIS:1d6:心灵|恶毒的话语伤人，失败者下一次攻击检定具有劣势。
+bane|灾祸术|1|惑控|A|30尺|1分|c|BCK||至多三个生物的攻击和豁免减 1d4（魅力豁免）。
+colorSpray|七彩喷射|1|幻术|A|自身(15尺锥)|I||BSW||锥形范围内的生物体质豁免，失败者目盲到你下回合结束。
+command|命令术|1|惑控|A|60尺|I||BCP||下达一个词的命令（感知豁免）。
+cureWounds|治疗伤口|1|防护|A|触及|I||BCDPR|h:2d8+m;u:2d8|触碰一个生物为其回复生命。
+detectMagic|侦测魔法|1|预言|A|自身|10分|cr|BCDPRSKW||感知 30 尺内的魔法。
+divineFavor|神恩|1|变化|B|自身|1分||P||武器命中额外造成 1d4 光耀伤害。
+entangle|纠缠术|1|咒法|A|90尺|1分|c|DR||藤蔓缠住区域内的生物（力量豁免）。
+falseLife|虚假生命|1|死灵|A|自身|I||SW|t:2d4+4;u:5|获得临时生命。
+goodberry|神莓术|1|咒法|A|自身|24时||DR||制造十颗浆果，每颗回复 1 点生命。
+grease|油腻术|1|咒法|A|60尺|1分||SW||地面变滑，区域内生物可能倒地（敏捷豁免）。
+healingWord|治愈真言|1|防护|B|60尺|I||BCD|h:2d4+m;u:2d4|附赠动作为视线内一个生物回复生命。
+hideousLaughter|塔莎狂笑术|1|惑控|A|30尺|1分|c|BKW||目标狂笑倒地并失能（感知豁免）。
+inflictWounds|致伤术|1|死灵|A|触及|I||C|s:CON:2d10:黯蚀:h;u:1d10|触碰一个生物，体质豁免失败受黯蚀伤害，成功减半。
+jump|跳跃术|1|变化|B|触及|1分||DRSW||目标的跳跃距离变为三倍。
+protectionFromEvilAndGood|防护善恶|1|防护|A|触及|10分|c|CDPKW||异怪、天界、邪魔等攻击目标时具有劣势。
+sleep|睡眠术|1|惑控|A|60尺|1分|c|BSW||范围内生物感知豁免，失败者失能，回合结束再失败则陷入昏睡；需专注。
+speakWithAnimals|动物交谈|1|预言|A|自身|10分|r|BDRK||能与野兽交谈。
+aid|援助术|2|防护|A|30尺|8时||BCDPR||至多三个生物的生命上限和当前生命各 +5。
+augury|卜筮术|2|预言|1m|自身|I|r|CDW||预知半小时内某项行动的吉凶。
+barkskin|树肤术|2|变化|B|触及|1时||DR||目标的 AC 不会低于 17，不需专注。
+blindnessDeafness|目盲/耳聋术|2|变化|A|120尺|1分||BCSW||令目标目盲或耳聋（体质豁免）。
+continualFlame|不灭明焰|2|塑能|A|触及|永久||CDW||制造永不熄灭、不发热的火焰。
+darkness|黑暗术|2|塑能|A|60尺|10分|c|SKW||制造一片魔法黑暗。
+enhanceAbility|强化属性|2|变化|A|触及|1时|c|BCDRSW||目标某项属性的检定具有优势等增益。
+enlargeReduce|变巨术/缩小术|2|变化|A|30尺|1分|c|BDSW||令目标体型变大或变小。
+enthrall|迷惑术|2|惑控|A|60尺|1分|c|BK||令附近生物的注意力被你吸引。
+findSteed|寻获坐骑|2|咒法|A|30尺|I||P||召唤一匹聪慧忠诚的坐骑。
+flameBlade|焰刃术|2|塑能|B|自身|10分|c|DS|a:3d6:火焰;u2:1d6|手中生成火焰之刃，进行近战法术攻击。
+flamingSphere|炽焰法球|2|咒法|A|60尺|1分|c|DSW|s:DEX:2d6:火焰:h;u:1d6|可移动的火球撞击附近生物。
+gentleRepose|遗体防腐|2|死灵|A|触及|10天|r|CPW||防止尸体腐坏或成为不死生物。
+gustOfWind|造风术|2|塑能|A|自身(60尺线)|1分|c|DRSW||强风推开直线上的生物（力量豁免）。
+lesserRestoration|次级复原术|2|防护|B|触及|I||BCDPR||解除一种疾病，或目盲、耳聋、麻痹、中毒。
+magicWeapon|魔化武器|2|变化|B|触及|1时||PRSW||武器成为 +1 魔法武器。
+mirrorImage|镜影术|2|幻术|A|自身|1分||BSKW||制造三个分身替你吸引攻击。
+prayerOfHealing|治疗祷言|2|防护|10m|30尺|I||CP|h:2d8+m;u:1d8|为至多六个生物回复生命。
+shatter|粉碎音波|2|塑能|A|60尺|I||BSW|s:CON:3d8:雷鸣:h;u:1d8|一声巨响震伤区域内的一切。
+spiritualWeapon|灵体武器|2|塑能|B|60尺|1分|c|C|a:1d8+m:力场;u:1d8|召唤漂浮的灵体武器，用附赠动作移动并攻击；需专注。
+wardingBond|守护联结|2|防护|A|触及|1时||CP||目标 AC 和豁免 +1，你分担它受到的伤害。
+conjureAnimals|召唤动物|3|咒法|A|60尺|10分|c|DR||召唤野兽协助战斗。
+dispelMagic|解除魔法|3|防护|A|120尺|I||BCDPRSKW||解除目标身上的法术效果。
+massHealingWord|群体治愈真言|3|防护|B|60尺|I||BC|h:2d4+m;u:1d4|为至多六个生物回复生命。
+meldIntoStone|融身入石|3|变化|A|触及|8时|r|CDR||融入石头中藏身。
+revivify|回生术|3|死灵|A|触及|I||CDPR||令一分钟内死亡的生物复活，恢复 1 点生命。
+sending|短讯术|3|预言|A|无限|I||BCW||向熟悉的生物发送一条短讯，对方可回复。
+slow|缓慢术|3|变化|A|120尺|1分|c|BSW||至多六个生物 AC -2、速度减半、行动受限（感知豁免）。
+speakWithDead|死者交谈|3|死灵|A|10尺|10分||BCW||向一具尸体提出五个问题。
+vampiricTouch|吸血鬼之触|3|死灵|A|自身|1分|c|SKW|a:3d6:黯蚀;u:1d6|近战法术攻击，回复造成伤害一半的生命。
+windWall|风墙术|3|塑能|A|120尺|1分|c|DR|s:STR:4d8:钝击:h|竖起一道狂风之墙，阻挡箭矢和小型飞行物。
+banishment|放逐术|4|防护|A|30尺|1分|c|CPSKW||把目标放逐到异界（魅力豁免）。
+conjureMinorElementals|召唤次级元素|4|咒法|A|自身|10分|c|DW||召唤元素生物协助你。
+conjureWoodlandBeings|召唤林地生物|4|咒法|A|自身|10分|c|DR||召唤妖精生物协助你。
+divination|预言术|4|预言|A|自身|I|r|CDW||向神祇询问一个关于近期事件的问题。
+dominateBeast|支配野兽|4|惑控|A|60尺|1分|c|DRS||控制一只野兽（感知豁免）。
+fireShield|火焰护盾|4|塑能|A|自身|10分||DSW||获得冷冻或火焰抗性，近战攻击你的生物受 2d8 伤害。
+giantInsect|巨虫术|4|咒法|A|60尺|10分|c|D||把昆虫变成巨型生物为你作战。
+iceStorm|冰风暴|4|塑能|A|300尺|I||DSW|s:DEX:2d10+4d6:钝击与冷冻:h;u:1d10|冰雹砸落，地面变为困难地形。
+phantasmalKiller|幻影杀手|4|幻术|A|120尺|1分|c|BW|s:WIS:4d10:心灵;u:1d10|把目标最深的恐惧具象化。
+resilientSphere|欧提路克弹力法球|4|防护|A|30尺|1分|c|W||把生物困在力场球中（敏捷豁免）。
+secretChest|李奥蒙秘藏箱|4|咒法|A|触及|直到解除||W||把一个箱子藏到以太位面，随时召回。
+stoneskin|石肤术|4|变化|A|触及|1时|c|DRSW||目标抵抗钝击、穿刺、挥砍伤害。
+coneOfCold|寒冰锥|5|塑能|A|自身(60尺锥)|I||DSW|s:CON:8d8:冷冻:h;u:1d8|喷出锥形的刺骨寒气。
+conjureElemental|召唤元素|5|咒法|A|60尺|10分|c|DW||召唤一个元素生物。
+flameStrike|焰击术|5|塑能|A|60尺|I||C|s:DEX:5d6+5d6:火焰与光耀:h;u:2d6|一道神圣火柱从天而降。
+greaterRestoration|高等复原术|5|防护|A|触及|I||BCDPR||解除魅惑、石化、诅咒、属性减值等。
+hallow|圣居|5|防护|24h|触及|永久||C||圣化一片区域，阻止特定生物进入。
+massCureWounds|群体治疗伤口|5|防护|A|60尺|I||BCD|h:5d8+m;u:1d8|为至多六个生物回复生命。
+mislead|误导术|5|幻术|A|自身|1时|c|BKW||自己隐形，同时制造一个分身。
+planarBinding|异界誓缚|5|防护|1h|60尺|24时||BCDKW||束缚一个异界生物为你效力。
+telepathicBond|心灵联结|5|预言|A|30尺|1时|r|BW||至多八个生物之间心灵相通。
+teleportationCircle|传送法阵|5|咒法|1m|10尺|1轮||BSKW||传送到一个已知的永久法阵。
+circleOfDeath|死亡法阵|6|死灵|A|150尺|I||SKW|s:CON:8d8:黯蚀:h;u:2d8|负能量球体向外扩散。
+conjureFey|召唤妖精|6|咒法|A|60尺|10分|c|D||召唤一个妖精生物。
+contingency|触发术|6|防护|10m|自身|10天||W||预设条件，满足时自动施展一个法术。
+fleshToStone|石化术|6|变化|A|60尺|1分|c|DSW||把生物逐渐变成石头（体质豁免）。
+freezingSphere|欧提路克冰封法球|6|塑能|A|300尺|I||SW|s:CON:10d6:冷冻:h;u:1d6|冰冷的法球爆裂，可冻结水面。
+guardsAndWards|守卫与结界|6|防护|1h|触及|24时||BW||用多种魔法守护一座建筑。
+heal|医疗术|6|防护|A|60尺|I||CD|h:70;u:10|回复 70 点生命，并解除目盲、耳聋和疾病。
+heroesFeast|英雄宴|6|咒法|10m|自身|I||BCD||盛宴令参与者免疫毒素与恐慌，并增加生命上限。
+massSuggestion|群体暗示术|6|惑控|A|60尺|24时||BSW||向至多十二个生物下达暗示。
+sunbeam|阳炎射线|6|塑能|A|自身(60尺线)|1分|c|CDSW|s:CON:6d8:光耀:h|灼热的阳光射线，失败者目盲。
+transportViaPlants|植物传送|6|咒法|A|10尺|1分||D||经由植物传送到远方。
+arcaneSword|魔邓肯魔剑|7|塑能|A|90尺|1分|c|BW|a:4d12:力场|召唤一柄力场之剑，用附赠动作攻击。
+conjureCelestial|召唤天界生物|7|咒法|A|90尺|10分|c|C||召唤一个天界生物。
+etherealness|虚体术|7|咒法|A|自身|8时||BCSKW||进入以太位面。
+forcecage|力场监牢|7|塑能|A|100尺|1时|c|BKW||把生物困在力场笼中。
+prismaticSpray|虹光喷射|7|塑能|A|自身(60尺锥)|I||BSW|s:DEX:12d6:多种:h|七色光束射出，每道光效果不同。
+symbol|徽记术|7|防护|1m|触及|直到解除||BCDW||刻下触发时产生强大效果的徽记。
+animalShapes|动物形态|8|变化|A|30尺|24时||D||把多个生物变成野兽。
+antipathySympathy|反感/共感术|8|惑控|1h|60尺|10天||BDW||令特定生物厌恶或被吸引。
+demiplane|半位面|8|咒法|A|60尺|1时||SKW||开启一扇通往空房间半位面的门。
+earthquake|地震术|8|变化|A|500尺|1分|c|CDS||引发剧烈的地震。
+glibness|舌粲莲花|8|惑控|A|自身|1时||BK||魅力检定至少按 15 计，谎言不会被魔法识破。
+incendiaryCloud|燃烧云|8|咒法|A|150尺|1分|c|DSW|s:DEX:10d8:火焰:h|一团会移动的燃烧烟云。
+sunburst|阳爆术|8|塑能|A|150尺|I||CDSW|s:CON:12d6:光耀:h|耀眼的阳光爆发，失败者目盲。
+astralProjection|星界投射|9|死灵|1h|10尺|直到解除||CKW||让灵体进入星界。
+gate|异界之门|9|咒法|A|60尺|1分|c|CSKW||开启通往其他位面的传送门。
+massHeal|群体医疗术|9|防护|A|60尺|I||C|h:700|把 700 点治疗分给附近的生物。
+prismaticWall|虹光墙|9|防护|A|60尺|10分||BW||召唤一道七层光幕之墙。
+stormOfVengeance|复仇风暴|9|咒法|A|1里|1分|c|D||召唤毁灭性的风暴云。
+weird|怪诞术|9|幻术|A|120尺|1分|c|KW|s:WIS:10d10:心灵:h|令一群生物看见最恐惧的幻象，失败者恐慌并持续受伤。
+arcaneHand|魔法巨掌|5|塑能|A|120尺|1分|c|SW|a:5d8:力场;u:2d8|召唤一只力场巨手，可以握拳攻击、推撞、抓住或挡住生物。
+reincarnate|转生术|5|死灵|1h|触及|I||D||让死去不超过十天的类人生物以随机的新身体复活。
+auraOfLife|生命光环|4|防护|A|自身|10分|c|CP||30 尺光环内盟友抵抗黯蚀，生命上限不会降低，0 生命的盟友回合开始回复 1 点。
+befuddlement|心智迷乱|8|惑控|A|150尺|I||BDKW|s:INT:10d12:心灵:h|失败者不能施法，也不能执行魔法动作。
+charmMonster|魅惑怪物|4|惑控|A|30尺|1时||BDSKW||令一个生物感知豁免，失败者被你魅惑。
+chromaticOrb|繁彩法球|1|塑能|A|90尺|I||SW|a:3d8:自选元素;u:1d8|掷出一颗元素法球，伤害骰相同时可弹射到另一目标。
+dissonantWhispers|不谐低语|1|惑控|A|60尺|I||B|s:WIS:3d6:心灵:h;u:1d6|失败者必须用反应远离你。
+dragonsBreath|龙息术|2|变化|B|触及|1分|c|SW|s:DEX:3d6:自选元素:h;u:1d6|让一个生物能用动作喷出 15 尺锥形元素吐息。
+elementalism|元素操控|0|变化|A|30尺|I||DSW||做出微小的元素效果，如吹风、点火、造水、塑土。
+ensnaringStrike|诱捕打击|1|咒法|B|自身|1分|c|R|s:STR:1d6:穿刺;u:1d6|武器命中后荆棘缠住目标，失败者被束缚并每回合受穿刺伤害。
+hex|脆弱诅咒|1|惑控|B|90尺|1时|c|K|d:1d6:黯蚀|诅咒目标，你命中它时额外造成黯蚀伤害，它的一项属性检定具有劣势。
+iceKnife|冰刃术|1|咒法|A|60尺|I||DSW|a:1d10:穿刺;s:DEX:2d6:冷冻|冰刃命中或落空后爆开，周围生物敏捷豁免受冷冻伤害（升环每环 +1d6）。
+mindSpike|心灵尖刺|2|预言|A|120尺|1时|c|SKW|s:WIS:3d8:心灵:h;u:1d8|刺入一个生物的心灵，失败者无法对你隐形。
+phantasmalForce|幻象之力|2|幻术|A|60尺|1分|c|BSW|s:INT:2d8:心灵|在一个生物脑中制造一个只有它能看见的逼真幻象。
+powerWordHeal|律令：医疗|9|惑控|A|60尺|I||BC||一个生物回满生命，并解除魅惑、恐慌、麻痹、中毒、震慑。
+rayOfSickness|致病射线|1|死灵|A|60尺|I||SW|a:2d8:毒素;u:1d8|命中后目标中毒到你下回合结束。
+searingSmite|灼热斩|1|塑能|B|自身|1分||P|d:1d6:火焰;u:1d6|武器命中后目标着火，每回合开始受火焰伤害，体质豁免成功可扑灭。
+shiningSmite|辉耀斩|2|变化|B|自身|1分|c|P|d:2d6:光耀;u:1d6|武器命中后目标发光，无法隐形，对它的攻击具有优势。
+sorcerousBurst|术法爆发|0|塑能|A|120尺|I||S|a:1d8:自选元素|掷出一团魔力，伤害骰掷出 8 可再加一颗。
+starryWisp|星辉微光|0|塑能|A|60尺|I||BD|a:1d8:光耀|射出一点星光，命中的目标发光且无法隐形。
+summonDragon|召唤龙灵|5|咒法|A|60尺|1时|c|W||召唤一个龙灵听你指挥，可以喷吐、撕咬。
+tsunami|海啸术|8|咒法|1m|1里|6轮|c|D|s:STR:6d10:钝击:h|召唤一道巨大的水墙向前推进。
+vitriolicSphere|强酸法球|4|塑能|A|150尺|I||SW|s:DEX:10d4:强酸:h;u:2d4|强酸法球炸开，失败者下回合结束时再受酸蚀伤害。
+blackTentacles|艾伐黑触手|4|咒法|A|90尺|1分|c|W|s:STR:3d6:钝击|触手束缚并伤害区域内的生物（力量豁免）。
+`;
+    const REMOVED_2024 = ['feeblemind', 'brandingSmite'];
     const CLASS_BY_LETTER = { B: 'bard', C: 'cleric', D: 'druid', P: 'paladin', R: 'ranger', S: 'sorcerer', K: 'warlock', W: 'wizard' };
     const TIME = { A: '动作', B: '附赠动作', R: '反应' };
 
@@ -346,14 +484,18 @@ reincarnate|转生术|5|变化|1h|触及|I||D||让死去不超过十天的类人
         return mech;
     };
 
-    const SPELLS = {};
-    for (const line of RAW.trim().split('\n')) {
+    const parse = (raw) => Object.fromEntries(raw.trim().split('\n').map(line => {
         const [id, name, level, school, time, range, duration, tags, classes, mech, desc] = line.split('|');
-        SPELLS[id] = {
+        return [id, {
             id, name, level: parseInt(level), school, time: TIME[time] || time.replace('m', ' 分钟').replace('h', ' 小时'), range,
             duration: duration === 'I' ? '立即' : duration, concentration: tags.includes('c'), ritual: tags.includes('r'),
             classes: [...classes].map(l => CLASS_BY_LETTER[l]), ...parseMech(mech), desc,
-        };
-    }
+        }];
+    }));
+    // SPELLS 为 2014 版法术表；spellBook(版本) 取对应版本的法术表
+    const SPELLS = parse(RAW);
+    const SPELLS_2024 = { ...SPELLS, ...parse(RAW_2024) };
+    REMOVED_2024.forEach(id => delete SPELLS_2024[id]);
     root.DND.SPELLS = SPELLS;
+    root.DND.spellBook = (edition) => (edition === '2024' ? SPELLS_2024 : SPELLS);
 })(typeof window !== 'undefined' ? window : globalThis);
