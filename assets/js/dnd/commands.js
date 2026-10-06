@@ -279,12 +279,12 @@
     // 长休：回满生命与法术位，恢复全部职业资源与生命骰（2014 版恢复一半），力竭 -1
     // 短休：恢复短休资源、契约法术位，长休资源中注明 shortRegain 的恢复对应次数
     const rest = (char, type) => {
-        const rollback = snapshot(char, ['slotsUsed', 'hitDiceUsed', 'exhaustion', 'resourcesUsed', ...HP_KEYS]);
+        const rollback = snapshot(char, ['slotsUsed', 'hitDiceUsed', 'exhaustion', 'resourcesUsed', 'mageArmor', ...HP_KEYS]);
         const resources = D.classResources(char);
         char.raging = false;
         if (/长|long/i.test(type)) {
             if (char.dead) return { ok: true, log: `${char.name} 已经死亡，无法休息恢复`, rollback };
-            Object.assign(char, { hp: char.maxHp, tempHp: 0, slotsUsed: {}, deathSaves: { success: 0, fail: 0 }, resourcesUsed: {} });
+            Object.assign(char, { hp: char.maxHp, tempHp: 0, slotsUsed: {}, deathSaves: { success: 0, fail: 0 }, resourcesUsed: {}, mageArmor: false, concentration: '' });
             removeCondition(char, '昏迷');
             const level = parseInt(char.level) || 1;
             char.hitDiceUsed = D.edition(char.edition).longRestHitDice === 'all' ? 0 : Math.max(0, (parseInt(char.hitDiceUsed) || 0) - Math.max(1, Math.floor(level / 2)));
@@ -302,6 +302,96 @@
         if (D.classInfo(char)?.caster === 'pact') { char.slotsUsed = {}; restored.push('契约法术位'); }
         const left = (parseInt(char.level) || 1) - (parseInt(char.hitDiceUsed) || 0);
         return { ok: true, log: `${char.name} 完成短休${restored.length ? `，恢复：${restored.join('、')}` : ''}；可用 .hd 花费生命骰回复生命（剩余 ${left} 枚）`, rollback };
+    };
+
+    // —— 施法 ——
+    // 骰子表达式乘以倍数，用于戏法随等级增强："1d10" × 2 → "2d10"
+    const scaleDice = (expr, times) => expr.replace(/(\d*)d(\d+)/g, (m, n, d) => `${(parseInt(n) || 1) * times}d${d}`);
+    const findSpell = (name) => Object.values(D.SPELLS || {}).find(s => s.name === name || s.id === name || s.name.split('/').includes(name));
+
+    // .cast 法术名 [N环] [仪式] [@目标]：消耗法术位、处理专注，并结算攻击、豁免、治疗等
+    // 返回检定卡片，changes = [{ char, log, rollback }] 记录对施法者和目标的改动
+    const castSpell = (char, text, party = []) => {
+        const m = String(text || '').trim().match(/^[.。]cast\s*(\S+)(.*)$/i);
+        if (!m || !char) return null;
+        const spell = findSpell(m[1]); const rest = m[2] || '';
+        const card = (level, extra = '', roll = '-') => ({ label: `施放 ${spell?.name || m[1]}`, roll, level, success: null, extra });
+        if (!spell) return card('没有这个法术');
+        if (char.raging) return card('狂暴中无法施法');
+
+        const cls = D.classInfo(char); const level = parseInt(char.level) || 1;
+        const ritual = spell.ritual && /仪式|ritual/i.test(rest);
+        const slots = D.spellSlots(char);
+        const rollback = snapshot(char, ['slotsUsed', 'concentration', 'tempHp', 'mageArmor', 'resourcesUsed']);
+        const notes = []; let slotLevel = spell.level;
+        if (!(char.spellIds || []).includes(spell.id)) notes.push('不在已准备的法术中');
+
+        if (spell.level > 0 && !ritual) {
+            if (cls?.caster === 'pact' && spell.level >= 6) {
+                const arcanum = D.classResources(char).find(r => r.id === 'arcanum');
+                if (!arcanum?.left) return card('秘法玄奥已用完，需长休恢复');
+                char.resourcesUsed = { ...(char.resourcesUsed || {}), arcanum: arcanum.used + 1 };
+                notes.push('使用秘法玄奥');
+            } else {
+                const wanted = parseInt(rest.match(/(\d)\s*环/)?.[1]) || spell.level;
+                slotLevel = cls?.caster === 'pact' ? Math.max(0, ...Object.keys(slots).map(Number)) : Math.max(spell.level, wanted);
+                const max = slots[slotLevel] || 0; const used = parseInt(char.slotsUsed?.[slotLevel]) || 0;
+                if (slotLevel < spell.level || used >= max) return card(`没有可用的 ${Math.max(slotLevel, spell.level)} 环法术位`);
+                char.slotsUsed = { ...(char.slotsUsed || {}), [slotLevel]: used + 1 };
+                notes.push(`消耗 ${slotLevel} 环法术位（剩余 ${max - used - 1}/${max}）`);
+            }
+        }
+        if (ritual) notes.push('仪式施法，不消耗法术位，施法时间 +10 分钟');
+        if (spell.concentration) {
+            if (char.concentration && char.concentration !== spell.name) notes.push(`结束对「${char.concentration}」的专注`);
+            char.concentration = spell.name; notes.push('开始专注');
+        }
+        if (spell.id === 'mageArmor' && !/@/.test(rest)) char.mageArmor = true;
+
+        // 升环加骰与戏法增强
+        const extraLevels = Math.max(0, slotLevel - spell.level);
+        const upTimes = spell.upcast && spell.upcast !== 'r' ? Math.floor(extraLevels / (spell.upcastEvery || 1)) : 0;
+        const tier = level >= 17 ? 4 : level >= 11 ? 3 : level >= 5 ? 2 : 1;
+        const mod = D.abilityMod(char.abilities?.[cls?.spellAbility]);
+        const withUpcast = (dice) => [dice, ...Array(upTimes).fill(spell.upcast)].join('+').replace(/m/g, String(mod));
+        const scaled = (dice) => withUpcast(spell.level === 0 ? scaleDice(dice, tier) : dice);
+
+        const details = []; let main = '-';
+        const changes = [];
+        if (spell.attack) {
+            const a = spell.attack;
+            const rays = a.rays === 'cantrip' ? tier : (a.rays || 1) + (spell.upcast === 'r' ? extraLevels : 0);
+            const dice = a.rays === 'cantrip' ? withUpcast(a.dice) : scaled(a.dice);
+            const mods = rollModifiers(char, { kind: 'attack' });
+            for (let i = 0; i < rays; i++) {
+                const t = D.d20Test({ mod: D.spellAttack(char) + mods.penalty, adv: mods.adv.length > 0, dis: mods.dis.length > 0 });
+                const dmg = D.rollDice(t.crit ? critDamage(dice) : dice).total;
+                if (i === 0) main = t.total;
+                details.push(`${rays > 1 ? `第${i + 1}道 ` : ''}攻击 ${t.total}（d20=${t.roll}${t.mode !== 'normal' ? ` ${t.mode === 'adv' ? '优势' : '劣势'}` : ''}）${t.crit ? ' 重击' : t.fumble ? ' 大失手' : ''}，命中则 ${dmg} ${a.type}`);
+            }
+        }
+        if (spell.save) {
+            const sv = spell.save;
+            const dmg = D.rollDice(scaled(sv.dice)).total; main = dmg;
+            details.push(`${D.ABILITIES[sv.ability]}豁免 DC ${D.spellSaveDc(char)}，失败受 ${dmg} ${sv.type} 伤害${sv.half ? '，成功减半' : ''}`);
+        }
+        if (spell.damage) { const dmg = D.rollDice(scaled(spell.damage.dice)).total; main = dmg; details.push(`造成 ${dmg} ${spell.damage.type} 伤害`); }
+        if (spell.temp) {
+            const amount = D.rollDice(scaled(spell.temp)).total; main = amount;
+            char.tempHp = Math.max(parseInt(char.tempHp) || 0, amount); details.push(`获得 ${amount} 点临时生命`);
+        }
+        if (spell.heal) {
+            const amount = D.rollDice(scaled(spell.heal)).total; main = amount;
+            const targetName = rest.match(/@(\S+)/)?.[1];
+            const target = targetName ? party.find(p => p.name === targetName || p.name?.includes(targetName)) : char;
+            if (target) {
+                const r = changeHp(target, `+${amount}`);
+                if (r.ok) changes.push({ char: target, log: r.log, rollback: r.rollback });
+            } else details.push(`回复 ${amount} 点生命（未找到 ${targetName}，请手动结算）`);
+        }
+        const header = `${spell.level ? `${slotLevel || spell.level}环` : '戏法'} · ${spell.time} · ${spell.range}`;
+        changes.unshift({ char, log: `${char.name} 施放${spell.name}：${notes.join('，') || '无消耗'}`, rollback });
+        return { label: `施放 ${spell.name}`, roll: main, level: '', success: null, extra: [header, ...details].join(' · '), changes };
     };
 
     // —— 战斗 ——
@@ -372,6 +462,13 @@
         return logs;
     };
 
+    // 已准备法术按环阶列出：戏法 火焰箭、法师之手；1环 魔法飞弹
+    const spellList = (char) => {
+        const groups = {};
+        (char.spellIds || []).map(id => D.SPELLS?.[id]).filter(Boolean).forEach(sp => (groups[sp.level] ||= []).push(sp.name + (sp.concentration ? '(专注)' : '')));
+        return Object.keys(groups).sort((a, b) => a - b).map(lv => `${+lv ? `${lv}环` : '戏法'} ${groups[lv].join('、')}`).join('；');
+    };
+
     // 发给 AI 的角色资料
     const profile = (char) => {
         const cls = D.classInfo(char); const race = D.raceOf(char); const sub = D.subraceOf(char); const bg = D.backgroundOf(char); const ed = D.edition(char.edition);
@@ -399,7 +496,8 @@
             features && `职业能力：${features}`,
             resources && `职业资源：${resources}`,
             slots && `法术位：${slots} | 法术豁免 DC ${D.spellSaveDc(char)}，法术攻击 ${D.signed(D.spellAttack(char))}`,
-            char.spells && `法术：${char.spells}`,
+            spellList(char) && `已准备法术：${spellList(char)}`,
+            char.spells && `法术备注：${char.spells}`,
             char.features && `专长与其他：${char.features}`,
             status && `当前状态：${status}`,
             char.inventory && `物品：${char.inventory}${char.gold ? ` | 金币 ${char.gold}` : ''}`,
@@ -407,5 +505,5 @@
         ].filter(Boolean).join('\n');
     };
 
-    Object.assign(D, { rollCheck, rollExpr, applyStat, undoStat, useResource, spendHitDice, rest, combat, runCombatCommands, profile });
+    Object.assign(D, { rollCheck, rollExpr, castSpell, spellList, applyStat, undoStat, useResource, spendHitDice, rest, combat, runCombatCommands, profile });
 })(typeof window !== 'undefined' ? window : globalThis);

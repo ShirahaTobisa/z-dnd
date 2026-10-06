@@ -10,6 +10,7 @@
     <script src="../assets/js/app-runtime.js"></script>
     <script src="../assets/js/dnd/rules.js"></script>
     <script src="../assets/js/dnd/features.js"></script>
+    <script src="../assets/js/dnd/spells.js"></script>
     <script src="../assets/js/dnd/edition-2014.js"></script>
     <script src="../assets/js/dnd/edition-2024.js"></script>
     <link href="../assets/vendor/daisyui.full.css" rel="stylesheet" type="text/css" />
@@ -817,7 +818,7 @@
                             <div>
                                 <label class="ws-label">规则版本 Edition</label>
                                 <div class="join w-full">
-                                    <button v-for="e in editionList" :key="e.id" @click="hero.edition = e.id" class="btn btn-sm join-item flex-1 font-serif" :class="hero.edition === e.id ? 'bg-mystic-gold text-dark-900 hover:bg-yellow-600 border-mystic-gold' : 'bg-dark-900 border-dark-700 text-slate-400 hover:bg-dark-800'">{{ e.name }}</button>
+                                    <button v-for="e in editionList" :key="e.id" @click="hero.edition = e.id" class="btn btn-sm join-item flex-1 font-serif" :class="hero.edition === e.id ? '!bg-mystic-gold !text-dark-900 hover:!bg-yellow-600 !border-mystic-gold' : '!bg-dark-900 !border-dark-700 !text-slate-400 hover:!bg-dark-800'">{{ e.name }}</button>
                                 </div>
                             </div>
                             <div>
@@ -1004,7 +1005,7 @@
             <div>
                 <div class="ws-label">状态 Conditions</div>
                 <div class="flex flex-wrap gap-1.5">
-                    <button v-for="c in conditions" :key="c" @click="toggleCondition(c)" class="btn btn-xs font-serif" :class="hero.conditions.includes(c) ? 'bg-red-900/60 border-red-700 text-red-200' : 'bg-dark-900 border-dark-700 text-slate-500'">{{ c }}</button>
+                    <button v-for="c in conditions" :key="c" @click="toggleCondition(c)" class="btn btn-xs font-serif" :class="hero.conditions.includes(c) ? '!bg-red-900/60 !border-red-700 !text-red-200' : '!bg-dark-900 !border-dark-700 !text-slate-500'">{{ c }}</button>
                 </div>
             </div>
         </div>
@@ -1080,8 +1081,23 @@
                     </div>
                     <div class="ws-label">专长与其他 Feats</div>
                     <textarea v-model="hero.features" class="textarea textarea-bordered h-20 ws-field text-sm" placeholder="专长、战斗风格选择、种族特性的细节..."></textarea>
-                    <div class="ws-label">法术 Spells</div>
-                    <textarea v-model="hero.spells" class="textarea textarea-bordered h-24 ws-field text-sm" placeholder="戏法与已准备的法术..."></textarea>
+                    <template v-if="cls?.caster">
+                        <div class="flex items-center justify-between gap-2">
+                            <div class="ws-label mb-0">法术 Spells <span class="normal-case font-normal text-slate-600">最高 {{ spellStats.maxLevel }} 环 · DC {{ derived.dc }} · 攻击 {{ signed(derived.atk) }}</span></div>
+                            <button class="btn btn-xs btn-outline border-indigo-700 text-indigo-300 hover:bg-indigo-900/40 font-serif" @click="showSpellModal = true">选择法术</button>
+                        </div>
+                        <div class="text-[11px] font-serif" :class="spellStats.cantrips > spellStats.cantripMax || spellStats.spells > spellStats.spellMax ? 'text-red-400' : 'text-slate-400'">
+                            戏法 {{ spellStats.cantrips }}/{{ spellStats.cantripMax }} · {{ spellStats.label }} {{ spellStats.spells }}/{{ spellStats.spellMax }}
+                        </div>
+                        <div v-if="chosenSpells.length" class="flex flex-wrap gap-1.5">
+                            <span v-for="sp in chosenSpells" :key="sp.id" :title="sp.desc" class="px-2 py-0.5 rounded border border-indigo-800/50 bg-indigo-900/10 text-xs text-indigo-200">
+                                <span class="text-[10px] text-indigo-400 font-mono">{{ sp.level || '戏' }}</span> {{ sp.name }}<span v-if="sp.concentration" class="text-[10px] text-sky-400"> 专注</span>
+                                <button class="ml-1 text-slate-500 hover:text-red-400" @click="toggleSpell(sp.id)">×</button>
+                            </span>
+                        </div>
+                    </template>
+                    <div class="ws-label">法术备注</div>
+                    <textarea v-model="hero.spells" class="textarea textarea-bordered h-16 ws-field text-sm" placeholder="如法术书中已抄录但未准备的法术、法术相关物品..."></textarea>
                 </div>
             </div>
             <div>
@@ -1540,6 +1556,38 @@
         </form>
     </dialog>
 
+    <!-- Spell Selection Modal -->
+    <dialog class="modal modal-bottom sm:modal-middle bg-black/60 backdrop-blur-sm" :class="{ 'modal-open': showSpellModal }">
+        <div class="modal-box bg-dark-900 border border-dark-700 shadow-2xl max-w-3xl max-h-[85vh] flex flex-col p-0">
+            <div class="p-4 border-b border-dark-700 flex justify-between items-center bg-dark-800/50 gap-3">
+                <div>
+                    <h3 class="font-bold text-lg text-indigo-300 font-serif">{{ cls?.name }}法术表</h3>
+                    <div class="text-xs text-slate-400 font-serif">戏法 {{ spellStats.cantrips }}/{{ spellStats.cantripMax }} · {{ spellStats.label }} {{ spellStats.spells }}/{{ spellStats.spellMax }} · 最高 {{ spellStats.maxLevel }} 环</div>
+                </div>
+                <button class="btn btn-sm btn-circle btn-ghost text-slate-500 hover:text-white" @click="showSpellModal = false">✕</button>
+            </div>
+            <div class="p-2 border-b border-dark-700 flex flex-wrap gap-1.5 items-center">
+                <button v-for="lv in ['all', 0, ...Array.from({ length: spellStats.maxLevel }, (_, i) => i + 1)]" :key="lv" @click="spellLevelFilter = lv" class="btn btn-xs font-serif" :class="spellLevelFilter === lv ? '!bg-indigo-700 !text-white !border-indigo-600' : '!bg-dark-900 !border-dark-700 !text-slate-400'">{{ lv === 'all' ? '全部' : lv === 0 ? '戏法' : `${lv}环` }}</button>
+                <input v-model="spellSearch" class="input input-bordered input-xs ws-field flex-1 min-w-[8rem]" placeholder="搜索法术名或效果..." />
+            </div>
+            <div class="flex-1 overflow-y-auto custom-scrollbar divide-y divide-dark-800">
+                <div v-for="sp in spellOptions" :key="sp.id" class="px-4 py-2.5 flex gap-3 items-start hover:bg-dark-800/40" :class="{ 'bg-indigo-950/30': hero.spellIds.includes(sp.id) }">
+                    <div class="flex-1 min-w-0">
+                        <div class="font-bold text-slate-200 text-sm">{{ sp.name }}
+                            <span class="text-[10px] font-normal text-slate-500">{{ sp.level ? `${sp.level}环` : '戏法' }} · {{ sp.school }}</span>
+                            <span v-if="sp.concentration" class="text-[10px] text-sky-400"> 专注</span><span v-if="sp.ritual" class="text-[10px] text-emerald-400"> 仪式</span>
+                        </div>
+                        <div class="text-[11px] text-slate-500">{{ sp.time }} · {{ sp.range }} · {{ sp.duration }}<span v-if="spellMech(sp)" class="text-amber-300/80"> · {{ spellMech(sp) }}</span></div>
+                        <div class="text-xs text-slate-400 leading-snug">{{ sp.desc }}</div>
+                    </div>
+                    <button @click="toggleSpell(sp.id)" class="btn btn-xs shrink-0 font-serif" :class="hero.spellIds.includes(sp.id) ? '!bg-indigo-700 !border-indigo-600 !text-white' : 'btn-ghost border border-indigo-700/50 text-indigo-300'">{{ hero.spellIds.includes(sp.id) ? '已选' : '选择' }}</button>
+                </div>
+                <div v-if="!spellOptions.length" class="p-8 text-center text-slate-500 text-sm">没有符合条件的法术</div>
+            </div>
+        </div>
+        <form method="dialog" class="modal-backdrop"><button @click="showSpellModal = false">close</button></form>
+    </dialog>
+
     <!-- Weapon Selection Modal -->
     <dialog class="modal modal-bottom sm:modal-middle bg-black/60 backdrop-blur-sm" :class="{ 'modal-open': showWeaponModal }">
         <div class="modal-box bg-dark-900 border border-dark-700 shadow-2xl max-w-2xl max-h-[80vh] flex flex-col p-0">
@@ -1663,6 +1711,9 @@
 
             // Weapon Modal
             const showWeaponModal = ref(false);
+            const showSpellModal = ref(false);
+            const spellLevelFilter = ref('all');
+            const spellSearch = ref('');
 
             const badgeIcons = {
                 'emblem': '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12,2C6.48,2,2,6.48,2,12c0,5.52,4.48,10,10,10s10-4.48,10-10C22,6.48,17.52,2,12,2z M12,20c-4.41,0-8-3.59-8-8 c0-4.41,3.59-8,8-8s8,3.59,8,8C20,16.41,16.41,20,12,20z M12,6c-3.31,0-6,2.69-6,6c0,1.36,0.46,2.61,1.23,3.62l1.46-1.46 C8.26,13.61,8,12.84,8,12c0-2.21,1.79-4,4-4s4,1.79,4,4c0,0.84-0.26,1.61-0.69,2.16l1.46,1.46C17.54,14.61,18,13.36,18,12 C18,8.69,15.31,6,12,6z M12,10c-1.1,0-2,0.9-2,2c0,0.55,0.22,1.05,0.59,1.41l2.83-2.83C13.05,10.22,12.55,10,12,10z"/></svg>',
@@ -2536,6 +2587,28 @@
             };
 
             const toggleIn = (list, value) => { const i = list.indexOf(value); i === -1 ? list.push(value) : list.splice(i, 1); };
+
+            // 法术：已选列表、数量上限、可选法术与机制说明
+            const chosenSpells = computed(() => hero.spellIds.map(id => DND.SPELLS[id]).filter(Boolean).sort((a, b) => a.level - b.level));
+            const spellStats = computed(() => {
+                const allowed = DND.spellsAllowed(hero);
+                return {
+                    maxLevel: DND.maxSpellLevel(hero), cantrips: chosenSpells.value.filter(s => !s.level).length, cantripMax: DND.cantripsKnown(hero),
+                    spells: chosenSpells.value.filter(s => s.level).length, spellMax: allowed.count, label: allowed.label || '法术',
+                };
+            });
+            const spellOptions = computed(() => DND.classSpells(hero)
+                .filter(s => (spellLevelFilter.value === 'all' || s.level === spellLevelFilter.value) && (!spellSearch.value || s.name.includes(spellSearch.value) || s.desc.includes(spellSearch.value)))
+                .sort((a, b) => a.level - b.level || a.name.localeCompare(b.name, 'zh')));
+            const spellMech = (s) => [
+                s.attack && `法术攻击 ${s.attack.dice} ${s.attack.type}`,
+                s.save && `${abilityNames[s.save.ability]}豁免 ${s.save.dice} ${s.save.type}${s.save.half ? '（成功减半）' : ''}`,
+                s.damage && `必中 ${s.damage.dice} ${s.damage.type}`,
+                s.heal && `治疗 ${s.heal.replace('+m', '+施法调整值')}`,
+                s.temp && `临时生命 ${s.temp}`,
+                s.upcast && (s.upcast === 'r' ? '升环多一道' : `升环每${s.upcastEvery > 1 ? '两' : ''}环 +${s.upcast}`),
+            ].filter(Boolean).join(' · ');
+            const toggleSpell = (id) => toggleIn(hero.spellIds, id);
             const toggleSkill = (id) => { toggleIn(hero.skillProfs, id); if (!hero.skillProfs.includes(id)) hero.expertise = hero.expertise.filter(s => s !== id); };
             const toggleExpertise = (id) => toggleIn(hero.expertise, id);
             const toggleCondition = (c) => toggleIn(hero.conditions, c);
@@ -2543,6 +2616,7 @@
             // 选项变化后：清掉不再有效的选择，重算最终属性、生命值上限，补上自带技能
             const refreshCharacter = () => {
                 const edition = ed.value;
+                if (hero.spellIds.some(id => !DND.SPELLS[id]?.classes.includes(hero.classId))) hero.spellIds = hero.spellIds.filter(id => DND.SPELLS[id]?.classes.includes(hero.classId));
                 if (hero.race && !edition.races[hero.race]) hero.race = '';
                 if (hero.background && !edition.backgrounds[hero.background]) hero.background = '';
                 const r = race.value;
@@ -2604,12 +2678,12 @@
 1. baseAbilities 用标准数组 15、14、13、12、10、8，按职业需要分配到 STR DEX CON INT WIS CHA，genMethod 填 "standard"。
 2. ${edition.abilityBonusFrom === 'background' ? 'bonusPicks 是背景给的属性加值：只能加在该背景列出的三项属性上，+2/+1 或 +1/+1/+1。' : 'bonusPicks 只给需要自选加值的种族（如半精灵）填写，其他种族填 {}。'}
 3. skillProfs 只填职业可选的技能（数量按职业规定），种族和背景自带的技能程序会自动补上。
-4. 武器、护甲要符合职业熟练；features 写职业能力和种族特性的简要说明，spells 写施法职业的戏法与 1 环法术（非施法职业留空）。
+4. 武器、护甲要符合职业熟练；features 写专长与战斗风格等选择；施法职业在 spellNames 里用中文法术名列出戏法和已准备法术（数量按职业规定，非施法职业留空数组）。
 5. avatar_prompt 是 NovelAI 格式的英文外貌提示词。
 JSON 结构：
 {"name":"","gender":"","age":"","alignment":"守序善良等九种之一","race":"","subrace":"","classId":"","background":"","level":1,
 "genMethod":"standard","baseAbilities":{"STR":15,"DEX":14,"CON":13,"INT":12,"WIS":10,"CHA":8},"bonusPicks":{},
-"skillProfs":[],"weapons":[],"armor":"","shield":false,"gold":10,"inventory":"","features":"","spells":"",
+"skillProfs":[],"weapons":[],"armor":"","shield":false,"gold":10,"inventory":"","features":"","spellNames":[],
 "backstory":{"appearance":"","personality":"","ideals":"","bonds":"","flaws":"","story":""},"avatar_prompt":""}`;
 
                 try {
@@ -2632,6 +2706,7 @@ JSON 结构：
                     catch { throw new Error('AI 返回的内容不是有效的角色数据，请重试或换个描述'); }
 
                     const current = JSON.parse(JSON.stringify(hero));
+                    if (Array.isArray(result.spellNames)) result.spellIds = result.spellNames.map(n => Object.values(DND.SPELLS).find(sp => sp.name === n)?.id).filter(Boolean);
                     Object.assign(hero, DND.normalizeCharacter({
                         ...current, ...result,
                         id: current.id, edition: current.edition, avatar: current.avatar, history: current.history, badges: current.badges,
@@ -3028,6 +3103,7 @@ return {
     imageGenArtistPresetOptions, isImageGenArtistCustom, applyImageGenArtistPreset, onAvatarLoad, onAvatarError, settings, showToast,
     radarLabels, radarGrid, radarStatsPoints, showWeaponModal,
     abilityNames, editionList, alignments, weaponProps, backstoryFields, ed, cls, race, subrace, bg, granted, derived, skillChoices, weaponRows, weaponList, featureList, resourceList,
+    showSpellModal, spellLevelFilter, spellSearch, chosenSpells, spellStats, spellOptions, spellMech, toggleSpell,
     saveMod, skillMod, fixedBonus, bonusRule, abilityHint, applyStandardArray, resetPointBuy, rollAbilities, changeGenMethod,
     toggleSkill, toggleExpertise, toggleCondition,
     classes: DND.CLASSES, skills: DND.SKILLS, armors: DND.ARMOR, conditions: DND.CONDITIONS,

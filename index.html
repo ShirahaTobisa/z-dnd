@@ -24,6 +24,7 @@
     <script src="assets/js/app-runtime.js"></script>
     <script src="assets/js/dnd/rules.js"></script>
     <script src="assets/js/dnd/features.js"></script>
+    <script src="assets/js/dnd/spells.js"></script>
     <script src="assets/js/dnd/edition-2014.js"></script>
     <script src="assets/js/dnd/edition-2024.js"></script>
     <script src="assets/js/dnd/commands.js"></script>
@@ -2424,6 +2425,18 @@
                                         </div>
                                     </div>
 
+                                    <!-- 法术：点击施放 -->
+                                    <div v-if="heroStats.spells.length">
+                                        <h4 class="font-bold text-slate-500 text-[10px] mb-3 uppercase tracking-widest flex items-center gap-2">
+                                            <span class="w-1 h-1 rounded-full bg-slate-500"></span> 法术 · {{ heroStats.spellInfo }}
+                                        </h4>
+                                        <div class="flex flex-wrap gap-1.5">
+                                            <button v-for="sp in heroStats.spells" :key="sp.id" @click="cocInput = `.cast ${sp.name}`" :title="`${sp.level ? sp.level + '环' : '戏法'} · ${sp.time} · ${sp.range} · ${sp.duration}${sp.concentration ? ' · 专注' : ''}\n${sp.desc}`" class="px-2 py-1 rounded border border-indigo-800/50 bg-indigo-900/10 text-xs text-indigo-200 hover:bg-indigo-900/30 transition-all">
+                                                <span class="text-[10px] text-indigo-400 font-mono">{{ sp.level || '戏' }}</span> {{ sp.name }}
+                                            </button>
+                                        </div>
+                                    </div>
+
                                     <!-- 职业资源与休息：点击使用 -->
                                     <div>
                                         <h4 class="font-bold text-slate-500 text-[10px] mb-3 uppercase tracking-widest flex items-center gap-2">
@@ -4564,7 +4577,7 @@
                     { id: 'dice_system', category: '机制处理', label: '遵守掷骰结果', content: '系统掷骰原则：玩家的掷骰指令已被系统处理并附带结果（总值、难度和成败）。请直接基于系统给出的结果叙事，不要重复掷骰。', enabled: true },
                     { id: 'dice_narrative', category: '机制处理', label: '结果叙事化', content: '检定结果叙事化：不要只报数字和“成功/失败”，要把结果转化为生动的描写；需要时可以简短提及命中与伤害数值。', enabled: true },
                     { id: 'checks', category: '机制处理', label: '主动引导检定', content: '主动要求检定 (核心)：当行动有风险或结果不确定时，要求玩家掷骰并给出难度。格式：`@角色名 .ra 技能或属性 dc难度`，例如 `@艾琳 .ra 隐匿 dc13`；豁免写 `.ra 敏捷豁免 dc15`；攻击写 `.ra 武器名`（把投掷武器扔出去时写 `.ra 标枪 投掷`）；有优势或劣势时在后面加“优势”或“劣势”。难度参考：非常简单 5、简单 10、中等 15、困难 20、非常困难 25、几乎不可能 30。结果显而易见或没有失败代价时不必掷骰。', enabled: true },
-                    { id: 'stat_updates', category: '机制处理', label: '自动状态变更', content: '更新角色状态 (核心)：角色受伤、治疗、消耗资源、获得状态或经验时，必须输出指令。格式：`@角色名 .st 项目 变化值`。项目可用：hp（受伤写负数，如 -7 或 -2d6）、临时、法术位1~法术位9（消耗写 +1）、状态（如 +中毒 / -中毒）、专注（如 `.st 专注 祝福术`，结束写 `.st 专注 结束`）、经验、金币、力竭。消耗职业资源用 `@角色名 .use 资源名 [数量]`（如 `.use 狂暴`、`.use 圣疗池 5`）。休息用 `@角色名 .rest 长休` 或 `.rest 短休`，短休时玩家可用 `.hd 数量` 花生命骰回血。扣血前先按角色的抗性、易伤、免疫调整伤害（如狂暴中的野蛮人受到的钝击、穿刺、挥砍伤害减半）。系统会自动处理：生命降到 0 进入濒死并要求死亡豁免、濒死时受伤记失败、受伤时提示专注豁免 DC、状态带来的优势劣势与自动失败，你只需按结果叙事。', enabled: true },
+                    { id: 'stat_updates', category: '机制处理', label: '自动状态变更', content: '更新角色状态 (核心)：角色受伤、治疗、消耗资源、获得状态或经验时，必须输出指令。格式：`@角色名 .st 项目 变化值`。项目可用：hp（受伤写负数，如 -7 或 -2d6）、临时、法术位1~法术位9（消耗写 +1）、状态（如 +中毒 / -中毒）、专注（如 `.st 专注 祝福术`，结束写 `.st 专注 结束`）、经验、金币、力竭。玩家施法用 `.cast 法术名 [N环] [@目标]`（系统自动扣法术位、处理专注、掷法术攻击或给出豁免 DC 与伤害、结算治疗），你按卡片结果叙事，不要再额外用 .st 扣法术位；消耗职业资源用 `@角色名 .use 资源名 [数量]`（如 `.use 狂暴`、`.use 圣疗池 5`）。休息用 `@角色名 .rest 长休` 或 `.rest 短休`，短休时玩家可用 `.hd 数量` 花生命骰回血。扣血前先按角色的抗性、易伤、免疫调整伤害（如狂暴中的野蛮人受到的钝击、穿刺、挥砍伤害减半）。系统会自动处理：生命降到 0 进入濒死并要求死亡豁免、濒死时受伤记失败、受伤时提示专注豁免 DC、状态带来的优势劣势与自动失败，你只需按结果叙事。', enabled: true },
                     { id: 'combat', category: '机制处理', label: '战斗指令', content: '战斗流程 (核心)：遭遇战斗时，先为每个敌人输出 `.monster 名称 hp=生命 ac=护甲 init=先攻加值`（同类敌人用 A、B 区分名称），再输出 `.combat start`，系统会自动掷先攻并显示战斗面板。敌人受伤用 `.dmg 名称 伤害`（可写骰子，如 `.dmg 哥布林A 1d8+3`），治疗用 `.heal 名称 数值`；一个角色或敌人行动完毕后输出 `.next` 轮到下一位；战斗结束输出 `.combat end`。敌人的攻击由你按怪物数据掷骰并描述，对冒险者造成的伤害用 `.st hp` 扣除。', enabled: true },
                     { id: 'core_rules', category: '机制处理', label: '核心战斗规则', content: '严格按 D&D 5e 核心规则裁定：每回合一个动作、一个附赠动作（仅当能力允许时）、一次移动和每轮一次反应；离开敌人触及范围引发借机攻击（撤离动作可避免）；优势与劣势不叠加，同时具备则抵消；半掩护 AC 与敏捷豁免 +2，四分之三掩护 +5；未被发现的攻击者具有优势；远程攻击在长射程或敌人贴身时具有劣势；攻击掷出 20 必中并暴击（伤害骰翻倍），掷出 1 必失；专注期间再施展专注法术会结束前一个。按角色卡中的职业能力、资源次数和法术位裁定，不要让角色使用其尚未获得的能力。', enabled: true },
                     { id: 'monsters', category: '机制处理', label: '怪物与遭遇', content: '怪物优先使用 SRD 中对应生物的数据（AC、生命、攻击加值、伤害、特殊能力），按队伍等级与人数设计难度合适的遭遇；敌人的行动要符合其智力与习性，不要无理由集火倒地的角色。战斗或挑战结束后，按击败怪物的挑战等级分配经验（各怪物经验值之和平均分给参与者），用 `.st 经验 +数值` 记录。', enabled: true },
@@ -5319,6 +5332,8 @@
                         resources: DND.classResources(c),
                         features: DND.classFeatures(c).filter(f => f.name !== '选择子职业'),
                         hitDice: `${(c.level || 1) - (parseInt(c.hitDiceUsed) || 0)}/${c.level || 1}`,
+                        spells: (c.spellIds || []).map(id => DND.SPELLS[id]).filter(Boolean).sort((a, b) => a.level - b.level),
+                        spellInfo: DND.classInfo(c)?.caster ? `DC ${DND.spellSaveDc(c)} · 攻击 ${DND.signed(DND.spellAttack(c))}` : '',
                     };
                 });
                 const cocState = reactive({ combat: DND.combat.create(), mode: null, isCoj: false, module: null, tempModuleText: '', investigators: [], activeInvestigatorIndex: -1, gameState: 'idle', log: [], systemPrompt: '', pendingRolls: [], isGameEnded: false });
@@ -7297,13 +7312,15 @@ ${buildInvestigatorProfile(inv)}
                 // 骰子处理函数
                 // 掷骰可能改动角色（如死亡豁免），改动转成状态变更记录，便于显示和撤销
                 const processDiceCommand = (content, inv) => {
-                    const diceResult = content ? (DND.rollCheck(inv, content) || DND.rollExpr(content)) : null;
-                    const change = diceResult?.change;
-                    if (diceResult) delete diceResult.change;
+                    const diceResult = content ? (DND.rollCheck(inv, content) || DND.castSpell(inv, content, cocState.investigators) || DND.rollExpr(content)) : null;
+                    const touched = [...(diceResult?.change ? [{ char: inv, ...diceResult.change }] : []), ...(diceResult?.changes || [])];
+                    if (diceResult) { delete diceResult.change; delete diceResult.changes; }
                     const changes = { logs: [], rollbacks: [] };
-                    if (change) {
-                        changes.logs.push(`🔧 ${change.log}`);
-                        changes.rollbacks.push({ invIndex: cocState.investigators.indexOf(inv), data: change.rollback });
+                    if (touched.length) {
+                        touched.forEach(c => {
+                            changes.logs.push(`🔧 ${c.log}`);
+                            if (c.rollback) changes.rollbacks.push({ invIndex: cocState.investigators.indexOf(c.char), data: c.rollback });
+                        });
                         saveData();
                         if (cocState.mode === 'multi' && multiplayerState.isHost) broadcastMessage({ type: 'sync_investigators', investigators: cocState.investigators });
                     }
@@ -7345,7 +7362,8 @@ ${buildInvestigatorProfile(inv)}
                     // 核心修改：接收结构化数据
                     const { content, diceResult, changes } = processDiceCommand(rawContent, inv);
 
-                    const isWhisper = /@\S+/.test(rawContent);
+                    // @ 某人且不含系统指令才算私语；指令里的 @ 是在指定目标
+                    const isWhisper = /@\S+/.test(rawContent) && !/[.。](?:ra|rc|r|st|rest|use|hd|cast)(?![a-z])/i.test(rawContent);
                     const msg = {
                         role: isWhisper ? 'whisper' : 'user',
                         content: content,

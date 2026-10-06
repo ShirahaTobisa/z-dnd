@@ -201,6 +201,7 @@
             const options = [10 + dex];
             if (unarmored && !(char.classId === 'monk' && char.shield)) options.push(10 + unarmored.reduce((sum, ab) => sum + abilityMod(char.abilities?.[ab]), 0));
             if (char.subclass === '龙族血脉') options.push(DRACONIC_AC[char.edition]?.(char) || 0);
+            if (char.mageArmor) options.push(13 + dex);
             ac = Math.max(...options);
         }
         return ac + (char.shield ? 2 : 0);
@@ -244,6 +245,30 @@
         if (char.subclass) add(ed.subclassFeatures?.[char.subclass], char.subclass);
         return list.sort((a, b) => a.level - b.level);
     };
+
+    // —— 法术 ——
+    const CANTRIPS_KNOWN = {
+        bard: [[1, 2], [4, 3], [10, 4]], cleric: [[1, 3], [4, 4], [10, 5]], druid: [[1, 2], [4, 3], [10, 4]],
+        sorcerer: [[1, 4], [4, 5], [10, 6]], warlock: [[1, 2], [4, 3], [10, 4]], wizard: [[1, 3], [4, 4], [10, 5]],
+    };
+    const cantripsKnown = (char) => steps(CANTRIPS_KNOWN[char.classId] || [])(clampLevel(char.level));
+    // 可准备或已知的 1 环以上法术数：{ count, label }
+    const spellsAllowed = (char) => {
+        const ed = edition(char.edition); const level = clampLevel(char.level);
+        const known = ed.spellsKnown?.[char.classId]; const prepared = ed.spellsPrepared?.[char.classId];
+        if (known) return { count: known[level - 1], label: '已知法术' };
+        if (Array.isArray(prepared)) return { count: prepared[level - 1], label: '已准备法术' };
+        const mod = abilityMod(char.abilities?.[classInfo(char)?.spellAbility]);
+        if (prepared === 'level') return { count: Math.max(1, mod + level), label: '已准备法术' };
+        if (prepared === 'half') return { count: level < 2 ? 0 : Math.max(1, mod + Math.floor(level / 2)), label: '已准备法术' };
+        return { count: 0, label: '' };
+    };
+    // 能学的最高环阶：法术位最高环，邪术师另含秘法玄奥（11 级 6 环起）
+    const maxSpellLevel = (char) => {
+        const top = Math.max(0, ...Object.keys(spellSlots(char)).map(Number));
+        return char.classId === 'warlock' ? Math.max(top, steps([[11, 6], [13, 7], [15, 8], [17, 9]])(clampLevel(char.level))) : top;
+    };
+    const classSpells = (char) => Object.values(root.DND.SPELLS || {}).filter(s => s.classes.includes(char.classId) && s.level <= maxSpellLevel(char));
 
     // 职业资源：[{ id, name, max, used, left, recharge, shortRegain }]，max 为 99 表示不限次数
     const classResources = (char) => {
@@ -327,7 +352,7 @@
         hp: 0, maxHp: 0, tempHp: 0, hitDiceUsed: 0, armor: '', shield: false, acOverride: null,
         weapons: [], slotsUsed: {}, spells: '', features: '', inventory: '', gold: 0,
         conditions: [], exhaustion: 0, deathSaves: { success: 0, fail: 0 }, dead: false,
-        resourcesUsed: {}, raging: false, concentration: '',
+        resourcesUsed: {}, raging: false, concentration: '', mageArmor: false, spellIds: [],
         backstory: { appearance: '', personality: '', ideals: '', bonds: '', flaws: '', story: '' },
         history: [], badges: [],
     });
@@ -341,11 +366,12 @@
         if (char.baseAbilities) char.abilities = finalAbilities(char);
         char.skillProfs = [...new Set([...(char.skillProfs || []), ...grantedSkills(char)])].filter(id => SKILLS[id]);
         char.weapons = (char.weapons || []).filter(id => WEAPONS[id]);
+        if (root.DND.SPELLS) char.spellIds = (char.spellIds || []).filter(id => root.DND.SPELLS[id]);
         const hp = maxHp(char);
         if (hp && !data?.maxHp) char.hp = hp;
         char.maxHp = hp || parseInt(char.maxHp) || 0;
         return char;
     };
 
-    root.DND = { ABILITIES, SKILLS, ALL_SKILLS, CLASSES, ARMOR, WEAPONS, CONDITIONS, XP_TABLE, STANDARD_ARRAY, POINT_BUY, editions, edition, classInfo, weaponData, signed, abilityMod, profBonus, levelFromXp, rollDice, d20Test, saveMod, skillMod, passivePerception, armorClass, maxHp, spellSlots, spellSaveDc, spellAttack, weaponAttack, weaponProficient, initiativeMod, steps, critRange, rageDamage, sneakAttackDice, classFeatures, classResources, raceOf, subraceOf, backgroundOf, subclassLevel, pointBuyCost, finalAbilities, grantedSkills, skillChoices, newCharacter, normalizeCharacter };
+    root.DND = { ABILITIES, SKILLS, ALL_SKILLS, CLASSES, ARMOR, WEAPONS, CONDITIONS, XP_TABLE, STANDARD_ARRAY, POINT_BUY, editions, edition, classInfo, weaponData, signed, abilityMod, profBonus, levelFromXp, rollDice, d20Test, saveMod, skillMod, passivePerception, armorClass, maxHp, spellSlots, spellSaveDc, spellAttack, weaponAttack, weaponProficient, initiativeMod, steps, critRange, rageDamage, sneakAttackDice, classFeatures, classResources, cantripsKnown, spellsAllowed, maxSpellLevel, classSpells, raceOf, subraceOf, backgroundOf, subclassLevel, pointBuyCost, finalAbilities, grantedSkills, skillChoices, newCharacter, normalizeCharacter };
 })(typeof window !== 'undefined' ? window : globalThis);
