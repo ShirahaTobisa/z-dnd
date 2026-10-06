@@ -16,6 +16,9 @@ const vendorFiles = new Map([
     ['node_modules/html-docx-js/dist/html-docx.js', 'html-docx.js'],
     ['node_modules/localforage/dist/localforage.min.js', 'localforage.min.js'],
     ['node_modules/daisyui/dist/full.css', 'daisyui.full.css'],
+    // pdf.js 只在导入 PDF 时按需加载；改成 .js 后缀，免得服务器不认 .mjs
+    ['node_modules/pdfjs-dist/build/pdf.min.mjs', 'pdf.min.js'],
+    ['node_modules/pdfjs-dist/build/pdf.worker.min.mjs', 'pdf.worker.min.js'],
 ]);
 
 await mkdir(vendorRoot, { recursive: true });
