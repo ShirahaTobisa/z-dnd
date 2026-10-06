@@ -27,13 +27,14 @@
             fighter: { skills: ['acrobatics', 'animalHandling', 'athletics', 'history', 'insight', 'intimidation', 'persuasion', 'perception', 'survival'] },
             wizard: { skills: ['arcana', 'history', 'insight', 'investigation', 'medicine', 'nature', 'religion'], weapons: ['简易武器'] },
             sorcerer: { weapons: ['简易武器'] },
-            druid: { weapons: ['简易武器'] },
+            bard: { weapons: ['简易武器'] },
+            druid: { weapons: ['简易武器'], armor: ['轻甲', '盾牌'] },
             monk: { weapons: ['简易武器', '轻型军用武器'] },
-            rogue: { weapons: ['简易武器', '灵巧或轻型军用武器'] },
+            rogue: { weapons: ['简易武器', '灵巧或轻型军用武器'], skills: ['acrobatics', 'athletics', 'deception', 'insight', 'intimidation', 'investigation', 'perception', 'persuasion', 'sleightOfHand', 'stealth'] },
         },
         // sizes 有多个时由玩家选择
         races: {
-            aasimar: { name: '阿斯莫', sizes: ['中型', '小型'], speed: 30, darkvision: 60, traits: ['天界抗性', '治愈之手', '持光者', '天界启示'] },
+            aasimar: { name: '阿斯莫', srd: false, sizes: ['中型', '小型'], speed: 30, darkvision: 60, traits: ['天界抗性', '治愈之手', '持光者', '天界启示'] },
             dragonborn: { name: '龙裔', sizes: ['中型'], speed: 30, darkvision: 60, traits: ['龙族血统', '吐息武器', '伤害抗性', '龙翼飞行'] },
             dwarf: { name: '矮人', sizes: ['中型'], speed: 30, darkvision: 120, traits: ['矮人韧性', '矮人坚韧', '石工知识'], hpPerLevel: 1 },
             elf: { name: '精灵', sizes: ['中型'], speed: 30, darkvision: 60, skillChoice: 1, skillOptions: ['insight', 'perception', 'survival'], traits: ['精灵血系', '精类血统', '敏锐感官', '出神'] },
@@ -83,7 +84,7 @@
         weaponOverrides: {
             trident: { damage: '1d8', versatile: '1d10' },
             warPick: { versatile: '1d10' },
-            lance: { props: ['heavy', 'reach', 'twoHanded'] },
+            lance: { damage: '1d10', props: ['heavy', 'reach', 'twoHanded'] },
         },
         weaponMastery: {
             club: '缓速', dagger: '迅击', handaxe: '烦扰', javelin: '缓速', mace: '削弱', quarterstaff: '掀翻', spear: '削弱',
@@ -141,7 +142,7 @@
             const chaMod = (lv, c) => Math.max(1, abilityMod(c.abilities?.CHA));
             return {
                 barbarian: [{ id: 'rage', name: '狂暴', max: steps([[1, 2], [3, 3], [6, 4], [12, 5], [17, 6]]), recharge: 'long', shortRegain: 1 }],
-                bard: [{ id: 'inspiration', name: '诗人激励', max: chaMod, recharge: (lv) => (lv >= 5 ? 'short' : 'long') }],
+                bard: [{ id: 'inspiration', name: (lv) => `诗人激励(d${steps([[1, 6], [5, 8], [10, 10], [15, 12]])(lv)})`, max: chaMod, recharge: (lv) => (lv >= 5 ? 'short' : 'long') }],
                 cleric: [{ id: 'channel', name: '引导神力', max: steps([[2, 2], [6, 3], [18, 4]]), recharge: 'long', shortRegain: 1 }],
                 druid: [{ id: 'wildShape', name: '野性变身', max: steps([[2, 2], [6, 3], [17, 4]]), recharge: 'long', shortRegain: 1 }],
                 fighter: [

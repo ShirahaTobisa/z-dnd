@@ -162,7 +162,7 @@ phantomSteed|幻影驹|3|幻术|1m|30尺|1时|r|W||召唤一匹快速的幻影�
 plantGrowth|植物滋长|3|变化|A|150尺|I||BDR||植物疯长成困难地形，或令作物丰收。
 protectionFromEnergy|防护能量|3|防护|A|触及|1时|c|CDRSW||目标获得一种元素伤害的抗性。
 removeCurse|移除诅咒|3|防护|A|触及|I||CPKW||解除生物或物品上的诅咒。
-revivify|回生术|3|死灵|A|触及|I||CP||令一分钟内死亡的生物复活，恢复 1 点生命。
+revivify|回生术|3|咒法|A|触及|I||CP||令一分钟内死亡的生物复活，恢复 1 点生命。
 sending|短讯术|3|塑能|A|无限|1轮||BCW||向熟悉的生物发送一条短讯，对方可回复。
 sleetStorm|雨夹雪|3|咒法|A|150尺|1分|c|DSW||冰雹覆盖区域，生物可能倒地、专注被打断。
 slow|缓慢术|3|变化|A|120尺|1分|c|SW||至多六个生物 AC -2、速度减半、行动受限（感知豁免）。
@@ -228,16 +228,16 @@ hallow|圣居|5|塑能|24h|触及|永久||C||圣化一片区域，阻止特定�
 holdMonster|怪物定身术|5|惑控|A|90尺|1分|c|BSKW||令任意生物麻痹（感知豁免）。
 insectPlague|疫虫群|5|咒法|A|300尺|10分|c|CDS|s:CON:4d10:穿刺:h;u:1d10|蝗虫群叮咬区域内的生物。
 legendLore|传说知识|5|预言|10m|自身|I||BCW||得知传说中的人物、地点或物品的信息。
-massCureWounds|群体治疗伤口|5|塑能|A|60尺|I||BCD|h:3d8+m;u:1d8|为至多六个生物回复生命。
+massCureWounds|群体治疗伤口|5|咒法|A|60尺|I||BCD|h:3d8+m;u:1d8|为至多六个生物回复生命。
 mislead|误导术|5|幻术|A|自身|1时|c|BW||自己隐形，同时制造一个分身。
 modifyMemory|篡改记忆|5|惑控|A|30尺|1分|c|BW||修改目标的记忆（感知豁免）。
 passwall|穿墙术|5|变化|A|30尺|1时||W||在墙壁上开出一条通道。
-planarBinding|异界誓缚|5|防护|1h|60尺|24时||BCDKW||束缚一个异界生物为你效力。
+planarBinding|异界誓缚|5|防护|1h|60尺|24时||BCDW||束缚一个异界生物为你效力。
 raiseDead|死者复活|5|死灵|1h|触及|I||BCP||复活十天内死亡的生物。
 scrying|探知术|5|预言|10m|自身|10分|c|BCDKW||远距离观察一个生物（感知豁免）。
 seeming|伪装术|5|幻术|A|30尺|8时||BSW||改变多个生物的外貌。
 telekinesis|心灵遥控|5|变化|A|60尺|10分|c|SW||用意念移动生物或物体。
-telepathicBond|心灵联结|5|预言|1m|30尺|1时|r|W||至多八个生物之间心灵相通。
+telepathicBond|心灵联结|5|预言|A|30尺|1时|r|W||至多八个生物之间心灵相通。
 teleportationCircle|传送法阵|5|咒法|1m|10尺|1轮||BSW||传送到一个已知的永久法阵。
 treeStride|树跃术|5|咒法|A|自身|1分|c|DR||在树木之间传送。
 wallOfForce|力场墙|5|塑能|A|120尺|10分|c|W||召唤一道隐形且坚不可摧的力场墙。
@@ -313,10 +313,10 @@ astralProjection|星界投射|9|死灵|1h|10尺|特殊||CKW||让灵体进入星�
 foresight|预警术|9|预言|1m|触及|8时||BDKW||目标的检定具有优势，攻击它的检定具有劣势。
 gate|异界之门|9|咒法|A|60尺|1分|c|CSW||开启通往其他位面的传送门。
 imprisonment|禁锢术|9|防护|1m|30尺|直到解除||KW||用多种方式永久禁锢一个生物。
-massHeal|群体医疗术|9|塑能|A|60尺|I||C|h:700|把 700 点治疗分给附近的生物。
+massHeal|群体医疗术|9|咒法|A|60尺|I||C|h:700|把 700 点治疗分给附近的生物。
 meteorSwarm|流星爆|9|塑能|A|1里|I||SW|s:DEX:20d6+20d6:火焰与钝击:h|召唤四颗流星爆炸。
 powerWordKill|律令：死亡|9|惑控|A|60尺|I||BSKW||杀死生命不超过 100 的生物。
-prismaticWall|虹光墙|9|防护|A|60尺|10分||SW||召唤一道七层光幕之墙。
+prismaticWall|虹光墙|9|防护|A|60尺|10分||W||召唤一道七层光幕之墙。
 shapechange|形态变换|9|变化|A|自身|1时|c|DW||变成其他生物的形态。
 stormOfVengeance|复仇风暴|9|咒法|A|视线|1分|c|D||召唤毁灭性的风暴云。
 timeStop|时间停止|9|变化|A|自身|I||SW||获得 1d4+1 个额外回合。
@@ -324,6 +324,9 @@ truePolymorph|完全变形术|9|变化|A|30尺|1时|c|BKW||把生物或物品变
 trueResurrection|完全复活术|9|死灵|1h|触及|I||CD||复活两百年内死亡的生物。
 weird|怪诞术|9|幻术|A|120尺|1分|c|W|s:WIS:4d10:心灵|对一群目标施加致命的恐惧幻象。
 wish|祈愿术|9|咒法|A|自身|I||SW||最强大的法术，可复制 8 环以下的任何法术。
+brandingSmite|烙印斩|2|塑能|B|自身|1分|c|P|d:2d6:光耀;u:1d6|下一次武器命中时追加光耀伤害，隐形的目标会现出身形。
+arcaneHand|魔法巨掌|5|塑能|A|120尺|1分|c|W|a:4d8:力场;u:2d8|召唤一只力场巨手，可以握拳攻击、推撞、抓住或挡住生物。
+reincarnate|转生术|5|变化|1h|触及|I||D||让死去不超过十天的类人生物以随机的新身体复活。
 `;
     const CLASS_BY_LETTER = { B: 'bard', C: 'cleric', D: 'druid', P: 'paladin', R: 'ranger', S: 'sorcerer', K: 'warlock', W: 'wizard' };
     const TIME = { A: '动作', B: '附赠动作', R: '反应' };

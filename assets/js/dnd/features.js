@@ -5,9 +5,9 @@
     root.DND.FIGHTING_STYLES = {
         archery: { name: '箭术', desc: '远程武器攻击检定 +2。', effect: 'rangedHit2' },
         defense: { name: '防御', desc: '穿着护甲时 AC +1。', effect: 'armorAc1' },
-        dueling: { name: '对决', desc: '只用单手近战武器时伤害 +2。', effect: 'meleeDmg2' },
+        dueling: { name: '对决', srd: false, desc: '只用单手近战武器时伤害 +2。', effect: 'meleeDmg2' },
         greatWeapon: { name: '巨武器战斗', desc: '双手或可双手武器的伤害骰掷出 1、2 时可以重骰（2024 版视为 3）。' },
-        protection: { name: '守护', desc: '持盾时可用反应让攻击你身边盟友的检定具有劣势。' },
+        protection: { name: '守护', srd: false, desc: '持盾时可用反应让攻击你身边盟友的检定具有劣势。' },
         twoWeapon: { name: '双武器战斗', desc: '副手攻击的伤害也加上属性调整值。' },
     };
 

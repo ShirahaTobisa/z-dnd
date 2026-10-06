@@ -130,7 +130,7 @@
             const chaMod = (lv, c) => Math.max(1, abilityMod(c.abilities?.CHA));
             return {
                 barbarian: [{ id: 'rage', name: '狂暴', max: steps([[1, 2], [3, 3], [6, 4], [12, 5], [17, 6], [20, 99]]), recharge: 'long' }],
-                bard: [{ id: 'inspiration', name: '诗人激励', max: chaMod, recharge: (lv) => (lv >= 5 ? 'short' : 'long') }],
+                bard: [{ id: 'inspiration', name: (lv) => `诗人激励(d${steps([[1, 6], [5, 8], [10, 10], [15, 12]])(lv)})`, max: chaMod, recharge: (lv) => (lv >= 5 ? 'short' : 'long') }],
                 cleric: [{ id: 'channel', name: '引导神力', max: steps([[2, 1], [6, 2], [18, 3]]), recharge: 'short' }],
                 druid: [{ id: 'wildShape', name: '野性变身', max: steps([[2, 2], [20, 99]]), recharge: 'short' }],
                 fighter: [

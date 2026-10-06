@@ -2610,7 +2610,7 @@
             const granted = computed(() => DND.grantedSkills(hero));
             const derived = computed(() => ({
                 ac: DND.armorClass(hero), init: DND.initiativeMod(hero), prof: DND.profBonus(hero.level), pp: DND.passivePerception(hero),
-                slots: DND.spellSlots(hero), speed: subrace.value?.speed || race.value?.speed || 30,
+                slots: DND.spellSlots(hero), speed: DND.speed(hero),
                 xpLevel: DND.levelFromXp(hero.xp), subclassLevel: DND.subclassLevel(hero),
             }));
             const skillChoices = computed(() => DND.skillChoices(hero).map(c => ({

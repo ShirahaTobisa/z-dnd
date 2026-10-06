@@ -6,7 +6,10 @@
     const ABILITY_BY_NAME = Object.fromEntries(Object.entries(D.ABILITIES).flatMap(([k, v]) => [[k, k], [k.toLowerCase(), k], [v, k]]));
     const SKILL_BY_NAME = Object.fromEntries(Object.entries(D.SKILLS).flatMap(([id, s]) => [[id, id], [s.name, id]]));
 
-    const findWeapon = (char, name) => (char.weapons || []).find(id => id === name || D.WEAPONS[id]?.name === name);
+    // 徒手攻击人人都能用，不必列在武器栏里
+    const findWeapon = (char, name) => (['徒手', '徒手攻击', 'unarmed'].includes(name) ? 'unarmed' : (char.weapons || []).find(id => id === name || D.WEAPONS[id]?.name === name));
+    // 骰子取最大值，如 "2d8+3" → 19（至高治疗）
+    const maxDice = (expr) => D.rollDice(String(expr).replace(/(\d*)d(\d+)/g, (m, n, d) => String((parseInt(n) || 1) * d))).total;
     const critDamage = (expr) => expr.replace(/(\d*)d(\d+)/g, (m, n, d) => `${(parseInt(n) || 1) * 2}d${d}`);
     const snapshot = (char, keys) => JSON.parse(JSON.stringify(Object.fromEntries(keys.map(k => [k, char[k]]))));
     const removeCondition = (char, name) => { char.conditions = (char.conditions || []).filter(c => c !== name); };
@@ -18,8 +21,8 @@
         const save = t.match(/^(.+?)豁免$/) || t.match(/^豁免(.+)$/);
         if (save && ABILITY_BY_NAME[save[1]]) { const ab = ABILITY_BY_NAME[save[1]]; return { kind: 'save', ability: ab, label: `${D.ABILITIES[ab]}豁免`, mod: D.saveMod(char, ab) }; }
         if (t === '先攻') return { kind: 'init', ability: 'DEX', label: '先攻', mod: D.initiativeMod(char) };
-        if (ABILITY_BY_NAME[t]) { const ab = ABILITY_BY_NAME[t]; return { kind: 'ability', ability: ab, label: `${D.ABILITIES[ab]}检定`, mod: D.abilityMod(char.abilities?.[ab]) }; }
-        if (SKILL_BY_NAME[t]) { const id = SKILL_BY_NAME[t]; return { kind: 'skill', ability: D.SKILLS[id].ability, label: `${D.SKILLS[id].name}检定`, mod: D.skillMod(char, id) }; }
+        if (ABILITY_BY_NAME[t]) { const ab = ABILITY_BY_NAME[t]; return { kind: 'ability', ability: ab, label: `${D.ABILITIES[ab]}检定`, mod: D.abilityMod(char.abilities?.[ab]) + D.halfProficiency(char, ab, 'ability') }; }
+        if (SKILL_BY_NAME[t]) { const id = SKILL_BY_NAME[t]; return { kind: 'skill', skill: id, ability: D.SKILLS[id].ability, label: `${D.SKILLS[id].name}检定`, mod: D.skillMod(char, id) }; }
         const weaponId = findWeapon(char, t);
         if (weaponId) { const w = D.weaponAttack(char, weaponId); return { kind: 'attack', ability: w.usesStr ? 'STR' : 'DEX', label: `${w.name}攻击`, mod: w.toHit, weapon: w }; }
         return null;
@@ -41,6 +44,8 @@
             else { if (isCheck && ex >= 1) dis.push(`力竭${ex}级`); if ((isAttack || isSave) && ex >= 3) dis.push(`力竭${ex}级`); }
         }
         if (char.raging && info.ability === 'STR' && (isCheck || info.kind === 'save')) adv.push('狂暴');
+        if (info.skill === 'stealth' && D.ARMOR[char.armor]?.stealth) dis.push('护甲');
+        if (char.edition === '2024' && (D.subclassEntry(char, '勇士')?.level || 0) >= 3 && (info.kind === 'init' || info.skill === 'athletics')) adv.push('卓越运动员');
         const barbarian = D.classLevel(char, 'barbarian');
         if (barbarian >= 2 && info.kind === 'save' && info.ability === 'DEX' && !['目盲', '耳聋', '失能'].some(has)) adv.push('危险感知');
         if (barbarian >= 7 && info.kind === 'init') adv.push('野性直觉');
@@ -83,7 +88,10 @@
         if (/优势|\badv\b/i.test(rest)) mods.adv.push('指定');
         if (/劣势|\bdis\b/i.test(rest)) mods.dis.push('指定');
         const mod = info.mod + mods.penalty;
-        const t = D.d20Test({ mod, adv: mods.adv.length > 0, dis: mods.dis.length > 0, dc });
+        const t = D.d20Test({ mod, adv: mods.adv.length > 0, dis: mods.dis.length > 0, dc, lucky: D.isLucky(char) });
+        // 游荡者 11 级可靠才能：熟练的技能检定 d20 低于 10 按 10 算
+        const reliable = info.kind === 'skill' && D.classLevel(char, 'rogue') >= 11 && char.skillProfs?.includes(info.skill) && t.roll < 10;
+        if (reliable) { t.total += 10 - t.roll; t.success = dc == null ? null : t.total >= dc; }
         let level = ''; let success = t.success; let change = null;
 
         if (info.kind === 'attack') {
@@ -100,6 +108,7 @@
         const reasons = [...mods.adv.map(r => `优势:${r}`), ...mods.dis.map(r => `劣势:${r}`)].filter(r => !r.endsWith(':指定'));
         let extra = `d20${t.mode === 'normal' ? '' : `（${t.mode === 'adv' ? '优势' : '劣势'} ${t.rolls.join('/')}）`}=${t.roll} ${D.signed(mod)}`;
         if (mods.penalty) extra += `（力竭 ${mods.penalty}）`;
+        if (reliable) extra += ' · 可靠才能按 10 算';
         if (reasons.length) extra += ` · ${reasons.join(' ')}`;
         if (info.kind === 'attack') {
             const w = info.weapon;
@@ -109,8 +118,14 @@
             if (thrown) extra += ' · 投掷';
             // 巨武器战斗：2024 伤害骰 1、2 当 3；2014 掷出 1、2 重骰一次
             const gwf = w.greatWeapon ? (char.edition === '2024' ? 'min3' : 'ro2') : '';
-            const dmgExpr = `${level === '重击' ? critDamage(w.damage) : w.damage}${rage ? `+${rage}` : ''}`.replace(/(\d*d\d+)/g, `$1${gwf}`);
-            extra += ` · 伤害 ${D.rollDice(dmgExpr).total} ${w.type}${rage ? `（含狂暴 +${rage}）` : ''}${gwf ? '（巨武器战斗）' : ''}`;
+            // 近战重击额外武器骰：2014 野蛮人残暴重击（9/13/17 级 1/2/3 颗）、2014 半兽人凶蛮攻击（1 颗）
+            const crit = level === '重击';
+            const brutal = crit && w.melee && char.edition === '2014' ? D.steps([[9, 1], [13, 2], [17, 3]])(D.classLevel(char, 'barbarian')) + (char.race === 'halfOrc' ? 1 : 0) : 0;
+            const die = String(w.damage).match(/d(\d+)/)?.[1];
+            const dmgExpr = `${crit ? critDamage(w.damage) : w.damage}${brutal && die ? `+${brutal}d${die}` : ''}${rage ? `+${rage}` : ''}`.replace(/(\d*d\d+)/g, `$1${gwf}`);
+            extra += ` · 伤害 ${D.rollDice(dmgExpr).total} ${w.type}${rage ? `（含狂暴 +${rage}）` : ''}${brutal ? `（含重击额外 ${brutal} 骰）` : ''}${gwf ? '（巨武器战斗）' : ''}`;
+            // 圣武士 11 级：近战武器命中另加 1d8 光耀（2014 精通至圣斩 / 2024 光耀打击）
+            if (w.melee && !thrown && D.classLevel(char, 'paladin') >= 11) extra += ` · 命中另加 ${D.rollDice(crit ? '2d8' : '1d8').total} 光耀`;
             if (!w.proficient) extra += ' · 未熟练';
             const sneak = D.sneakAttackDice(char);
             if (sneak && w.finesseOrRanged) extra += ` · 满足条件可加偷袭 ${level === '重击' ? sneak * 2 : sneak}d6`;
@@ -370,6 +385,9 @@
         const mod = D.abilityMod(char.abilities?.[cls?.spellAbility]);
         const withUpcast = (dice) => [dice, ...Array(upTimes).fill(spell.upcast)].join('+').replace(/m/g, String(mod));
         const scaled = (dice) => withUpcast(spell.level === 0 ? scaleDice(dice, tier) : dice);
+        // 塑能学派 10 级强化塑能：法师的塑能法术伤害加智力调整值（一次）
+        const empowered = castClass === 'wizard' && spell.school === '塑能' && (D.subclassEntry(char, '塑能学派')?.level || 0) >= 10 ? Math.max(0, D.abilityMod(char.abilities?.INT)) : 0;
+        const dmgRoll = (dice) => D.rollDice(scaled(dice)).total + empowered;
 
         const details = []; let main = '-';
         const changes = [];
@@ -379,24 +397,26 @@
             const dice = a.rays === 'cantrip' ? withUpcast(a.dice) : scaled(a.dice);
             const mods = rollModifiers(char, { kind: 'attack' });
             for (let i = 0; i < rays; i++) {
-                const t = D.d20Test({ mod: D.spellAttack(char, castClass) + mods.penalty, adv: mods.adv.length > 0, dis: mods.dis.length > 0 });
-                const dmg = D.rollDice(t.crit ? critDamage(dice) : dice).total;
+                const t = D.d20Test({ mod: D.spellAttack(char, castClass) + mods.penalty, adv: mods.adv.length > 0, dis: mods.dis.length > 0, lucky: D.isLucky(char) });
+                const dmg = D.rollDice(t.crit ? critDamage(dice) : dice).total + (i === 0 ? empowered : 0);
                 if (i === 0) main = t.total;
                 details.push(`${rays > 1 ? `第${i + 1}道 ` : ''}攻击 ${t.total}（d20=${t.roll}${t.mode !== 'normal' ? ` ${t.mode === 'adv' ? '优势' : '劣势'}` : ''}）${t.crit ? ' 重击' : t.fumble ? ' 大失手' : ''}，命中则 ${dmg} ${a.type}`);
             }
         }
         if (spell.save) {
             const sv = spell.save;
-            const dmg = D.rollDice(scaled(sv.dice)).total; main = dmg;
+            const dmg = dmgRoll(sv.dice); main = dmg;
             details.push(`${D.ABILITIES[sv.ability]}豁免 DC ${D.spellSaveDc(char, castClass)}，失败受 ${dmg} ${sv.type} 伤害${sv.half ? '，成功减半' : ''}`);
         }
-        if (spell.damage) { const dmg = D.rollDice(scaled(spell.damage.dice)).total; main = dmg; details.push(`造成 ${dmg} ${spell.damage.type} 伤害`); }
+        if (spell.damage) { const dmg = dmgRoll(spell.damage.dice); main = dmg; details.push(`造成 ${dmg} ${spell.damage.type} 伤害`); }
         if (spell.temp) {
             const amount = D.rollDice(scaled(spell.temp)).total; main = amount;
             char.tempHp = Math.max(parseInt(char.tempHp) || 0, amount); details.push(`获得 ${amount} 点临时生命`);
         }
         if (spell.heal) {
-            const amount = D.rollDice(scaled(spell.heal)).total; main = amount;
+            // 生命领域：1 环以上治疗法术多回复 2 + 法术环阶；17 级至高治疗时治疗骰取最大值
+            const life = D.subclassEntry(char, '生命领域');
+            const amount = (life?.level >= 17 ? maxDice(scaled(spell.heal)) : D.rollDice(scaled(spell.heal)).total) + (life && spell.level > 0 ? 2 + slotLevel : 0); main = amount;
             const targetName = rest.match(/@(\S+)/)?.[1];
             const target = targetName ? party.find(p => p.name === targetName || p.name?.includes(targetName)) : char;
             if (target) {
@@ -422,7 +442,7 @@
             Object.assign(state, { active: true, round: 1, turn: 0 });
             state.order = chars.map(({ char, index }) => {
                 const mods = rollModifiers(char, { kind: 'init', ability: 'DEX' });
-                const init = D.d20Test({ mod: D.initiativeMod(char) + mods.penalty, adv: mods.adv.length > 0, dis: mods.dis.length > 0 }).total;
+                const init = D.d20Test({ mod: D.initiativeMod(char) + mods.penalty, adv: mods.adv.length > 0, dis: mods.dis.length > 0, lucky: D.isLucky(char) }).total;
                 return { name: char.name, pc: true, index, init, ac: D.armorClass(char) };
             });
             state.order.push(...state.pending || []); delete state.pending;
@@ -515,7 +535,7 @@
         const resources = D.classResources(char).map(r => `${r.name} ${r.max === 99 ? '不限' : `${r.left}/${r.max}`}（${r.recharge === 'short' ? '短休' : '长休'}恢复）`).join('、');
         const crit = D.critRange(char); const sneak = D.sneakAttackDice(char);
         const status = [
-            ...(char.conditions || []), char.exhaustion ? `力竭${char.exhaustion}级` : '',
+            ...(char.conditions || []), char.exhaustion ? `力竭${char.exhaustion}级${char.edition === '2014' && char.exhaustion >= 4 ? '(生命上限减半)' : ''}` : '',
             char.raging ? `狂暴中(力量近战伤害+${D.rageDamage(char)}，抵抗钝击/穿刺/挥砍伤害)` : '', char.concentration ? `专注:${char.concentration}` : '',
             char.dead ? '已死亡' : (parseInt(char.hp) || 0) === 0 ? `濒死(死亡豁免 成功${char.deathSaves?.success || 0}/失败${char.deathSaves?.fail || 0})` : '',
         ].filter(Boolean).join('、');
@@ -525,8 +545,8 @@
             `姓名：${char.name} | ${ed.name}`,
             `${sub?.name || race?.name || '未知种族'} ${D.classSummary(char) || '未知职业'}${subclasses ? `（${subclasses}）` : ''} | 总等级 ${char.level} | 背景：${bg?.name || '无'} | 阵营：${char.alignment || '未定'}`,
             `属性：${abilities}`,
-            `生命 ${char.hp}/${char.maxHp}${char.tempHp ? ` +临时${char.tempHp}` : ''} | AC ${D.armorClass(char)} | 速度 ${sub?.speed || race?.speed || 30} 尺 | 熟练加值 ${D.signed(D.profBonus(char.level))} | 被动察觉 ${D.passivePerception(char)} | 生命骰 ${hdLeft}/${pool.length} (${D.hitDiceText(pool) || '?'})`,
-            `豁免熟练：${Object.keys(D.ABILITIES).filter(a => D.saveProficient(char, a)).map(a => D.ABILITIES[a]).join('、') || '无'} | 技能熟练：${skills || '无'}`,
+            `生命 ${char.hp}/${char.maxHp}${char.tempHp ? ` +临时${char.tempHp}` : ''} | AC ${D.armorClass(char)} | 速度 ${D.speed(char)} 尺 | 熟练加值 ${D.signed(D.profBonus(char.level))} | 被动察觉 ${D.passivePerception(char)} | 生命骰 ${hdLeft}/${pool.length} (${D.hitDiceText(pool) || '?'})`,
+            `豁免熟练：${Object.keys(D.ABILITIES).filter(a => D.saveProficient(char, a)).map(a => D.ABILITIES[a]).join('、') || '无'}${D.auraOfProtection(char) ? `（守护灵光：所有豁免 +${D.auraOfProtection(char)}，10 尺内盟友同享）` : ''} | 技能熟练：${skills || '无'}`,
             weapons && `武器：${weapons}${crit < 20 ? ` | 暴击范围 ${crit}-20` : ''}${sneak ? ` | 偷袭 ${sneak}d6` : ''}`,
             features && `职业能力：${features}`,
             resources && `职业资源：${resources}`,

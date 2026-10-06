@@ -30,7 +30,7 @@
     // 子职业 srd: false 表示非 SRD 内容，只能写自己的概括，不能照搬书中原文。
     const CLASSES = {
         barbarian: { name: '野蛮人', description: '凭怒火战斗的原始勇士，血厚、抗打，适合冲在最前面。', hitDie: 12, saves: ['STR', 'CON'], skillCount: 2, skills: ['animalHandling', 'athletics', 'intimidation', 'nature', 'perception', 'survival'], armor: ['轻甲', '中甲', '盾牌'], weapons: ['简易武器', '军用武器'], caster: null, unarmored: ['DEX', 'CON'], features: {}, subclasses: [{ name: '狂战士道途', srd: true, description: '', features: {} }] },
-        bard: { name: '吟游诗人', description: '用音乐和话语施展魔法的多面手，擅长社交、辅助和各种技能。', hitDie: 8, saves: ['DEX', 'CHA'], skillCount: 3, skills: ALL_SKILLS, armor: ['轻甲'], weapons: ['简易武器'], caster: 'full', spellAbility: 'CHA', features: {}, subclasses: [{ name: '逸闻学院', srd: true, description: '', features: {} }] },
+        bard: { name: '吟游诗人', description: '用音乐和话语施展魔法的多面手，擅长社交、辅助和各种技能。', hitDie: 8, saves: ['DEX', 'CHA'], skillCount: 3, skills: ALL_SKILLS, armor: ['轻甲'], weapons: ['简易武器', '手弩', '长剑', '刺剑', '短剑'], caster: 'full', spellAbility: 'CHA', features: {}, subclasses: [{ name: '逸闻学院', srd: true, description: '', features: {} }] },
         cleric: { name: '牧师', description: '侍奉神祇的神术施法者，能治疗、守护队友，也能惩戒敌人。', hitDie: 8, saves: ['WIS', 'CHA'], skillCount: 2, skills: ['history', 'insight', 'medicine', 'persuasion', 'religion'], armor: ['轻甲', '中甲', '盾牌'], weapons: ['简易武器'], caster: 'full', spellAbility: 'WIS', features: {}, subclasses: [{ name: '生命领域', srd: true, description: '', features: {} }] },
         druid: { name: '德鲁伊', description: '守护自然的施法者，能调用自然之力，还能变成野兽。', hitDie: 8, saves: ['INT', 'WIS'], skillCount: 2, skills: ['arcana', 'animalHandling', 'insight', 'medicine', 'nature', 'perception', 'religion', 'survival'], armor: ['轻甲', '中甲', '盾牌'], weapons: ['木棍', '匕首', '飞镖', '标枪', '硬头锤', '长棍', '弯刀', '镰刀', '投石索', '矛'], caster: 'full', spellAbility: 'WIS', features: {}, subclasses: [{ name: '大地结社', srd: true, description: '', features: {} }] },
         fighter: { name: '战士', description: '精通各种武器和护甲的战斗专家，稳定可靠，上手最容易。', hitDie: 10, saves: ['STR', 'CON'], skillCount: 2, skills: ['acrobatics', 'animalHandling', 'athletics', 'history', 'insight', 'intimidation', 'perception', 'survival'], armor: ['全部护甲', '盾牌'], weapons: ['简易武器', '军用武器'], caster: null, features: {}, subclasses: [{ name: '勇士', srd: true, description: '', features: {} }] },
@@ -44,19 +44,20 @@
     };
 
     // type: light 轻甲 / medium 中甲（敏捷最多 +2）/ heavy 重甲（不加敏捷）
+    // stealth: 穿着时隐匿检定劣势；str: 力量不足时速度 -10 尺
     const ARMOR = {
-        padded: { name: '布甲', base: 11, type: 'light' },
+        padded: { name: '布甲', base: 11, type: 'light', stealth: true },
         leather: { name: '皮甲', base: 11, type: 'light' },
         studdedLeather: { name: '镶钉皮甲', base: 12, type: 'light' },
         hide: { name: '兽皮甲', base: 12, type: 'medium' },
         chainShirt: { name: '链甲衫', base: 13, type: 'medium' },
-        scaleMail: { name: '鳞甲', base: 14, type: 'medium' },
+        scaleMail: { name: '鳞甲', base: 14, type: 'medium', stealth: true },
         breastplate: { name: '胸甲', base: 14, type: 'medium' },
-        halfPlate: { name: '半身板甲', base: 15, type: 'medium' },
-        ringMail: { name: '环甲', base: 14, type: 'heavy' },
-        chainMail: { name: '链甲', base: 16, type: 'heavy' },
-        splint: { name: '板条甲', base: 17, type: 'heavy' },
-        plate: { name: '板甲', base: 18, type: 'heavy' },
+        halfPlate: { name: '半身板甲', base: 15, type: 'medium', stealth: true },
+        ringMail: { name: '环甲', base: 14, type: 'heavy', stealth: true },
+        chainMail: { name: '链甲', base: 16, type: 'heavy', stealth: true, str: 13 },
+        splint: { name: '板条甲', base: 17, type: 'heavy', stealth: true, str: 15 },
+        plate: { name: '板甲', base: 18, type: 'heavy', stealth: true, str: 15 },
     };
 
     // SRD 武器表。cat: simple 简易 / martial 军用；range 为“常规/最远”射程（尺）
@@ -98,6 +99,7 @@
         handCrossbow: { name: '手弩', cat: 'martial', damage: '1d6', type: '穿刺', props: ['ranged', 'light', 'loading'], range: '30/120' },
         heavyCrossbow: { name: '重弩', cat: 'martial', damage: '1d10', type: '穿刺', props: ['ranged', 'heavy', 'loading', 'twoHanded'], range: '100/400' },
         longbow: { name: '长弓', cat: 'martial', damage: '1d8', type: '穿刺', props: ['ranged', 'heavy', 'twoHanded'], range: '150/600' },
+        unarmed: { name: '徒手攻击', cat: 'simple', damage: '1', type: '钝击', props: ['unarmed'] },
     };
 
     // 武器数据 = 通用数据 + 版本覆盖（2024 版部分武器数值有变）
@@ -169,10 +171,11 @@
         return { expr: clean, total, parts };
     };
 
-    // d20 检定：优势和劣势同时存在时互相抵消
-    const d20Test = ({ mod = 0, adv = false, dis = false, dc = null } = {}) => {
+    // d20 检定：优势和劣势同时存在时互相抵消；lucky（半身人幸运）掷出 1 时重骰一次
+    const d20Test = ({ mod = 0, adv = false, dis = false, dc = null, lucky = false } = {}) => {
         const mode = adv && !dis ? 'adv' : dis && !adv ? 'dis' : 'normal';
-        const rolls = mode === 'normal' ? [randInt(20)] : [randInt(20), randInt(20)];
+        const die = () => { const r = randInt(20); return lucky && r === 1 ? randInt(20) : r; };
+        const rolls = mode === 'normal' ? [die()] : [die(), die()];
         const roll = mode === 'adv' ? Math.max(...rolls) : mode === 'dis' ? Math.min(...rolls) : rolls[0];
         const total = roll + mod;
         return { rolls, roll, mod, total, mode, crit: roll === 20, fumble: roll === 1, success: dc == null ? null : total >= dc, dc };
@@ -194,6 +197,7 @@
     const classView = (char, e) => ({ ...char, classId: e.classId, subclass: e.subclass, level: e.level, multiclass: [] });
     const classLevel = (char, classId) => classEntries(char).filter(e => e.classId === classId).reduce((sum, e) => sum + e.level, 0);
     const subclassEntry = (char, name) => classEntries(char).find(e => e.subclass === name);
+    const isLucky = (char) => char.race === 'halfling';
     const isMulticlass = (char) => classEntries(char).length > 1;
     // 「战士 3 / 法师 2」；单职业只写职业名
     const classSummary = (char) => {
@@ -210,14 +214,28 @@
             .map(req => `${CLASSES[e.classId].name}需要${[].concat(req).map(ab => ABILITIES[ab]).join('或')} 13`));
     };
 
-    // 豁免熟练：职业自带 + 坚韧专长选的属性
-    const saveProficient = (char, ability) => !!classInfo(char)?.saves.includes(ability) || asiRecords(char).some(r => r.mode === 'feat' && r.feat === 'resilient' && r.fa === ability);
-    const saveMod = (char, ability) => abilityMod(char.abilities?.[ability]) + (saveProficient(char, ability) ? profBonus(char.level) : 0);
+    // 豁免熟练：起始职业自带 + 坚韧专长 + 武僧 14 级全部豁免 + 游荡者 15 级圆滑心智
+    const saveProficient = (char, ability) => !!classInfo(char)?.saves.includes(ability)
+        || asiRecords(char).some(r => r.mode === 'feat' && r.feat === 'resilient' && r.fa === ability)
+        || classLevel(char, 'monk') >= 14
+        || (classLevel(char, 'rogue') >= 15 && (ability === 'WIS' || (char.edition === '2024' && ability === 'CHA')));
+    // 圣武士 6 级守护灵光：所有豁免加魅力调整值（至少 +1）
+    const auraOfProtection = (char) => (classLevel(char, 'paladin') >= 6 ? Math.max(1, abilityMod(char.abilities?.CHA)) : 0);
+    const saveMod = (char, ability) => abilityMod(char.abilities?.[ability]) + (saveProficient(char, ability) ? profBonus(char.level) : 0) + auraOfProtection(char);
+
+    // 没有熟练的属性检定加一半熟练加值：吟游诗人 2 级万事通（2024 版只限技能检定）、2014 版勇士 7 级卓越运动员（力量/敏捷/体质，向上取整）
+    // kind: 'skill' 技能检定 / 'ability' 纯属性检定（含先攻）
+    const halfProficiency = (char, ability, kind) => {
+        const pb = profBonus(char.level);
+        const jack = classLevel(char, 'bard') >= 2 && (char.edition === '2014' || kind === 'skill') ? Math.floor(pb / 2) : 0;
+        const athlete = char.edition === '2014' && (subclassEntry(char, '勇士')?.level || 0) >= 7 && ['STR', 'DEX', 'CON'].includes(ability) ? Math.ceil(pb / 2) : 0;
+        return Math.max(jack, athlete);
+    };
 
     const skillMod = (char, skillId) => {
         const skill = SKILLS[skillId]; if (!skill) return 0;
         const pb = profBonus(char.level);
-        const prof = char.expertise?.includes(skillId) ? pb * 2 : char.skillProfs?.includes(skillId) ? pb : 0;
+        const prof = char.expertise?.includes(skillId) ? pb * 2 : char.skillProfs?.includes(skillId) ? pb : halfProficiency(char, skill.ability, 'skill');
         return abilityMod(char.abilities?.[skill.ability]) + prof;
     };
 
@@ -265,6 +283,7 @@
     // 武器熟练：职业的武器类别或具体武器名，加上种族武器训练
     const weaponProficient = (char, weaponId) => {
         const w = weaponData(char, weaponId); if (!w) return false;
+        if (weaponId === 'unarmed') return true;
         const gains = edition(char.edition).multiclassGains || {};
         const list = [...(classInfo(char)?.weapons || []), ...classEntries(char).slice(1).flatMap(e => gains[e.classId]?.weapons || []), ...(raceOf(char)?.weapons || []), ...(subraceOf(char)?.weapons || [])];
         if (list.includes(w.name) || (w.cat === 'simple' && list.includes('简易武器'))) return true;
@@ -327,7 +346,8 @@
         classEntries(char).forEach(e => (edition(char.edition).resources?.[e.classId] || []).forEach(d => {
             const max = typeof d.max === 'function' ? d.max(e.level, char) : d.max;
             const recharge = typeof d.recharge === 'function' ? d.recharge(e.level) : d.recharge;
-            if (max > (out[d.id]?.max || 0)) out[d.id] = { ...d, max, recharge };
+            const name = typeof d.name === 'function' ? d.name(e.level) : d.name;
+            if (max > (out[d.id]?.max || 0)) out[d.id] = { ...d, name, max, recharge };
         }));
         return Object.values(out).map(r => { const used = Math.min(r.max, parseInt(char.resourcesUsed?.[r.id]) || 0); return { ...r, used, left: r.max - used }; });
     };
@@ -371,8 +391,18 @@
 
     // 武器攻击：灵巧武器取力量和敏捷中较高的，远程用敏捷
     const weaponAttack = (char, weaponId) => {
-        const w = weaponData(char, weaponId); if (!w) return null;
+        let w = weaponData(char, weaponId); if (!w) return null;
         const str = abilityMod(char.abilities?.STR); const dex = abilityMod(char.abilities?.DEX);
+        // 武僧武器：2014 版为短剑和非双手、非重型的简易近战武器；2024 版为简易近战武器和轻型军用近战武器
+        const monk = classLevel(char, 'monk');
+        const monkWeapon = monk && !w.props.includes('ranged') && (weaponId === 'unarmed' || (char.edition === '2024'
+            ? w.cat === 'simple' || w.props.includes('light')
+            : weaponId === 'shortsword' || (w.cat === 'simple' && !w.props.includes('twoHanded') && !w.props.includes('heavy'))));
+        if (monkWeapon) {
+            const die = char.edition === '2024' ? steps([[1, 6], [5, 8], [11, 10], [17, 12]])(monk) : steps([[1, 4], [5, 6], [11, 8], [17, 10]])(monk);
+            const own = parseInt(String(w.damage).split('d')[1]) || 0;
+            w = { ...w, damage: own >= die ? w.damage : `1d${die}`, props: [...w.props, 'finesse'] };
+        }
         const mod = w.props.includes('ranged') ? dex : w.props.includes('finesse') ? Math.max(str, dex) : str;
         const proficient = weaponProficient(char, weaponId);
         const ranged = w.props.includes('ranged');
@@ -381,7 +411,21 @@
         return { id: weaponId, name: w.name, toHit: mod + styleHit + (proficient ? profBonus(char.level) : 0), proficient, damage: `${w.damage}${dmgMod ? signed(dmgMod) : ''}`, greatWeapon: char.fightingStyle === 'greatWeapon' && (w.props.includes('twoHanded') || !!w.versatile) && !ranged, type: w.type, range: w.range || '', melee: !w.props.includes('ranged'), usesStr: mod === str && !w.props.includes('ranged'), finesseOrRanged: w.props.includes('finesse') || w.props.includes('ranged'), mastery: edition(char.edition).weaponMastery?.[weaponId] || null };
     };
 
-    const initiativeMod = (char) => abilityMod(char.abilities?.DEX) + (hasFeat(char, 'alert') ? (char.edition === '2024' ? profBonus(char.level) : 5) : 0);
+    const initiativeMod = (char) => abilityMod(char.abilities?.DEX) + (hasFeat(char, 'alert') ? (char.edition === '2024' ? profBonus(char.level) : 5) : halfProficiency(char, 'DEX', 'ability'));
+
+    // 速度：种族基础 + 野蛮人快速移动 / 武僧无甲移动；重甲力量不足 -10；力竭（2014 2 级减半、5 级为 0；2024 每级 -5）
+    const speed = (char) => {
+        const armor = ARMOR[char.armor];
+        let v = subraceOf(char)?.speed || raceOf(char)?.speed || 30;
+        if (classLevel(char, 'barbarian') >= 5 && armor?.type !== 'heavy') v += 10;
+        if (!armor && !char.shield) v += steps([[2, 10], [6, 15], [10, 20], [14, 25], [18, 30]])(classLevel(char, 'monk'));
+        if (armor?.str && (parseInt(char.abilities?.STR) || 0) < armor.str && !(char.edition === '2014' && char.race === 'dwarf')) v -= 10;
+        const ex = parseInt(char.exhaustion) || 0;
+        if (char.edition === '2024') v -= 5 * ex;
+        else if (ex >= 5) v = 0;
+        else if (ex >= 2) v = Math.floor(v / 2);
+        return Math.max(0, v);
+    };
 
     // —— 成长：属性值提升 / 专长 ——
     // char.asi = { 键: { mode: 'asi', a1, a2 } | { mode: 'feat', feat, fa } }；起始职业的键是等级（如 "4"），兼职职业是「职业:等级」（如 "wizard:4"）
@@ -473,5 +517,5 @@
         return char;
     };
 
-    root.DND = { ABILITIES, SKILLS, ALL_SKILLS, CLASSES, ARMOR, WEAPONS, CONDITIONS, XP_TABLE, STANDARD_ARRAY, POINT_BUY, editions, edition, classInfo, casterSummary, classEntries, classLevel, subclassEntry, isMulticlass, classSummary, hitDicePool, hitDiceText, multiclassIssues, fitMulticlass, MULTICLASS_REQ, slotLevel, slotLabel, weaponData, signed, abilityMod, profBonus, levelFromXp, rollDice, d20Test, saveProficient, saveMod, skillMod, passivePerception, armorClass, maxHp, spellSlots, spellSaveDc, spellAttack, weaponAttack, weaponProficient, initiativeMod, steps, critRange, rageDamage, sneakAttackDice, classFeatures, classResources, asiRecords, asiLevels, characterFeats, hasFeat, hasFightingStyle, cantripsKnown, spellsAllowed, maxSpellLevel, classSpells, raceOf, subraceOf, backgroundOf, subclassLevel, pointBuyCost, finalAbilities, grantedSkills, skillChoices, newCharacter, normalizeCharacter };
+    root.DND = { ABILITIES, SKILLS, ALL_SKILLS, CLASSES, ARMOR, WEAPONS, CONDITIONS, XP_TABLE, STANDARD_ARRAY, POINT_BUY, editions, edition, classInfo, isLucky, casterSummary, classEntries, classLevel, subclassEntry, isMulticlass, classSummary, hitDicePool, hitDiceText, multiclassIssues, fitMulticlass, MULTICLASS_REQ, slotLevel, slotLabel, weaponData, signed, abilityMod, profBonus, levelFromXp, rollDice, d20Test, saveProficient, saveMod, skillMod, passivePerception, armorClass, maxHp, spellSlots, spellSaveDc, spellAttack, weaponAttack, weaponProficient, initiativeMod, speed, halfProficiency, auraOfProtection, steps, critRange, rageDamage, sneakAttackDice, classFeatures, classResources, asiRecords, asiLevels, characterFeats, hasFeat, hasFightingStyle, cantripsKnown, spellsAllowed, maxSpellLevel, classSpells, raceOf, subraceOf, backgroundOf, subclassLevel, pointBuyCost, finalAbilities, grantedSkills, skillChoices, newCharacter, normalizeCharacter };
 })(typeof window !== 'undefined' ? window : globalThis);
