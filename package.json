@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "build:css": "tailwindcss -i ./assets/css/tailwind.input.css -o ./assets/css/tailwind.css --minify",
+    "vendor": "node tools/vendor.mjs",
     "build:mobile-web": "pnpm build:css && node tools/build-mobile.mjs",
     "mobile:sync": "pnpm build:mobile-web && cap sync android",
     "mobile:open": "cap open android",
