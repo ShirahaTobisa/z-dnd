@@ -45,6 +45,7 @@
             else { if (isCheck && ex >= 1) dis.push(`力竭${ex}级`); if ((isAttack || isSave) && ex >= 3) dis.push(`力竭${ex}级`); }
         }
         if (char.raging && info.ability === 'STR' && (isCheck || info.kind === 'save')) adv.push('狂暴');
+        if (D.armorIssue(char) && (isAttack || ((isCheck || isSave) && ['STR', 'DEX'].includes(info.ability)))) dis.push('护甲不熟练');
         if (D.encumbrance(char).status === 'heavy' && (isAttack || ((isCheck || isSave) && ['STR', 'DEX', 'CON'].includes(info.ability)))) dis.push('重度负重');
         if (info.skill === 'stealth' && D.ARMOR[char.armor]?.stealth) dis.push('护甲');
         if (char.edition === '2024' && (D.subclassEntry(char, '勇士')?.level || 0) >= 3 && (info.kind === 'init' || info.skill === 'athletics')) adv.push('卓越运动员');
@@ -129,6 +130,8 @@
             // 圣武士 11 级：近战武器命中另加 1d8 光耀（2014 精通至圣斩 / 2024 光耀打击）
             if (w.melee && !thrown && D.classLevel(char, 'paladin') >= 11) extra += ` · 命中另加 ${D.rollDice(crit ? '2d8' : '1d8').total} 光耀`;
             if (w.magicExtra) extra += ` · 魔法武器额外 ${w.magicExtra}（按物品说明的条件）`;
+            const strikeDice = D.chose(char, 'blessedStrikes', 'divineStrike') ? (D.classLevel(char, 'cleric') >= 14 ? '2d8' : '1d8') : D.chose(char, 'elementalFury', 'primalStrike') ? (D.classLevel(char, 'druid') >= 15 ? '2d8' : '1d8') : '';
+            if (strikeDice) extra += ` · 每回合首次命中可另加 ${D.rollDice(crit ? critDamage(strikeDice) : strikeDice).total}（${D.chose(char, 'blessedStrikes', 'divineStrike') ? '光耀或黯蚀' : '冷冻、火焰、闪电或雷鸣'}）`;
             if (!w.proficient) extra += ' · 未熟练';
             const sneak = D.sneakAttackDice(char);
             if (sneak && w.finesseOrRanged) extra += ` · 满足条件可加偷袭 ${level === '重击' ? sneak * 2 : sneak}d6`;
@@ -370,6 +373,7 @@
         const card = (level, extra = '', roll = '-') => ({ label: `施放 ${spell?.name || m[1]}`, roll, level, success: null, extra });
         if (!spell) return card('没有这个法术');
         if (char.raging) return card('狂暴中无法施法');
+        if (D.armorIssue(char)) return card(`穿着不熟练的护甲无法施法（${D.armorIssue(char)}）`);
 
         // 施法职业：法术表里有这个法术的职业（兼职时取第一个），决定施法属性
         const castClass = D.spellCastingClass(char, spell);
@@ -414,8 +418,12 @@
         const withUpcast = (dice) => [dice, ...Array(upTimes).fill(spell.upcast)].join('+').replace(/m/g, String(mod));
         const scaled = (dice) => withUpcast(spell.level === 0 ? scaleDice(dice, tier) : dice);
         // 塑能学派 10 级强化塑能：法师的塑能法术伤害加智力调整值（一次）
+        // 2024 牧师受祝打击、德鲁伊元素之怒选了强效施法：本职业戏法伤害加感知
+        const potent = spell.level === 0 && ((castClass === 'cleric' && D.chose(char, 'blessedStrikes', 'potentSpellcasting')) || (castClass === 'druid' && D.chose(char, 'elementalFury', 'potentSpellcasting'))) ? Math.max(0, D.abilityMod(char.abilities?.WIS)) : 0;
+        // 苦痛冲击：魔能爆每道光束加魅力
+        const agonizing = spell.id === 'eldritchBlast' && D.chose(char, 'invocations', 'agonizingBlast') ? Math.max(0, D.abilityMod(char.abilities?.CHA)) : 0;
         const empowered = castClass === 'wizard' && spell.school === '塑能' && (D.subclassEntry(char, '塑能学派')?.level || 0) >= 10 ? Math.max(0, D.abilityMod(char.abilities?.INT)) : 0;
-        const dmgRoll = (dice) => D.rollDice(scaled(dice)).total + empowered;
+        const dmgRoll = (dice) => D.rollDice(scaled(dice)).total + empowered + potent;
 
         const details = []; let main = '-';
         const changes = [];
@@ -426,7 +434,7 @@
             const mods = rollModifiers(char, { kind: 'attack' });
             for (let i = 0; i < rays; i++) {
                 const t = D.d20Test({ mod: D.spellAttack(char, castClass) + mods.penalty, adv: mods.adv.length > 0, dis: mods.dis.length > 0, lucky: D.isLucky(char) });
-                const dmg = D.rollDice(t.crit ? critDamage(dice) : dice).total + (i === 0 ? empowered : 0);
+                const dmg = D.rollDice(t.crit ? critDamage(dice) : dice).total + (i === 0 ? empowered + potent : 0) + agonizing;
                 if (i === 0) main = t.total;
                 details.push(`${rays > 1 ? `第${i + 1}道 ` : ''}攻击 ${t.total}（d20=${t.roll}${t.mode !== 'normal' ? ` ${t.mode === 'adv' ? '优势' : '劣势'}` : ''}）${t.crit ? ' 重击' : t.fumble ? ' 大失手' : ''}，命中则 ${dmg} ${a.type}`);
             }
@@ -580,6 +588,12 @@
         ].filter(Boolean).join('\n');
     };
 
+    // 职业、物种、专长上的选择（武器专精、魔能祈唤、超魔等）
+    const choiceText = (char) => (D.choiceDefs ? D.choiceDefs(char) : []).map(d => {
+        const names = D.choicePicks(char, d.id).map(v => d.options.find(o => o.id === v)?.name || v);
+        return names.length ? `${d.label}：${names.join('、')}` : '';
+    }).filter(Boolean).join('；');
+
     // 发给 AI 的角色资料
     const profile = (char) => {
         const race = D.raceOf(char); const sub = D.subraceOf(char); const bg = D.backgroundOf(char); const ed = D.edition(char.edition);
@@ -616,6 +630,9 @@
             char.features && `专长与其他：${char.features}`,
             status && `当前状态：${status}`,
             inventoryText(char),
+            choiceText(char),
+            (char.languages || char.tools) && `语言：${char.languages || '未填'} | 工具：${char.tools || '未填'}`,
+            D.armorIssue(char) && `护甲（${D.armorIssue(char)}）：力量、敏捷的检定、豁免和攻击具有劣势，不能施法`,
             story && `背景故事：${story}`,
         ].filter(Boolean).join('\n');
     };

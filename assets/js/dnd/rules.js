@@ -252,6 +252,27 @@
     // 智能物品与持有者冲突：双方魅力检定对抗
     const sentientCheckMod = (item) => abilityMod(item?.sentient?.cha);
 
+    // —— 选择（choices.js）——
+    const chose = (char, id, value) => [].concat(char.choices?.[id] || []).includes(value);
+    // 战斗风格：主选 + 勇士的额外战斗风格
+    const hasStyle = (char, id) => char.fightingStyle === id || char.choices?.fightingStyle2 === id;
+    // 护甲训练：职业（含兼职所得）、神圣秩序守护者、原初秩序守望者、2014 生命领域、2014 山地矮人
+    const armorTraining = (char) => {
+        const set = new Set([...(classInfo(char)?.armor || []), ...classEntries(char).slice(1).flatMap(e => edition(char.edition).multiclassGains?.[e.classId]?.armor || [])]);
+        if (chose(char, 'divineOrder', 'protector')) set.add('重甲');
+        if (chose(char, 'primalOrder', 'warden')) set.add('中甲');
+        if (char.edition === '2014' && subclassEntry(char, '生命领域')) set.add('重甲');
+        if (char.edition === '2014' && char.subrace === 'mountain') { set.add('轻甲'); set.add('中甲'); }
+        return set;
+    };
+    // 穿着不熟练的护甲或盾牌：力量、敏捷的检定、豁免和攻击劣势，不能施法
+    const armorIssue = (char) => {
+        const t = armorTraining(char); const all = t.has('全部护甲');
+        const armor = ARMOR[char.armor]; const need = armor && { light: '轻甲', medium: '中甲', heavy: '重甲' }[armor.type];
+        const bad = [need && !all && !t.has(need) && armor.name, char.shield && !t.has('盾牌') && '盾牌'].filter(Boolean);
+        return bad.length ? `未熟练：${bad.join('、')}` : '';
+    };
+
     // —— 兼职 ——
     // 所有职业条目：[{ classId, subclass, level }]，起始职业在最前，等级 = 总等级减去兼职等级
     const classEntries = (char) => {
@@ -303,7 +324,8 @@
         const skill = SKILLS[skillId]; if (!skill) return 0;
         const pb = profBonus(char.level);
         const prof = char.expertise?.includes(skillId) ? pb * 2 : char.skillProfs?.includes(skillId) ? pb : halfProficiency(char, skill.ability, 'skill');
-        return abilityMod(char.abilities?.[skill.ability]) + prof + itemBonus(char, 'check');
+        const wisBonus = (chose(char, 'divineOrder', 'thaumaturge') && ['arcana', 'religion'].includes(skillId)) || (chose(char, 'primalOrder', 'magician') && ['arcana', 'nature'].includes(skillId)) ? Math.max(1, abilityMod(char.abilities?.WIS)) : 0;
+        return abilityMod(char.abilities?.[skill.ability]) + prof + itemBonus(char, 'check') + wisBonus;
     };
 
     const passivePerception = (char) => 10 + skillMod(char, 'perception') + (char.edition === '2014' && hasFeat(char, 'observant') ? 5 : 0);
@@ -325,7 +347,7 @@
             ac = Math.max(...options);
         }
         const unarmoredBonus = !armor && !char.shield ? itemBonus(char, 'acUnarmored') : 0;
-        return ac + (char.shield ? 2 : 0) + (armor && char.fightingStyle === 'defense' ? 1 : 0) + itemBonus(char, 'ac') + unarmoredBonus;
+        return ac + (char.shield ? 2 : 0) + (armor && hasStyle(char, 'defense') ? 1 : 0) + itemBonus(char, 'ac') + unarmoredBonus;
     };
 
     // 1 级取起始职业生命骰最大值，之后每级取掷骰记录或平均值（每级至少 1 点）；再加上种族、子职业的每级生命加值
@@ -354,7 +376,8 @@
         const w = weaponData(char, weaponId); if (!w) return false;
         if (weaponId === 'unarmed') return true;
         const gains = edition(char.edition).multiclassGains || {};
-        const list = [...(classInfo(char)?.weapons || []), ...classEntries(char).slice(1).flatMap(e => gains[e.classId]?.weapons || []), ...(raceOf(char)?.weapons || []), ...(subraceOf(char)?.weapons || [])];
+        const orders = chose(char, 'divineOrder', 'protector') || chose(char, 'primalOrder', 'warden') ? ['军用武器'] : [];
+        const list = [...(classInfo(char)?.weapons || []), ...orders, ...classEntries(char).slice(1).flatMap(e => gains[e.classId]?.weapons || []), ...(raceOf(char)?.weapons || []), ...(subraceOf(char)?.weapons || [])];
         if (list.includes(w.name) || (w.cat === 'simple' && list.includes('简易武器'))) return true;
         if (w.cat !== 'martial') return false;
         return list.includes('军用武器')
@@ -383,7 +406,8 @@
         sorcerer: [[1, 4], [4, 5], [10, 6]], warlock: [[1, 2], [4, 3], [10, 4]], wizard: [[1, 3], [4, 4], [10, 5]],
     };
     // 兼职时各职业分别按自己的等级算，再加起来
-    const cantripsKnown = (char) => classEntries(char).reduce((sum, e) => sum + steps(CANTRIPS_KNOWN[e.classId] || [])(e.level), 0);
+    const cantripsKnown = (char) => classEntries(char).reduce((sum, e) => sum + steps(CANTRIPS_KNOWN[e.classId] || [])(e.level), 0)
+        + (chose(char, 'divineOrder', 'thaumaturge') ? 1 : 0) + (chose(char, 'primalOrder', 'magician') ? 1 : 0);
     const spellsAllowed = (char) => {
         const list = classEntries(char).map(e => singleSpellsAllowed(classView(char, e))).filter(a => a.count);
         const labels = [...new Set(list.map(a => a.label))];
@@ -409,11 +433,19 @@
     // 子职业表里到了等级的法术：table 为 alwaysPrepared（始终准备）或 expandedSpells（加进可选表）
     const subclassSpellIds = (char, e, table) => Object.entries(edition(char.edition)[table]?.[e.subclass] || {}).filter(([lv]) => +lv <= e.level).flatMap(([, ids]) => ids);
     // 可选法术：各职业的法术表加上子职业扩展表，环阶不超过该职业能学的
-    const classSpells = (char) => Object.values(root.DND.spellBook?.(char.edition) || {}).filter(s => classEntries(char).some(e => (s.classes.includes(e.classId) || subclassSpellIds(char, e, 'expandedSpells').includes(s.id)) && s.level <= singleMaxSpellLevel(classView(char, e))));
+    // 吟游诗人魔法奥秘：2014 版 10 级（逸闻学院 6 级）可学任何职业的法术；2024 版 10 级可准备牧师、德鲁伊、法师的法术
+    const secretsLists = (char, e) => {
+        if (e.classId !== 'bard') return null;
+        if (char.edition === '2024') return e.level >= 10 ? ['bard', 'cleric', 'druid', 'wizard'] : null;
+        return e.level >= 10 || (e.subclass === '逸闻学院' && e.level >= 6) ? Object.keys(CLASSES) : null;
+    };
+    const classSpells = (char) => Object.values(root.DND.spellBook?.(char.edition) || {}).filter(s => classEntries(char).some(e => (s.classes.includes(e.classId) || subclassSpellIds(char, e, 'expandedSpells').includes(s.id) || secretsLists(char, e)?.some(c => s.classes.includes(c))) && s.level <= singleMaxSpellLevel(classView(char, e))));
     // 子职业送的始终准备法术（不占准备数量）
-    const alwaysPreparedSpells = (char) => [...new Set(classEntries(char).flatMap(e => subclassSpellIds(char, e, 'alwaysPrepared')))].filter(id => root.DND.spellBook?.(char.edition)[id]);
+    // 种族、子种族送的法术（按角色等级解锁）
+    const speciesSpells = (char) => [raceOf(char), subraceOf(char)].flatMap(r => Object.entries(r?.spells || {}).filter(([l]) => +l <= clampLevel(char.level)).flatMap(([, ids]) => ids));
+    const alwaysPreparedSpells = (char) => [...new Set([...speciesSpells(char), ...classEntries(char).flatMap(e => subclassSpellIds(char, e, 'alwaysPrepared')), ...(root.DND.landSpells?.(char) || []), ...(root.DND.magicInitiateSpells?.(char) || [])])].filter(id => root.DND.spellBook?.(char.edition)[id]);
     // 施放某个法术用的职业：法术表、子职业送的或扩展表里有它的职业，都没有就取第一个施法职业
-    const spellCastingClass = (char, spell) => (classEntries(char).find(e => spell.classes.includes(e.classId) || subclassSpellIds(char, e, 'alwaysPrepared').includes(spell.id) || subclassSpellIds(char, e, 'expandedSpells').includes(spell.id))
+    const spellCastingClass = (char, spell) => ((root.DND.magicInitiateSpells?.(char) || []).includes(spell.id) && !classEntries(char).some(e => spell.classes.includes(e.classId)) ? char.choices.magicInitiateList : null) || (classEntries(char).find(e => spell.classes.includes(e.classId) || subclassSpellIds(char, e, 'alwaysPrepared').includes(spell.id) || subclassSpellIds(char, e, 'expandedSpells').includes(spell.id))
         || classEntries(char).find(e => CLASSES[e.classId].spellAbility))?.classId;
 
     // 职业资源：[{ id, name, max, used, left, recharge, shortRegain }]，max 为 99 表示不限次数
@@ -486,10 +518,10 @@
         const magicHit = parseInt(magic?.effects?.attack) || 0; const magicDmg = parseInt(magic?.effects?.damage) || 0;
         const proficient = weaponProficient(char, weaponId);
         const ranged = w.props.includes('ranged');
-        const styleHit = ranged && char.fightingStyle === 'archery' ? 2 : 0;
-        const dmgMod = mod + (!ranged && !w.props.includes('twoHanded') && char.fightingStyle === 'dueling' ? 2 : 0);
+        const styleHit = ranged && hasStyle(char, 'archery') ? 2 : 0;
+        const dmgMod = mod + (!ranged && !w.props.includes('twoHanded') && hasStyle(char, 'dueling') ? 2 : 0);
         const totalDmg = dmgMod + magicDmg;
-        return { id: weaponId, name: magic?.name || w.name, magicExtra: magic?.effects?.extra || '', toHit: mod + styleHit + magicHit + (proficient ? profBonus(char.level) : 0), proficient, damage: `${w.damage}${totalDmg ? signed(totalDmg) : ''}`, greatWeapon: char.fightingStyle === 'greatWeapon' && (w.props.includes('twoHanded') || !!w.versatile) && !ranged, type: w.type, range: w.range || '', melee: !w.props.includes('ranged'), usesStr: mod === str && !w.props.includes('ranged'), finesseOrRanged: w.props.includes('finesse') || w.props.includes('ranged'), mastery: edition(char.edition).weaponMastery?.[weaponId] || null };
+        return { id: weaponId, name: magic?.name || w.name, magicExtra: magic?.effects?.extra || '', toHit: mod + styleHit + magicHit + (proficient ? profBonus(char.level) : 0), proficient, damage: `${w.damage}${totalDmg ? signed(totalDmg) : ''}`, greatWeapon: hasStyle(char, 'greatWeapon') && (w.props.includes('twoHanded') || !!w.versatile) && !ranged, type: w.type, range: w.range || '', melee: !w.props.includes('ranged'), usesStr: mod === str && !w.props.includes('ranged'), finesseOrRanged: w.props.includes('finesse') || w.props.includes('ranged'), mastery: chose(char, 'weaponMastery', weaponId) ? edition(char.edition).weaponMastery?.[weaponId] || null : null };
     };
 
     const initiativeMod = (char) => abilityMod(char.abilities?.DEX) + (hasFeat(char, 'alert') ? (char.edition === '2024' ? profBonus(char.level) : 5) : halfProficiency(char, 'DEX', 'ability'));
@@ -519,7 +551,7 @@
     // 只计入当前等级已经拿到的记录
     const asiRecords = (char) => { const keys = asiLevels(char).map(a => a.key); return Object.entries(char.asi || {}).filter(([k]) => keys.includes(k)).map(([k, r]) => ({ key: k, ...r })); };
     // 已获得的专长：成长中选的 + 2024 背景送的起源专长
-    const characterFeats = (char) => [...new Set([...asiRecords(char).filter(r => r.mode === 'feat' && r.feat).map(r => r.feat), backgroundOf(char)?.featId].filter(Boolean))];
+    const characterFeats = (char) => [...new Set([...asiRecords(char).filter(r => r.mode === 'feat' && r.feat).map(r => r.feat), backgroundOf(char)?.featId, char.edition === '2024' && char.race === 'human' && char.choices?.humanFeat].filter(Boolean))];
     const hasFeat = (char, id) => characterFeats(char).includes(id);
     // 战斗风格：职业在当前等级是否已获得
     const hasFightingStyle = (char) => classFeatures(char).some(f => f.name === '战斗风格');
@@ -545,7 +577,7 @@
     };
 
     // 种族、子种族、背景自带的技能熟练
-    const grantedSkills = (char) => [...new Set([...(raceOf(char)?.skills || []), ...(subraceOf(char)?.skills || []), ...(backgroundOf(char)?.skills || [])])];
+    const grantedSkills = (char) => [...new Set([...(raceOf(char)?.skills || []), ...(subraceOf(char)?.skills || []), ...(backgroundOf(char)?.skills || []), ...(root.DND.choiceSkills?.(char) || [])])];
 
     // 各来源还能自选几项技能
     const skillChoices = (char) => {
@@ -570,7 +602,7 @@
         weapons: [], items: [], coins: { cp: 0, sp: 0, ep: 0, pp: 0 }, variantEncumbrance: false, slotsUsed: {}, spells: '', features: '', inventory: '', gold: 0,
         conditions: [], exhaustion: 0, deathSaves: { success: 0, fail: 0 }, dead: false,
         resourcesUsed: {}, raging: false, concentration: '', mageArmor: false, spellIds: [],
-        asi: {}, fightingStyle: '', hpRolls: {},
+        asi: {}, fightingStyle: '', hpRolls: {}, choices: {}, languages: '', tools: '',
         backstory: { appearance: '', personality: '', ideals: '', bonds: '', flaws: '', story: '' },
         history: [], badges: [],
     });
@@ -605,5 +637,5 @@
         return char;
     };
 
-    root.DND = { ABILITIES, SKILLS, ALL_SKILLS, CLASSES, ARMOR, WEAPONS, CONDITIONS, XP_TABLE, STANDARD_ARRAY, POINT_BUY, editions, edition, classInfo, isLucky, GEAR_WEIGHT, SLOTS, ATTUNE_MAX, itemFromRef, activeItems, itemBonus, syncEquipment, encumbrance, ENCUMBRANCE_TEXT, equipmentIssues, sentientCheckMod, casterSummary, classEntries, classLevel, subclassEntry, isMulticlass, classSummary, hitDicePool, hitDiceText, multiclassIssues, fitMulticlass, MULTICLASS_REQ, slotLevel, slotLabel, weaponData, signed, abilityMod, profBonus, levelFromXp, rollDice, d20Test, saveProficient, saveMod, skillMod, passivePerception, armorClass, maxHp, spellSlots, spellSaveDc, spellAttack, weaponAttack, weaponProficient, initiativeMod, speed, halfProficiency, auraOfProtection, steps, critRange, rageDamage, sneakAttackDice, classFeatures, classResources, asiRecords, asiLevels, characterFeats, hasFeat, hasFightingStyle, cantripsKnown, spellsAllowed, maxSpellLevel, classSpells, alwaysPreparedSpells, spellCastingClass, raceOf, subraceOf, backgroundOf, subclassLevel, pointBuyCost, finalAbilities, grantedSkills, skillChoices, newCharacter, normalizeCharacter };
+    root.DND = { ABILITIES, SKILLS, ALL_SKILLS, CLASSES, ARMOR, WEAPONS, CONDITIONS, XP_TABLE, STANDARD_ARRAY, POINT_BUY, editions, edition, classInfo, isLucky, speciesSpells, chose, hasStyle, armorTraining, armorIssue, GEAR_WEIGHT, SLOTS, ATTUNE_MAX, itemFromRef, activeItems, itemBonus, syncEquipment, encumbrance, ENCUMBRANCE_TEXT, equipmentIssues, sentientCheckMod, casterSummary, classEntries, classLevel, subclassEntry, isMulticlass, classSummary, hitDicePool, hitDiceText, multiclassIssues, fitMulticlass, MULTICLASS_REQ, slotLevel, slotLabel, weaponData, signed, abilityMod, profBonus, levelFromXp, rollDice, d20Test, saveProficient, saveMod, skillMod, passivePerception, armorClass, maxHp, spellSlots, spellSaveDc, spellAttack, weaponAttack, weaponProficient, initiativeMod, speed, halfProficiency, auraOfProtection, steps, critRange, rageDamage, sneakAttackDice, classFeatures, classResources, asiRecords, asiLevels, characterFeats, hasFeat, hasFightingStyle, cantripsKnown, spellsAllowed, maxSpellLevel, classSpells, alwaysPreparedSpells, spellCastingClass, raceOf, subraceOf, backgroundOf, subclassLevel, pointBuyCost, finalAbilities, grantedSkills, skillChoices, newCharacter, normalizeCharacter };
 })(typeof window !== 'undefined' ? window : globalThis);
