@@ -31,6 +31,20 @@
     };
     const MAGIC_INITIATE_LISTS = opt([['cleric', '牧师（感知）'], ['druid', '德鲁伊（感知）'], ['wizard', '法师（智力）']]);
 
+    // 战斗大师的战技（非 SRD，说明为自行概括）；ed 标了版本的只在该版出现。「加骰」= 加一颗卓越骰
+    const MANEUVERS = [
+        ['ambush', '伏击', '隐匿检定或先攻加骰。', '2024'], ['baitAndSwitch', '换位', '与 5 尺内盟友交换位置，你或他的 AC 加骰直到下回合。', '2024'],
+        ['commandersStrike', '指挥打击', '放弃一次攻击，让一名盟友用反应攻击，伤害加骰。'], ['commandingPresence', '威严气场', '威吓、表演或游说检定加骰。', '2024'],
+        ['disarmingAttack', '缴械攻击', '命中加骰伤害，目标力量豁免失败则掉落一件手持物品。'], ['distractingStrike', '扰乱打击', '命中加骰伤害，下一个攻击该目标的盟友有优势。'],
+        ['evasiveFootwork', '闪避步法', '移动时 AC 加骰。'], ['feintingAttack', '佯攻', '附赠动作佯攻，下一次攻击该目标有优势，命中加骰伤害。'],
+        ['goadingAttack', '挑衅攻击', '命中加骰伤害，目标感知豁免失败则攻击你以外的生物有劣势。'], ['lungingAttack', '突刺', '近战触及更远（2024 版先移动 5 尺），命中加骰伤害。'],
+        ['maneuveringAttack', '调度攻击', '命中加骰伤害，一名盟友可用反应移动一半速度且不引发目标的借机攻击。'], ['menacingAttack', '威吓攻击', '命中加骰伤害，目标感知豁免失败则恐惧。'],
+        ['parry', '格挡', '被近战命中时用反应，减少卓越骰+敏捷（2024 版取力量或敏捷）的伤害。'], ['precisionAttack', '精准攻击', '攻击检定加骰。'],
+        ['pushingAttack', '推撞攻击', '命中加骰伤害，大型或更小目标力量豁免失败被推开 15 尺。'], ['rally', '鼓舞', '附赠动作给一名盟友卓越骰+魅力（2024 版加熟练）的临时生命。'],
+        ['riposte', '还击', '近战攻击你未命中时用反应反击，命中加骰伤害。'], ['sweepingAttack', '横扫', '命中后，对旁边另一个生物造成卓越骰伤害（原检定要能命中它）。'],
+        ['tacticalAssessment', '战术评估', '调查、历史或洞悉检定加骰。', '2024'], ['tripAttack', '绊摔攻击', '命中加骰伤害，大型或更小目标力量豁免失败则倒地。'],
+    ];
+
     // 选择定义（按版本过滤）
     const DEFS = [
         { id: 'weaponMastery', label: '武器专精', source: '职业', editions: ['2024'], many: true,
@@ -58,6 +72,9 @@
           options: (c) => OPTIONS[c.edition].metamagic },
         { id: 'fightingStyle2', label: '额外战斗风格', source: '勇士', when: (c) => sub(c, '勇士') >= (c.edition === '2024' ? 7 : 10),
           options: () => Object.entries(D.FIGHTING_STYLES).map(([id, f]) => ({ id, name: f.name, desc: f.desc })) },
+        { id: 'maneuvers', label: '战技', source: '战斗大师', many: true, when: (c) => sub(c, '战斗大师') >= 3,
+          count: (c) => steps([[3, 3], [7, 5], [10, 7], [15, 9]], sub(c, '战斗大师')),
+          options: (c) => MANEUVERS.filter(([, , , ed]) => !ed || ed === c.edition).map(([id, name, desc]) => ({ id, name, desc })) },
         { id: 'primalKnowledge', label: '原初知识（技能）', source: '野蛮人 3 级', editions: ['2024'], when: (c) => lv(c, 'barbarian') >= 3, skills: true,
           options: () => skillOptions(D.CLASSES.barbarian.skills) },
         { id: 'loreSkills', label: '额外熟练（技能）', source: '逸闻学院', many: true, count: () => 3, when: (c) => sub(c, '逸闻学院') >= 3, skills: true,

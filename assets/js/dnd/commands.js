@@ -11,6 +11,8 @@
         : (char.weapons || []).find(id => id === name || D.WEAPONS[id]?.name === name) || (char.items || []).find(i => i.equipped && D.WEAPONS[i.ref] && i.name === name)?.ref);
     // 骰子取最大值，如 "2d8+3" → 19（至高治疗）
     const maxDice = (expr) => D.rollDice(String(expr).replace(/(\d*)d(\d+)/g, (m, n, d) => String((parseInt(n) || 1) * d))).total;
+    // 2014 版牧师领域 8 级神圣打击的伤害类型（「武器」= 与武器相同）
+    const DIVINE_STRIKE_2014 = { 生命领域: '光耀', 自然领域: '冷冻、火焰或闪电', 风暴领域: '雷鸣', 诡术领域: '毒素', 战争领域: '武器' };
     const critDamage = (expr) => expr.replace(/(\d*)d(\d+)/g, (m, n, d) => `${(parseInt(n) || 1) * 2}d${d}`);
     const snapshot = (char, keys) => JSON.parse(JSON.stringify(Object.fromEntries(keys.map(k => [k, char[k]]))));
     const removeCondition = (char, name) => { char.conditions = (char.conditions || []).filter(c => c !== name); };
@@ -130,8 +132,10 @@
             // 圣武士 11 级：近战武器命中另加 1d8 光耀（2014 精通至圣斩 / 2024 光耀打击）
             if (w.melee && !thrown && D.classLevel(char, 'paladin') >= 11) extra += ` · 命中另加 ${D.rollDice(crit ? '2d8' : '1d8').total} 光耀`;
             if (w.magicExtra) extra += ` · 魔法武器额外 ${w.magicExtra}（按物品说明的条件）`;
-            const strikeDice = D.chose(char, 'blessedStrikes', 'divineStrike') ? (D.classLevel(char, 'cleric') >= 14 ? '2d8' : '1d8') : D.chose(char, 'elementalFury', 'primalStrike') ? (D.classLevel(char, 'druid') >= 15 ? '2d8' : '1d8') : '';
-            if (strikeDice) extra += ` · 每回合首次命中可另加 ${D.rollDice(crit ? critDamage(strikeDice) : strikeDice).total}（${D.chose(char, 'blessedStrikes', 'divineStrike') ? '光耀或黯蚀' : '冷冻、火焰、闪电或雷鸣'}）`;
+            const domainStrike = char.edition === '2014' && D.classLevel(char, 'cleric') >= 8 && DIVINE_STRIKE_2014[D.classEntries(char).find(e => e.classId === 'cleric')?.subclass];
+            const strikeType = D.chose(char, 'blessedStrikes', 'divineStrike') ? '光耀或黯蚀' : D.chose(char, 'elementalFury', 'primalStrike') ? '冷冻、火焰、闪电或雷鸣' : domainStrike;
+            const strikeDice = !strikeType ? '' : D.chose(char, 'elementalFury', 'primalStrike') ? (D.classLevel(char, 'druid') >= 15 ? '2d8' : '1d8') : (D.classLevel(char, 'cleric') >= 14 ? '2d8' : '1d8');
+            if (strikeDice) extra += ` · 每回合首次命中可另加 ${D.rollDice(crit ? critDamage(strikeDice) : strikeDice).total}（${strikeType === '武器' ? w.type : strikeType}）`;
             if (!w.proficient) extra += ' · 未熟练';
             const sneak = D.sneakAttackDice(char);
             if (sneak && w.finesseOrRanged) extra += ` · 满足条件可加偷袭 ${level === '重击' ? sneak * 2 : sneak}d6`;
@@ -377,7 +381,7 @@
 
         // 施法职业：法术表里有这个法术的职业（兼职时取第一个），决定施法属性
         const castClass = D.spellCastingClass(char, spell);
-        const cls = D.CLASSES[castClass]; const level = parseInt(char.level) || 1;
+        const level = parseInt(char.level) || 1;
         const ritual = spell.ritual && /仪式|ritual/i.test(rest);
         const slots = D.spellSlots(char);
         const rollback = snapshot(char, ['slotsUsed', 'concentration', 'tempHp', 'mageArmor', 'resourcesUsed']);
@@ -414,7 +418,7 @@
         const extraLevels = Math.max(0, slotLevel - spell.level);
         const upTimes = spell.upcast && spell.upcast !== 'r' ? Math.floor(extraLevels / (spell.upcastEvery || 1)) : 0;
         const tier = level >= 17 ? 4 : level >= 11 ? 3 : level >= 5 ? 2 : 1;
-        const mod = D.abilityMod(char.abilities?.[cls?.spellAbility]);
+        const mod = D.abilityMod(char.abilities?.[D.spellAbilityOf(char, castClass)]);
         const withUpcast = (dice) => [dice, ...Array(upTimes).fill(spell.upcast)].join('+').replace(/m/g, String(mod));
         const scaled = (dice) => withUpcast(spell.level === 0 ? scaleDice(dice, tier) : dice);
         // 塑能学派 10 级强化塑能：法师的塑能法术伤害加智力调整值（一次）

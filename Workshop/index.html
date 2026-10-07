@@ -14,6 +14,7 @@
     <script src="../assets/js/dnd/edition-2014.js"></script>
     <script src="../assets/js/dnd/edition-2024.js"></script>
     <script src="../assets/js/dnd/monsters.js"></script>
+    <script src="../assets/js/dnd/subclasses.js"></script>
     <script src="../assets/js/dnd/choices.js"></script>
     <link href="../assets/vendor/daisyui.full.css" rel="stylesheet" type="text/css" />
     <script src="../assets/vendor/vue.global.prod.js"></script>
@@ -851,7 +852,7 @@
                                 <label class="ws-label">子职业 Subclass</label>
                                 <select v-model="hero.subclass" class="select select-bordered select-sm w-full ws-field" :disabled="!cls || primaryLevel < derived.subclassLevel">
                                     <option value="">{{ cls && primaryLevel < derived.subclassLevel ? `${cls.name} ${derived.subclassLevel} 级解锁` : '选择子职业...' }}</option>
-                                    <option v-for="s in cls?.subclasses || []" :key="s.name" :value="s.name">{{ s.name }}</option>
+                                    <option v-for="s in subclassOptions(hero.classId)" :key="s.name" :value="s.name">{{ s.name }}{{ s.srd ? '' : '（玩家手册）' }}</option>
                                 </select>
                             </div>
                             <div>
@@ -892,7 +893,7 @@
                                         <span class="text-slate-500">级</span>
                                         <select v-model="m.subclass" class="select select-bordered select-xs ws-field flex-1 min-w-[6rem]" :disabled="m.level < subclassUnlock(m.classId)">
                                             <option value="">{{ m.level < subclassUnlock(m.classId) ? `${subclassUnlock(m.classId)} 级解锁子职业` : '选择子职业...' }}</option>
-                                            <option v-for="sc in classes[m.classId].subclasses" :key="sc.name" :value="sc.name">{{ sc.name }}</option>
+                                            <option v-for="sc in subclassOptions(m.classId)" :key="sc.name" :value="sc.name">{{ sc.name }}{{ sc.srd ? '' : '（玩家手册）' }}</option>
                                         </select>
                                         <button class="btn btn-xs btn-ghost text-slate-500 hover:text-red-400" @click="hero.multiclass.splice(i, 1)">×</button>
                                     </div>
@@ -2846,10 +2847,11 @@
             const classSummary = computed(() => DND.classSummary(hero));
             const multiclassIssues = computed(() => DND.multiclassIssues(hero));
             const hitDiceText = computed(() => DND.hitDiceText(DND.hitDicePool(hero)));
-            const hasCaster = computed(() => entries.value.some(e => DND.CLASSES[e.classId].caster));
+            const hasCaster = computed(() => entries.value.some(e => DND.casterType(e)));
             const casterSummary = computed(() => DND.casterSummary(hero));
             const slotLabel = DND.slotLabel;
             const subclassUnlock = (classId) => DND.subclassLevel(hero, classId);
+            const subclassOptions = (classId) => DND.subclassesOf(hero, classId);
             const multiclassGainText = (classId) => {
                 const g = ed.value.multiclassGains?.[classId] || {};
                 return [...(g.armor || []), ...(g.weapons || []), g.skill && `${g.skill} 项技能`, g.other].filter(Boolean).join('、');
@@ -2989,7 +2991,7 @@
                 // 兼职条目放不下时修剪；各职业子职业要已解锁且属于该职业
                 const fitted = DND.fitMulticlass(hero);
                 if (JSON.stringify(fitted) !== JSON.stringify(hero.multiclass)) hero.multiclass = fitted;
-                hero.multiclass.forEach(m => { if (m.subclass && (m.level < DND.subclassLevel(hero, m.classId) || !DND.CLASSES[m.classId].subclasses.some(s => s.name === m.subclass))) m.subclass = ''; });
+                hero.multiclass.forEach(m => { if (m.subclass && (m.level < DND.subclassLevel(hero, m.classId) || !subclassOptions(m.classId).some(s => s.name === m.subclass))) m.subclass = ''; });
                 // 只保留当前职业（含子职业扩展表）能选的法术
                 const allowed = new Set(DND.classSpells(hero).map(sp => sp.id));
                 if (hero.spellIds.some(id => !allowed.has(id))) hero.spellIds = hero.spellIds.filter(id => allowed.has(id));
@@ -3000,7 +3002,7 @@
                 if (!r?.subraces && hero.subrace) hero.subrace = '';
                 const sizes = r?.sizes || (r?.size ? [r.size] : []);
                 if (sizes.length && !sizes.includes(hero.size)) hero.size = sizes[0];
-                if (hero.subclass && (!cls.value?.subclasses.some(s => s.name === hero.subclass) || primaryLevel.value < derived.value.subclassLevel)) hero.subclass = '';
+                if (hero.subclass && (!subclassOptions(hero.classId).some(s => s.name === hero.subclass) || primaryLevel.value < derived.value.subclassLevel)) hero.subclass = '';
                 for (const ab in hero.bonusPicks) if (!bonusRule.value.abilities.includes(ab)) delete hero.bonusPicks[ab];
 
                 hero.abilities = DND.finalAbilities(hero);
@@ -3046,6 +3048,7 @@
 所有 id 字段必须从下列清单中选：
 - race（${edition.raceLabel}）：${idList(edition.races)}${subraces ? `\n- subrace：${subraces}（只有带子种族的种族才填）` : ''}
 - classId：${idList(DND.CLASSES)}
+- subclass（达到子职业等级才填，否则留空）：${Object.keys(DND.CLASSES).map(id => `${id}=${DND.subclassesOf(hero, id).map(s => s.name).join('/')}`).join('; ')}
 - background：${idList(edition.backgrounds)}
 - skillProfs：${idList(DND.SKILLS)}
 - weapons：${idList(DND.WEAPONS)}
@@ -3056,9 +3059,9 @@
 3. skillProfs 只填职业可选的技能（数量按职业规定），种族和背景自带的技能程序会自动补上。
 4. 武器、护甲要符合职业熟练；有战斗风格的职业在 fightingStyle 填 ${Object.entries(DND.FIGHTING_STYLES).map(([id, f]) => `${id}=${f.name}`).join(', ')} 之一；features 写其他特性备注；施法职业在 spellNames 里用中文法术名列出戏法和已准备法术（数量按职业规定，非施法职业留空数组）。
 5. avatar_prompt 是 NovelAI 格式的英文外貌提示词。
-6. 用户要求兼职时，classId 填起始职业，multiclass 填兼职职业，如 [{"classId":"wizard","level":2}]；level 是总等级，兼职等级从中扣除。不要求兼职就填 []。
+6. 用户要求兼职时，classId 填起始职业，multiclass 填兼职职业，如 [{"classId":"wizard","level":2,"subclass":""}]；level 是总等级，兼职等级从中扣除。不要求兼职就填 []。
 JSON 结构：
-{"name":"","gender":"","age":"","alignment":"守序善良等九种之一","race":"","subrace":"","classId":"","multiclass":[],"background":"","level":1,
+{"name":"","gender":"","age":"","alignment":"守序善良等九种之一","race":"","subrace":"","classId":"","subclass":"","multiclass":[],"background":"","level":1,
 "genMethod":"standard","baseAbilities":{"STR":15,"DEX":14,"CON":13,"INT":12,"WIS":10,"CHA":8},"bonusPicks":{},
 "skillProfs":[],"weapons":[],"armor":"","shield":false,"gold":10,"inventory":"","features":"","fightingStyle":"","spellNames":[],
 "backstory":{"appearance":"","personality":"","ideals":"","bonds":"","flaws":"","story":""},"avatar_prompt":""}`;
@@ -3486,7 +3489,7 @@ return {
     choiceList, picks, setChoice, toggleChoice, suggestedLanguages, suggestedTools, expertiseAllowed, armorIssue,
     coinTypes, slotNames, rarityNames, rarityColor, encumbranceText, attuneMax, load, attunedCount, equipIssues, openItem, gearName, effectText, setArmor, setShield, addWeapon, unequipWeapon,
     toggleAttune, addCustomItem, sentientOptions, toggleSentient, rollSentient, sentientMod, lib, openItemLibrary, libResults, addLibraryItem,
-    primaryLevel, classSummary, multiclassIssues, hitDiceText, hasCaster, casterSummary, slotLabel, subclassUnlock, multiclassGainText, addMulticlass, hpRollRows, clearHpRolls,
+    primaryLevel, classSummary, multiclassIssues, hitDiceText, hasCaster, casterSummary, slotLabel, subclassUnlock, subclassOptions, multiclassGainText, addMulticlass, hpRollRows, clearHpRolls,
     fightingStyles, hasStyle, asiLevels, feats, featOptions, setAsiMode, rollHp, startingGear, takeStartingGear, isSaveProf,
     showSpellModal, spellLevelFilter, spellSearch, chosenSpells, alwaysSpells, spellStats, spellOptions, spellMech, toggleSpell,
     saveMod, skillMod, fixedBonus, bonusRule, abilityHint, applyStandardArray, resetPointBuy, rollAbilities, changeGenMethod,
