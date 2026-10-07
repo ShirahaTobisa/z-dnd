@@ -102,6 +102,14 @@
         unarmed: { name: '徒手攻击', cat: 'simple', damage: '1', type: '钝击', props: ['unarmed'] },
     };
 
+    // 武器、护甲、盾牌的重量（磅，SRD）
+    const GEAR_WEIGHT = {
+        battleaxe: 4, blowgun: 1, club: 2, dagger: 1, dart: 0.25, flail: 2, glaive: 6, greataxe: 7, greatclub: 10, greatsword: 6, halberd: 6, handaxe: 2, handCrossbow: 3,
+        heavyCrossbow: 18, javelin: 2, lance: 6, lightCrossbow: 5, lightHammer: 2, longbow: 2, longsword: 3, mace: 4, maul: 10, morningstar: 4, pike: 18, quarterstaff: 4,
+        rapier: 2, scimitar: 3, shortbow: 2, shortsword: 2, sickle: 2, sling: 0, spear: 3, trident: 4, warPick: 2, warhammer: 2, whip: 3, unarmed: 0,
+        padded: 8, leather: 10, studdedLeather: 13, hide: 12, chainShirt: 20, scaleMail: 45, breastplate: 20, halfPlate: 40, ringMail: 40, chainMail: 55, splint: 60, plate: 65, shield: 6,
+    };
+
     // 武器数据 = 通用数据 + 版本覆盖（2024 版部分武器数值有变）
     const weaponData = (char, id) => WEAPONS[id] && { ...WEAPONS[id], ...(editions[char?.edition]?.weaponOverrides?.[id] || {}) };
 
@@ -185,6 +193,65 @@
     // 职业数据 = 共用数据 + 版本覆盖
     const classInfo = (char) => CLASSES[char.classId] && { ...CLASSES[char.classId], ...(edition(char.edition).classOverrides?.[char.classId] || {}) };
 
+    // —— 物品栏 ——
+    // char.items：[{ uid, name, cat, ref?, qty, w, equipped, attune?, attuned, rarity?, slot?, effects?, desc?, sentient? }]
+    // cat: weapon / armor / shield / magic / gear；ref 指向 WEAPONS 或 ARMOR（盾牌为 'shield'）。护甲、盾牌、武器字段由装备中的物品推出
+    // effects：ac 护甲等级、save 豁免、check 属性检定、attack/damage 武器、spellAttack/spellDc 法术、set 属性设为、inc 属性加值（上限 20）、
+    //          acUnarmored 无甲无盾时 AC 加值、baseAc 无甲时基础 AC、extra 额外伤害说明
+    const SLOTS = {
+        head: { name: '头部', max: 1 }, neck: { name: '颈部', max: 1 }, cloak: { name: '披风', max: 1 }, body: { name: '身体', max: 1 }, robe: { name: '长袍', max: 1 },
+        hands: { name: '手部', max: 1 }, ring: { name: '戒指', max: 2 }, waist: { name: '腰部', max: 1 }, feet: { name: '脚部', max: 1 },
+        hand: { name: '手持', max: 99 }, offhand: { name: '副手', max: 1 }, ioun: { name: '环绕', max: 99 },
+    };
+    const ATTUNE_MAX = 3;
+    const uid = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
+    const itemFromRef = (ref, extra = {}) => {
+        const cat = ref === 'shield' ? 'shield' : ARMOR[ref] ? 'armor' : 'weapon';
+        const name = ref === 'shield' ? '盾牌' : (ARMOR[ref] || WEAPONS[ref])?.name || ref;
+        return { uid: uid(), name, cat, ref, qty: 1, w: GEAR_WEIGHT[ref] ?? 0, equipped: false, attuned: false, slot: cat === 'armor' ? 'body' : cat === 'shield' ? 'offhand' : 'hand', ...extra };
+    };
+    // 生效的物品：需要同调的看是否同调，其余看是否装备
+    const activeItems = (char) => (char.items || []).filter(i => (i.attune ? i.attuned : i.equipped));
+    const itemBonus = (char, key) => activeItems(char).reduce((sum, i) => sum + (parseInt(i.effects?.[key]) || 0), 0);
+    // 由物品栏推出护甲、盾牌、武器（旧代码都读这三个字段）
+    const syncEquipment = (char) => {
+        const eq = (char.items || []).filter(i => i.equipped);
+        char.armor = eq.find(i => ARMOR[i.ref])?.ref || '';
+        char.shield = eq.some(i => i.ref === 'shield');
+        char.weapons = [...new Set(eq.filter(i => WEAPONS[i.ref]).map(i => i.ref))];
+        return char;
+    };
+    // 旧角色卡没有物品栏：把护甲、盾牌、武器转成已装备的物品
+    const migrateItems = (char) => (Array.isArray(char.items) ? char.items : [
+        ...(ARMOR[char.armor] ? [itemFromRef(char.armor, { equipped: true })] : []),
+        ...(char.shield ? [itemFromRef('shield', { equipped: true })] : []),
+        ...(char.weapons || []).filter(id => WEAPONS[id]).map(id => itemFromRef(id, { equipped: true })),
+    ]);
+    // 负重：总重（物品 + 每 50 枚硬币 1 磅）与负重上限（力量 ×15，按体型倍乘）
+    const SIZE_CARRY = { 微型: 0.5, 小型: 1, 中型: 1, 大型: 2, 巨型: 4, 超巨型: 8 };
+    const encumbrance = (char) => {
+        const coins = Object.values(char.coins || {}).reduce((a, b) => a + (parseInt(b) || 0), 0) + (parseInt(char.gold) || 0);
+        const weight = Math.round(((char.items || []).reduce((sum, i) => sum + (parseFloat(i.w) || 0) * (parseInt(i.qty) || 0), 0) + coins / 50) * 100) / 100;
+        const str = parseInt(char.abilities?.STR) || 10;
+        const capacity = str * 15 * (SIZE_CARRY[char.size] || 1);
+        // 超过上限只能拖拽；2014 版可选的细化负重：超过力量 ×5 负重、×10 重度负重
+        const status = weight > capacity ? 'over' : char.edition === '2014' && char.variantEncumbrance ? (weight > str * 10 ? 'heavy' : weight > str * 5 ? 'encumbered' : 'ok') : 'ok';
+        return { weight, capacity, status };
+    };
+    const ENCUMBRANCE_TEXT = { over: '超出负重上限：只能拖拽，速度 5 尺', heavy: '重度负重：速度 -20 尺，力量/敏捷/体质检定、攻击、豁免劣势', encumbered: '负重：速度 -10 尺' };
+    // 装备栏位超出、同调超出的提示
+    const equipmentIssues = (char) => {
+        const eq = (char.items || []).filter(i => i.equipped && i.slot);
+        const counts = eq.reduce((m, i) => ({ ...m, [i.slot]: (m[i.slot] || 0) + 1 }), {});
+        const issues = Object.entries(counts).filter(([slot, n]) => n > (SLOTS[slot]?.max ?? 99)).map(([slot, n]) => `${SLOTS[slot].name}装备了 ${n} 件（最多 ${SLOTS[slot].max} 件）`);
+        const attuned = (char.items || []).filter(i => i.attuned).length;
+        if (attuned > ATTUNE_MAX) issues.push(`同调了 ${attuned} 件（最多 ${ATTUNE_MAX} 件）`);
+        if (eq.filter(i => ARMOR[i.ref]).length > 1) issues.push('同时穿了两件护甲，只算第一件');
+        return issues;
+    };
+    // 智能物品与持有者冲突：双方魅力检定对抗
+    const sentientCheckMod = (item) => abilityMod(item?.sentient?.cha);
+
     // —— 兼职 ——
     // 所有职业条目：[{ classId, subclass, level }]，起始职业在最前，等级 = 总等级减去兼职等级
     const classEntries = (char) => {
@@ -221,7 +288,7 @@
         || (classLevel(char, 'rogue') >= 15 && (ability === 'WIS' || (char.edition === '2024' && ability === 'CHA')));
     // 圣武士 6 级守护灵光：所有豁免加魅力调整值（至少 +1）
     const auraOfProtection = (char) => (classLevel(char, 'paladin') >= 6 ? Math.max(1, abilityMod(char.abilities?.CHA)) : 0);
-    const saveMod = (char, ability) => abilityMod(char.abilities?.[ability]) + (saveProficient(char, ability) ? profBonus(char.level) : 0) + auraOfProtection(char);
+    const saveMod = (char, ability) => abilityMod(char.abilities?.[ability]) + (saveProficient(char, ability) ? profBonus(char.level) : 0) + auraOfProtection(char) + itemBonus(char, 'save');
 
     // 没有熟练的属性检定加一半熟练加值：吟游诗人 2 级万事通（2024 版只限技能检定）、2014 版勇士 7 级卓越运动员（力量/敏捷/体质，向上取整）
     // kind: 'skill' 技能检定 / 'ability' 纯属性检定（含先攻）
@@ -236,7 +303,7 @@
         const skill = SKILLS[skillId]; if (!skill) return 0;
         const pb = profBonus(char.level);
         const prof = char.expertise?.includes(skillId) ? pb * 2 : char.skillProfs?.includes(skillId) ? pb : halfProficiency(char, skill.ability, 'skill');
-        return abilityMod(char.abilities?.[skill.ability]) + prof;
+        return abilityMod(char.abilities?.[skill.ability]) + prof + itemBonus(char, 'check');
     };
 
     const passivePerception = (char) => 10 + skillMod(char, 'perception') + (char.edition === '2014' && hasFeat(char, 'observant') ? 5 : 0);
@@ -254,9 +321,11 @@
             if (ua && !(ua.classId === 'monk' && char.shield)) options.push(10 + CLASSES[ua.classId].unarmored.reduce((sum, ab) => sum + abilityMod(char.abilities?.[ab]), 0));
             if (subclassEntry(char, '龙族血脉')) options.push(DRACONIC_AC[char.edition]?.(char) || 0);
             if (char.mageArmor) options.push(13 + dex);
+            activeItems(char).forEach(i => { if (i.effects?.baseAc) options.push(i.effects.baseAc + dex); });
             ac = Math.max(...options);
         }
-        return ac + (char.shield ? 2 : 0) + (armor && char.fightingStyle === 'defense' ? 1 : 0);
+        const unarmoredBonus = !armor && !char.shield ? itemBonus(char, 'acUnarmored') : 0;
+        return ac + (char.shield ? 2 : 0) + (armor && char.fightingStyle === 'defense' ? 1 : 0) + itemBonus(char, 'ac') + unarmoredBonus;
     };
 
     // 1 级取起始职业生命骰最大值，之后每级取掷骰记录或平均值（每级至少 1 点）；再加上种族、子职业的每级生命加值
@@ -387,11 +456,11 @@
     const casterClass = (char, classId) => CLASSES[classId]?.spellAbility ? classId : classEntries(char).find(e => CLASSES[e.classId].spellAbility)?.classId;
     const spellSaveDc = (char, classId) => {
         const ab = CLASSES[casterClass(char, classId)]?.spellAbility;
-        return ab ? 8 + profBonus(char.level) + abilityMod(char.abilities?.[ab]) : null;
+        return ab ? 8 + profBonus(char.level) + abilityMod(char.abilities?.[ab]) + itemBonus(char, 'spellDc') : null;
     };
     const spellAttack = (char, classId) => {
         const ab = CLASSES[casterClass(char, classId)]?.spellAbility;
-        return ab ? profBonus(char.level) + abilityMod(char.abilities?.[ab]) : null;
+        return ab ? profBonus(char.level) + abilityMod(char.abilities?.[ab]) + itemBonus(char, 'spellAttack') : null;
     };
     // 「法师 DC 14 · 攻击 +6」，兼职多个施法职业时用「；」分开
     const casterSummary = (char) => [...new Set(classEntries(char).map(e => e.classId).filter(id => CLASSES[id].spellAbility))]
@@ -412,11 +481,15 @@
             w = { ...w, damage: own >= die ? w.damage : `1d${die}`, props: [...w.props, 'finesse'] };
         }
         const mod = w.props.includes('ranged') ? dex : w.props.includes('finesse') ? Math.max(str, dex) : str;
+        // 魔法武器：取装备中、加值最高的同类武器（需要同调的要已同调）
+        const magic = (char.items || []).filter(i => i.equipped && i.ref === weaponId && (!i.attune || i.attuned)).sort((a, b) => (b.effects?.attack || 0) - (a.effects?.attack || 0))[0];
+        const magicHit = parseInt(magic?.effects?.attack) || 0; const magicDmg = parseInt(magic?.effects?.damage) || 0;
         const proficient = weaponProficient(char, weaponId);
         const ranged = w.props.includes('ranged');
         const styleHit = ranged && char.fightingStyle === 'archery' ? 2 : 0;
         const dmgMod = mod + (!ranged && !w.props.includes('twoHanded') && char.fightingStyle === 'dueling' ? 2 : 0);
-        return { id: weaponId, name: w.name, toHit: mod + styleHit + (proficient ? profBonus(char.level) : 0), proficient, damage: `${w.damage}${dmgMod ? signed(dmgMod) : ''}`, greatWeapon: char.fightingStyle === 'greatWeapon' && (w.props.includes('twoHanded') || !!w.versatile) && !ranged, type: w.type, range: w.range || '', melee: !w.props.includes('ranged'), usesStr: mod === str && !w.props.includes('ranged'), finesseOrRanged: w.props.includes('finesse') || w.props.includes('ranged'), mastery: edition(char.edition).weaponMastery?.[weaponId] || null };
+        const totalDmg = dmgMod + magicDmg;
+        return { id: weaponId, name: magic?.name || w.name, magicExtra: magic?.effects?.extra || '', toHit: mod + styleHit + magicHit + (proficient ? profBonus(char.level) : 0), proficient, damage: `${w.damage}${totalDmg ? signed(totalDmg) : ''}`, greatWeapon: char.fightingStyle === 'greatWeapon' && (w.props.includes('twoHanded') || !!w.versatile) && !ranged, type: w.type, range: w.range || '', melee: !w.props.includes('ranged'), usesStr: mod === str && !w.props.includes('ranged'), finesseOrRanged: w.props.includes('finesse') || w.props.includes('ranged'), mastery: edition(char.edition).weaponMastery?.[weaponId] || null };
     };
 
     const initiativeMod = (char) => abilityMod(char.abilities?.DEX) + (hasFeat(char, 'alert') ? (char.edition === '2024' ? profBonus(char.level) : 5) : halfProficiency(char, 'DEX', 'ability'));
@@ -428,6 +501,9 @@
         if (classLevel(char, 'barbarian') >= 5 && armor?.type !== 'heavy') v += 10;
         if (!armor && !char.shield) v += steps([[2, 10], [6, 15], [10, 20], [14, 25], [18, 30]])(classLevel(char, 'monk'));
         if (armor?.str && (parseInt(char.abilities?.STR) || 0) < armor.str && !(char.edition === '2014' && char.race === 'dwarf')) v -= 10;
+        const load = encumbrance(char).status;
+        if (load === 'over') return 5;
+        v -= { encumbered: 10, heavy: 20 }[load] || 0;
         const ex = parseInt(char.exhaustion) || 0;
         if (char.edition === '2024') v -= 5 * ex;
         else if (ex >= 5) v = 0;
@@ -461,7 +537,9 @@
         for (const ab of Object.keys(ABILITIES)) {
             const growth = asiRecords(char).reduce((sum, r) => sum + (r.mode === 'asi' ? (r.a1 === ab) + (r.a2 === ab) : r.fa === ab ? 1 : 0), 0);
             const v = (parseInt(char.baseAbilities?.[ab]) || 0) + (raceOf(char)?.bonuses?.[ab] || 0) + (subraceOf(char)?.bonuses?.[ab] || 0) + (parseInt(char.bonusPicks?.[ab]) || 0) + growth;
-            out[ab] = Math.min(20, v);
+            const inc = activeItems(char).reduce((sum, i) => sum + (parseInt(i.effects?.inc?.[ab]) || 0), 0);
+            const set = Math.max(0, ...activeItems(char).map(i => parseInt(i.effects?.set?.[ab]) || 0));
+            out[ab] = Math.max(Math.min(20, v + inc), set);
         }
         return out;
     };
@@ -489,7 +567,7 @@
         abilities: { STR: 15, DEX: 14, CON: 13, INT: 12, WIS: 10, CHA: 8 },
         skillProfs: [], expertise: [],
         hp: 0, maxHp: 0, tempHp: 0, hitDiceUsed: 0, armor: '', shield: false, acOverride: null,
-        weapons: [], slotsUsed: {}, spells: '', features: '', inventory: '', gold: 0,
+        weapons: [], items: [], coins: { cp: 0, sp: 0, ep: 0, pp: 0 }, variantEncumbrance: false, slotsUsed: {}, spells: '', features: '', inventory: '', gold: 0,
         conditions: [], exhaustion: 0, deathSaves: { success: 0, fail: 0 }, dead: false,
         resourcesUsed: {}, raging: false, concentration: '', mageArmor: false, spellIds: [],
         asi: {}, fightingStyle: '', hpRolls: {},
@@ -516,7 +594,9 @@
         char.multiclass = fitMulticlass(char);
         if (char.baseAbilities) char.abilities = finalAbilities(char);
         char.skillProfs = [...new Set([...(char.skillProfs || []), ...grantedSkills(char)])].filter(id => SKILLS[id]);
-        char.weapons = (char.weapons || []).filter(id => WEAPONS[id]);
+        char.items = Array.isArray(data?.items) ? data.items : migrateItems({ ...char, items: null, weapons: (char.weapons || []).filter(id => WEAPONS[id]) });
+        char.coins = { ...base.coins, ...(data?.coins || {}) };
+        syncEquipment(char);
         if (root.DND.spellBook) char.spellIds = (char.spellIds || []).filter(id => root.DND.spellBook(char.edition)[id]);
         if (root.DND.FIGHTING_STYLES && !root.DND.FIGHTING_STYLES[char.fightingStyle]) char.fightingStyle = '';
         const hp = maxHp(char);
@@ -525,5 +605,5 @@
         return char;
     };
 
-    root.DND = { ABILITIES, SKILLS, ALL_SKILLS, CLASSES, ARMOR, WEAPONS, CONDITIONS, XP_TABLE, STANDARD_ARRAY, POINT_BUY, editions, edition, classInfo, isLucky, casterSummary, classEntries, classLevel, subclassEntry, isMulticlass, classSummary, hitDicePool, hitDiceText, multiclassIssues, fitMulticlass, MULTICLASS_REQ, slotLevel, slotLabel, weaponData, signed, abilityMod, profBonus, levelFromXp, rollDice, d20Test, saveProficient, saveMod, skillMod, passivePerception, armorClass, maxHp, spellSlots, spellSaveDc, spellAttack, weaponAttack, weaponProficient, initiativeMod, speed, halfProficiency, auraOfProtection, steps, critRange, rageDamage, sneakAttackDice, classFeatures, classResources, asiRecords, asiLevels, characterFeats, hasFeat, hasFightingStyle, cantripsKnown, spellsAllowed, maxSpellLevel, classSpells, alwaysPreparedSpells, spellCastingClass, raceOf, subraceOf, backgroundOf, subclassLevel, pointBuyCost, finalAbilities, grantedSkills, skillChoices, newCharacter, normalizeCharacter };
+    root.DND = { ABILITIES, SKILLS, ALL_SKILLS, CLASSES, ARMOR, WEAPONS, CONDITIONS, XP_TABLE, STANDARD_ARRAY, POINT_BUY, editions, edition, classInfo, isLucky, GEAR_WEIGHT, SLOTS, ATTUNE_MAX, itemFromRef, activeItems, itemBonus, syncEquipment, encumbrance, ENCUMBRANCE_TEXT, equipmentIssues, sentientCheckMod, casterSummary, classEntries, classLevel, subclassEntry, isMulticlass, classSummary, hitDicePool, hitDiceText, multiclassIssues, fitMulticlass, MULTICLASS_REQ, slotLevel, slotLabel, weaponData, signed, abilityMod, profBonus, levelFromXp, rollDice, d20Test, saveProficient, saveMod, skillMod, passivePerception, armorClass, maxHp, spellSlots, spellSaveDc, spellAttack, weaponAttack, weaponProficient, initiativeMod, speed, halfProficiency, auraOfProtection, steps, critRange, rageDamage, sneakAttackDice, classFeatures, classResources, asiRecords, asiLevels, characterFeats, hasFeat, hasFightingStyle, cantripsKnown, spellsAllowed, maxSpellLevel, classSpells, alwaysPreparedSpells, spellCastingClass, raceOf, subraceOf, backgroundOf, subclassLevel, pointBuyCost, finalAbilities, grantedSkills, skillChoices, newCharacter, normalizeCharacter };
 })(typeof window !== 'undefined' ? window : globalThis);

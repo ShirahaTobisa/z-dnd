@@ -979,11 +979,11 @@
                     <span class="ws-stat-label text-blue-400">护甲等级 AC</span>
                     <span class="text-2xl font-black font-mono text-blue-300">{{ derived.ac }}</span>
                     <div class="flex items-center gap-1 w-full">
-                        <select v-model="hero.armor" class="select select-xs flex-1 min-w-0 ws-field px-1">
+                        <select :value="hero.armor" @change="setArmor($event.target.value)" class="select select-xs flex-1 min-w-0 ws-field px-1">
                             <option value="">无甲</option>
                             <option v-for="(a, id) in armors" :key="id" :value="id">{{ a.name }} {{ a.base }}</option>
                         </select>
-                        <label class="text-[10px] text-slate-400 flex items-center gap-0.5 shrink-0"><input type="checkbox" v-model="hero.shield" class="checkbox checkbox-xs" />盾</label>
+                        <label class="text-[10px] text-slate-400 flex items-center gap-0.5 shrink-0"><input type="checkbox" :checked="hero.shield" @change="setShield($event.target.checked)" class="checkbox checkbox-xs" />盾</label>
                     </div>
                 </div>
                 <div class="ws-stat">
@@ -1073,23 +1073,80 @@
                         <thead><tr class="text-slate-500"><th>武器</th><th>命中</th><th>伤害</th><th v-if="hero.edition === '2024'">专精</th><th></th></tr></thead>
                         <tbody>
                             <tr v-for="(w, idx) in weaponRows" :key="idx" class="border-b border-dark-700/30">
-                                <td class="font-bold text-slate-300">{{ w.name }}<span v-if="!w.proficient" class="text-[10px] text-amber-500 font-normal"> 未熟练</span><span v-if="w.range" class="text-[10px] text-slate-500 font-normal"> {{ w.range }}尺</span></td>
+                                <td class="font-bold text-slate-300">{{ w.name }}<span v-if="w.magicExtra" class="text-[10px] text-violet-300 font-normal"> +{{ w.magicExtra }}</span><span v-if="!w.proficient" class="text-[10px] text-amber-500 font-normal"> 未熟练</span><span v-if="w.range" class="text-[10px] text-slate-500 font-normal"> {{ w.range }}尺</span></td>
                                 <td class="font-mono text-mystic-gold">{{ signed(w.toHit) }}</td>
                                 <td class="font-mono text-slate-300">{{ w.damage }} {{ w.type }}</td>
                                 <td v-if="hero.edition === '2024'" class="text-slate-400">{{ w.mastery }}</td>
-                                <td class="text-right"><button @click="hero.weapons.splice(idx, 1)" class="btn btn-ghost btn-xs text-slate-600 hover:text-red-500">×</button></td>
+                                <td class="text-right"><button @click="unequipWeapon(w.id)" title="收起（留在背包里）" class="btn btn-ghost btn-xs text-slate-600 hover:text-red-500">×</button></td>
                             </tr>
                         </tbody>
                     </table>
                     <button @click="showWeaponModal = true" class="btn btn-xs btn-outline border-dashed border-dark-600 text-slate-500 hover:border-mystic-gold hover:text-mystic-gold w-full font-serif">+ 添加武器</button>
-                    <div class="flex items-center gap-2 mt-2">
-                        <span class="ws-label mb-0">物品 Inventory</span>
+                    <div class="flex flex-wrap items-center gap-2 mt-2">
+                        <span class="ws-label mb-0">装备与背包 Equipment</span>
                         <button v-if="startingGear" @click="takeStartingGear" :disabled="hero.inventory.includes(startingGear.items)" class="btn btn-xs btn-ghost border border-mystic-gold/40 text-mystic-gold font-serif" :title="startingGear.items">领取起始装备</button>
                         <span class="flex-1"></span>
-                        <span class="text-xs text-slate-500">金币</span>
-                        <input v-model.number="hero.gold" type="number" min="0" class="input input-bordered input-xs w-20 ws-field font-mono" />
+                        <button @click="openItemLibrary" class="btn btn-xs btn-ghost border border-violet-500/40 text-violet-300 font-serif">+ 物品库</button>
+                        <button @click="addCustomItem" class="btn btn-xs btn-ghost border border-dark-600 text-slate-400 font-serif">+ 自定义</button>
                     </div>
-                    <textarea v-model="hero.inventory" class="textarea textarea-bordered h-24 ws-field text-sm" placeholder="背包里的东西、工具、消耗品..."></textarea>
+                    <div class="flex flex-wrap gap-2 text-xs text-slate-400">
+                        <label v-for="c in coinTypes" :key="c.id" class="flex items-center gap-1">{{ c.name }}
+                            <input v-if="c.id === 'gp'" v-model.number="hero.gold" type="number" min="0" class="input input-bordered input-xs w-16 ws-field font-mono px-1" />
+                            <input v-else v-model.number="hero.coins[c.id]" type="number" min="0" class="input input-bordered input-xs w-14 ws-field font-mono px-1" />
+                        </label>
+                    </div>
+                    <div class="text-xs text-slate-400 flex flex-wrap items-center gap-x-3 gap-y-1">
+                        <span>负重 <b class="font-mono" :class="load.status === 'ok' ? 'text-slate-200' : 'text-amber-400'">{{ load.weight }}</b> / {{ load.capacity }} 磅</span>
+                        <span>同调 <b class="font-mono" :class="attunedCount > attuneMax ? 'text-amber-400' : 'text-slate-200'">{{ attunedCount }}</b>/{{ attuneMax }}</span>
+                        <label v-if="hero.edition === '2014'" class="flex items-center gap-1" title="2014 版可选规则：超过力量×5 磅负重、×10 磅重度负重"><input type="checkbox" v-model="hero.variantEncumbrance" class="checkbox checkbox-xs" />细化负重</label>
+                        <span v-if="load.status !== 'ok'" class="text-amber-400">{{ encumbranceText[load.status] }}</span>
+                    </div>
+                    <div v-for="w in equipIssues" :key="w" class="text-xs text-amber-400">⚠ {{ w }}</div>
+                    <div v-if="hero.items.length" class="ws-box space-y-1 max-h-96 overflow-y-auto custom-scrollbar">
+                        <div v-for="(it, i) in hero.items" :key="it.uid" class="text-xs border-b border-dark-800/60 pb-1">
+                            <div class="flex items-center gap-1.5">
+                                <button v-if="it.slot" @click="it.equipped = !it.equipped" class="btn btn-xs px-1.5 min-h-0 h-5 font-serif" :class="it.equipped ? '!bg-mystic-gold/20 !border-mystic-gold/50 !text-mystic-gold' : '!bg-dark-900 !border-dark-700 !text-slate-500'">{{ it.equipped ? '已装备' : '装备' }}</button>
+                                <span v-else class="w-[3.2rem] shrink-0"></span>
+                                <span class="flex-1 min-w-0 truncate cursor-pointer hover:underline" :class="rarityColor(it.rarity)" @click="openItem = openItem === it.uid ? null : it.uid" :title="it.en || ''">{{ it.name }}<span v-if="it.slot && slotNames[it.slot]" class="text-[10px] text-slate-600"> · {{ slotNames[it.slot] }}</span><span v-if="it.sentient" class="text-[10px] text-fuchsia-300"> · 智能</span></span>
+                                <button v-if="it.attune" @click="toggleAttune(it)" class="btn btn-xs px-1.5 min-h-0 h-5 font-serif" :class="it.attuned ? '!bg-violet-900/40 !border-violet-500/60 !text-violet-200' : '!bg-dark-900 !border-dark-700 !text-slate-500'">{{ it.attuned ? '已同调' : '同调' }}</button>
+                                <input v-model.number="it.qty" type="number" min="0" class="w-10 bg-dark-900 rounded text-center font-mono" title="数量" />
+                                <span class="w-12 text-right font-mono text-slate-500">{{ Math.round((it.w || 0) * (it.qty || 0) * 100) / 100 }}磅</span>
+                                <button @click="hero.items.splice(i, 1)" class="text-slate-600 hover:text-red-400 px-1">×</button>
+                            </div>
+                            <div v-if="openItem === it.uid" class="pl-2 mt-1.5 space-y-1.5 text-slate-400">
+                                <div class="flex flex-wrap gap-1.5 items-center">
+                                    <input v-model="it.name" class="input input-bordered input-xs ws-field flex-1 min-w-[8rem]" placeholder="名称" />
+                                    <label class="flex items-center gap-1">每件 <input v-model.number="it.w" type="number" min="0" step="0.1" class="w-14 bg-dark-900 rounded text-center font-mono" /> 磅</label>
+                                    <select v-model="it.slot" class="select select-bordered select-xs ws-field" title="装备栏位">
+                                        <option value="">不能装备</option>
+                                        <option v-for="(sl, id) in slotNames" :key="id" :value="id">{{ sl }}</option>
+                                    </select>
+                                    <label class="flex items-center gap-1"><input type="checkbox" v-model="it.attune" class="checkbox checkbox-xs" />需同调</label>
+                                </div>
+                                <div v-if="it.rarity || it.attuneBy" class="text-[11px]">{{ rarityNames[it.rarity] || '' }}<template v-if="it.attuneBy"> · 同调要求：{{ it.attuneBy }}</template></div>
+                                <div v-if="effectText(it)" class="text-[11px] text-emerald-300">自动生效：{{ effectText(it) }}</div>
+                                <div v-if="it.desc" class="text-[11px] whitespace-pre-line leading-relaxed bg-dark-950/40 rounded p-2 max-h-48 overflow-y-auto custom-scrollbar">{{ it.desc }}</div>
+                                <textarea v-model="it.notes" class="textarea textarea-bordered textarea-xs w-full ws-field" rows="1" placeholder="备注：充能、来历、谁送的..."></textarea>
+                                <label class="flex items-center gap-1"><input type="checkbox" :checked="!!it.sentient" @change="toggleSentient(it, $event.target.checked)" class="checkbox checkbox-xs" />智能物品（有自己的意志）</label>
+                                <div v-if="it.sentient" class="ws-box space-y-1.5 border-fuchsia-900/40">
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <label v-for="ab in ['int', 'wis', 'cha']" :key="ab" class="flex items-center gap-1">{{ { int: '智力', wis: '感知', cha: '魅力' }[ab] }} <input v-model.number="it.sentient[ab]" type="number" min="1" max="30" class="w-10 bg-dark-900 rounded text-center font-mono" /></label>
+                                        <button class="btn btn-xs btn-ghost text-mystic-gold" @click="rollSentient(it)">4d6 去最低掷属性</button>
+                                    </div>
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                                        <select v-model="it.sentient.alignment" class="select select-bordered select-xs ws-field"><option v-for="a in alignments" :key="a" :value="a">阵营：{{ a }}</option></select>
+                                        <select v-model="it.sentient.communication" class="select select-bordered select-xs ws-field"><option v-for="c in sentientOptions.communication" :key="c" :value="c">交流：{{ c }}</option></select>
+                                        <select v-model="it.sentient.senses" class="select select-bordered select-xs ws-field"><option v-for="c in sentientOptions.senses" :key="c" :value="c">感官：{{ c }}</option></select>
+                                        <select v-model="it.sentient.purpose" class="select select-bordered select-xs ws-field"><option v-for="c in sentientOptions.purpose" :key="c" :value="c">目标：{{ c }}</option></select>
+                                    </div>
+                                    <textarea v-model="it.sentient.personality" class="textarea textarea-bordered textarea-xs w-full ws-field" rows="2" placeholder="性格、理想、羁绊、缺点..."></textarea>
+                                    <div class="text-[11px] text-fuchsia-300">冲突时：物品魅力检定（{{ signed(sentientMod(it)) }}）对抗持有者魅力检定，游戏中用 <code>.conflict {{ it.name }}</code></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="ws-label">其他物品备注</div>
+                    <textarea v-model="hero.inventory" class="textarea textarea-bordered h-16 ws-field text-sm" placeholder="不想逐件登记的杂物、待鉴定的东西..."></textarea>
                 </div>
                 <div class="flex flex-col gap-2">
                     <div class="ws-label">职业能力 Class Features <span class="normal-case font-normal text-slate-600">（按等级自动列出）</span></div>
@@ -1677,6 +1734,49 @@
         <form method="dialog" class="modal-backdrop"><button @click="showSpellModal = false">close</button></form>
     </dialog>
 
+    <!-- Item Library Modal -->
+    <dialog class="modal modal-bottom sm:modal-middle bg-black/60 backdrop-blur-sm" :class="{ 'modal-open': lib.show }">
+        <div class="modal-box bg-dark-900 border border-dark-700 shadow-2xl max-w-3xl max-h-[85vh] flex flex-col p-0">
+            <div class="p-4 border-b border-dark-700 flex justify-between items-center bg-dark-800/50 gap-3">
+                <div>
+                    <h3 class="font-bold text-lg text-violet-300 font-serif">物品库 · {{ hero.edition }} 版</h3>
+                    <div class="text-[10px] text-slate-500">数据来自 SRD 5.1 / 5.2（CC-BY-4.0），说明为英文原文</div>
+                </div>
+                <button class="btn btn-sm btn-circle btn-ghost text-slate-500 hover:text-white" @click="lib.show = false">✕</button>
+            </div>
+            <div class="p-2 border-b border-dark-700 flex flex-wrap gap-1.5 items-center">
+                <button v-for="t in [['magic', '魔法物品'], ['gear', '普通物品']]" :key="t[0]" @click="lib.tab = t[0]" class="btn btn-xs font-serif" :class="lib.tab === t[0] ? '!bg-violet-800 !text-white !border-violet-600' : '!bg-dark-900 !border-dark-700 !text-slate-400'">{{ t[1] }}</button>
+                <select v-if="lib.tab === 'magic'" v-model="lib.rarity" class="select select-bordered select-xs ws-field">
+                    <option value="">全部稀有度</option>
+                    <option v-for="(n, id) in rarityNames" :key="id" :value="id">{{ n }}</option>
+                </select>
+                <input v-model="lib.search" class="input input-bordered input-xs ws-field flex-1 min-w-[8rem]" placeholder="搜索中文或英文名..." />
+            </div>
+            <div class="flex-1 overflow-y-auto custom-scrollbar divide-y divide-dark-800">
+                <div v-if="lib.loading" class="p-8 text-center text-slate-500 text-sm">正在加载物品库...</div>
+                <div v-for="x in libResults" :key="x.id" class="px-4 py-2 hover:bg-dark-800/40">
+                    <div class="flex items-center gap-2">
+                        <div class="flex-1 min-w-0 cursor-pointer" @click="lib.open = lib.open === x.id ? null : x.id">
+                            <span class="font-bold text-sm" :class="rarityColor(x.rarity)">{{ x.zh }}</span>
+                            <span class="text-[10px] text-slate-500"> {{ x.en }}</span>
+                            <div class="text-[10px] text-slate-500">
+                                <template v-if="x.rarity">{{ rarityNames[x.rarity] }}<template v-if="x.attune"> · 需同调</template><template v-if="x.slot"> · {{ slotNames[x.slot] }}</template> · </template>{{ x.w || 0 }} 磅<template v-if="x.cost"> · {{ x.cost }} gp</template>
+                                <span v-if="effectText(x)" class="text-emerald-300"> · {{ effectText(x) }}</span>
+                            </div>
+                        </div>
+                        <select v-if="x.variants" v-model="lib.variant[x.id]" class="select select-bordered select-xs ws-field max-w-[7rem]">
+                            <option v-for="(v, vi) in x.variants" :key="vi" :value="vi">{{ v.ref ? gearName(v.ref) : v.zh }}</option>
+                        </select>
+                        <button @click="addLibraryItem(x)" class="btn btn-xs btn-ghost border border-violet-500/40 text-violet-300 shrink-0">加入</button>
+                    </div>
+                    <div v-if="lib.open === x.id && x.desc" class="mt-1 text-[11px] text-slate-400 whitespace-pre-line leading-relaxed">{{ x.desc }}</div>
+                </div>
+                <div v-if="!lib.loading && !libResults.length" class="p-8 text-center text-slate-500 text-sm">没有符合条件的物品</div>
+            </div>
+        </div>
+        <form method="dialog" class="modal-backdrop"><button @click="lib.show = false">close</button></form>
+    </dialog>
+
     <!-- Weapon Selection Modal -->
     <dialog class="modal modal-bottom sm:modal-middle bg-black/60 backdrop-blur-sm" :class="{ 'modal-open': showWeaponModal }">
         <div class="modal-box bg-dark-900 border border-dark-700 shadow-2xl max-w-2xl max-h-[80vh] flex flex-col p-0">
@@ -1693,7 +1793,7 @@
                             <td class="font-mono text-mystic-gold">{{ w.damage }}{{ w.versatile ? ` / ${w.versatile}` : '' }} {{ w.type }}</td>
                             <td class="hidden sm:table-cell text-slate-500">{{ w.props.map(p => weaponProps[p]).join('、') }}{{ w.range ? ` · ${w.range}尺` : '' }}</td>
                             <td v-if="hero.edition === '2024'" class="text-slate-400">{{ ed.weaponMastery?.[w.id] }}</td>
-                            <td class="pr-4 text-right"><button @click="hero.weapons.push(w.id); showWeaponModal = false" class="btn btn-xs btn-ghost text-mystic-gold border border-mystic-gold/30">添加</button></td>
+                            <td class="pr-4 text-right"><button @click="addWeapon(w.id); showWeaponModal = false" class="btn btn-xs btn-ghost text-mystic-gold border border-mystic-gold/30">添加</button></td>
                         </tr>
                     </tbody>
                 </table>
@@ -2623,6 +2723,84 @@
                 ...c, picked: hero.skillProfs.filter(s => c.options.includes(s) && !granted.value.includes(s)).length,
             })));
             const weaponRows = computed(() => hero.weapons.map(id => DND.weaponAttack(hero, id)).filter(Boolean));
+
+            // —— 装备与背包 ——
+            const coinTypes = [{ id: 'cp', name: '铜' }, { id: 'sp', name: '银' }, { id: 'ep', name: '银金' }, { id: 'gp', name: '金' }, { id: 'pp', name: '白金' }];
+            const slotNames = Object.fromEntries(Object.entries(DND.SLOTS).map(([id, sl]) => [id, sl.name]));
+            const rarityNames = { common: '普通', uncommon: '非普通', rare: '稀有', 'very-rare': '极珍稀', legendary: '传说', artifact: '神器' };
+            const rarityColor = (r) => ({ uncommon: 'text-emerald-300', rare: 'text-sky-300', 'very-rare': 'text-violet-300', legendary: 'text-amber-300', artifact: 'text-rose-300' }[r] || 'text-slate-200');
+            const encumbranceText = DND.ENCUMBRANCE_TEXT;
+            const attuneMax = DND.ATTUNE_MAX;
+            const load = computed(() => DND.encumbrance(hero));
+            const attunedCount = computed(() => hero.items.filter(i => i.attuned).length);
+            const equipIssues = computed(() => DND.equipmentIssues(hero));
+            const openItem = ref(null);
+            const gearName = (ref) => (ref === 'shield' ? '盾牌' : (DND.WEAPONS[ref] || DND.ARMOR[ref])?.name || ref);
+            const abilityShort = { STR: '力量', DEX: '敏捷', CON: '体质', INT: '智力', WIS: '感知', CHA: '魅力' };
+            const effectText = (x) => {
+                const e = x.effects || {};
+                return [e.ac && `AC +${e.ac}`, e.acUnarmored && `无甲无盾时 AC +${e.acUnarmored}`, e.baseAc && `无甲时基础 AC ${e.baseAc}+敏捷`, e.save && `豁免 +${e.save}`, e.check && `属性检定 +${e.check}`,
+                    e.attack && `命中 +${e.attack}`, e.damage && `伤害 +${e.damage}`, e.spellAttack && `法术攻击 +${e.spellAttack}`, e.spellDc && `法术 DC +${e.spellDc}`, e.extra && `额外 ${e.extra}`,
+                    ...Object.entries(e.set || {}).map(([ab, v]) => `${abilityShort[ab]}变为 ${v}`), ...Object.entries(e.inc || {}).map(([ab, v]) => `${abilityShort[ab]} +${v}`)].filter(Boolean).join('，');
+            };
+            // 护甲、盾牌、武器都记在物品栏里：普通的直接增删，魔法的只是收起
+            const plain = (i) => !i.rarity && !i.notes && !i.sentient;
+            const setArmor = (id) => {
+                hero.items.filter(i => i.equipped && DND.ARMOR[i.ref]).forEach(i => { i.equipped = false; });
+                hero.items = hero.items.filter(i => !(DND.ARMOR[i.ref] && plain(i) && i.ref !== id));
+                if (!id) return;
+                const own = hero.items.find(i => i.ref === id);
+                if (own) own.equipped = true; else hero.items.push(DND.itemFromRef(id, { equipped: true }));
+            };
+            const setShield = (on) => {
+                hero.items.filter(i => i.ref === 'shield').forEach(i => { i.equipped = false; });
+                if (!on) { hero.items = hero.items.filter(i => !(i.ref === 'shield' && plain(i))); return; }
+                const own = hero.items.find(i => i.ref === 'shield');
+                if (own) own.equipped = true; else hero.items.push(DND.itemFromRef('shield', { equipped: true }));
+            };
+            const addWeapon = (id) => hero.items.push(DND.itemFromRef(id, { equipped: true }));
+            const unequipWeapon = (id) => hero.items.filter(i => i.equipped && i.ref === id).forEach(i => { i.equipped = false; });
+            const toggleAttune = (it) => {
+                if (!it.attuned && hero.items.filter(i => i.attuned).length >= DND.ATTUNE_MAX) return showToast(`最多同调 ${DND.ATTUNE_MAX} 件物品`, 'warning');
+                it.attuned = !it.attuned;
+            };
+            const addCustomItem = () => { const it = { uid: `${Date.now().toString(36)}`, name: '新物品', cat: 'gear', qty: 1, w: 0, equipped: false, attuned: false, slot: '' }; hero.items.push(it); openItem.value = it.uid; };
+            // 智能物品：SRD 的交流方式、感官、目标表
+            const sentientOptions = {
+                communication: ['传达情绪', '说话、读写语言', '说话并能心灵感应'],
+                senses: ['听觉与普通视觉 30 尺', '听觉与普通视觉 60 尺', '听觉与普通视觉 120 尺', '听觉与黑暗视觉 120 尺'],
+                purpose: ['阵营：消灭对立阵营者', '克星：消灭某类生物', '守护者：保护某个种族或生物', '十字军：打击某神祇的仆从', '圣殿骑士：守护某神祇的仆从', '毁灭者：渴望破坏', '荣耀追求者：想成为世上最伟大的魔法物品', '知识追求者：渴望知识或解开谜团', '命运追求者：坚信自己与持有者肩负使命', '寻找创造者：想知道自己为何被造'],
+            };
+            const roll4d6 = () => DND.rollDice('4d6kh3').total;
+            const toggleSentient = (it, on) => { it.sentient = on ? { int: roll4d6(), wis: roll4d6(), cha: roll4d6(), alignment: '绝对中立', communication: sentientOptions.communication[0], senses: sentientOptions.senses[0], purpose: sentientOptions.purpose[8], personality: '' } : undefined; };
+            const rollSentient = (it) => Object.assign(it.sentient, { int: roll4d6(), wis: roll4d6(), cha: roll4d6() });
+            const sentientMod = (it) => DND.sentientCheckMod(it);
+
+            // 物品库（按版本加载 assets/data/items-版本.json）
+            const lib = reactive({ show: false, tab: 'magic', search: '', rarity: '', loading: false, open: null, variant: {}, data: {} });
+            const openItemLibrary = async () => {
+                lib.show = true;
+                if (lib.data[hero.edition]) return;
+                lib.loading = true;
+                try { lib.data[hero.edition] = await (await fetch(`../assets/data/items-${hero.edition}.json`)).json(); }
+                catch (e) { showToast('物品库加载失败', 'error'); }
+                finally { lib.loading = false; }
+            };
+            const libResults = computed(() => {
+                const d = lib.data[hero.edition]; if (!d) return [];
+                const q = lib.search.trim().toLowerCase();
+                return (lib.tab === 'magic' ? d.magic : d.gear).filter(x => (!q || x.zh.includes(q) || x.en.toLowerCase().includes(q)) && (lib.tab !== 'magic' || !lib.rarity || x.rarity === lib.rarity)).slice(0, 200);
+            });
+            const addLibraryItem = (x) => {
+                const v = x.variants?.[lib.variant[x.id] || 0];
+                const ref = v?.ref || (/shield/i.test(x.en) && x.slot === 'offhand' ? 'shield' : '');
+                const base = ref ? DND.itemFromRef(ref) : { uid: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`, cat: lib.tab === 'magic' ? 'magic' : 'gear', w: x.w || 0, slot: x.slot || '', qty: 1, equipped: false, attuned: false };
+                // 名称：「+1 武器」按武器写成「长剑 +1」，类型变体写成「火舌（长剑）」
+                const plus = x.en.match(/^(Weapon|Armor|Shield|Ammunition) \+(\d)$/);
+                const name = plus && ref ? `${gearName(ref)} +${plus[2]}` : v?.zh || (ref && x.variants ? `${x.zh}（${gearName(ref)}）` : x.zh);
+                hero.items.push({ ...base, name, en: x.en, libId: x.id, rarity: x.rarity, attune: !!x.attune, attuneBy: x.attuneBy, effects: x.effects, desc: x.desc, cost: x.cost });
+                showToast(`已加入：${name}`, 'success');
+            };
             // 武器库：按当前版本数据列出，熟练的排在前面
             const weaponList = computed(() => Object.keys(DND.WEAPONS).map(id => ({ id, ...DND.weaponData(hero, id), proficient: DND.weaponProficient(hero, id) })).sort((a, b) => b.proficient - a.proficient));
             const featureList = computed(() => DND.classFeatures(hero).filter(f => f.name !== '选择子职业'));
@@ -2669,9 +2847,9 @@
             const startingGear = computed(() => ed.value.startingGear?.[hero.classId]);
             const takeStartingGear = () => {
                 const g = startingGear.value;
-                g.weapons.forEach(w => { if (!hero.weapons.includes(w)) hero.weapons.push(w); });
-                if (g.armor) hero.armor = g.armor;
-                if (g.shield) hero.shield = true;
+                g.weapons.forEach(w => { if (!hero.items.some(i => i.ref === w)) addWeapon(w); });
+                if (g.armor) setArmor(g.armor);
+                if (g.shield) setShield(true);
                 hero.inventory = [hero.inventory.trim(), g.items].filter(Boolean).join('\n');
                 hero.gold = (parseInt(hero.gold) || 0) + (g.gold || 0) + (bg.value?.gold || 0);
             };
@@ -2755,6 +2933,7 @@
             // 选项变化后：清掉不再有效的选择，重算最终属性、生命值上限，补上自带技能
             const refreshCharacter = () => {
                 const edition = ed.value;
+                DND.syncEquipment(hero);
                 // 兼职条目放不下时修剪；各职业子职业要已解锁且属于该职业
                 const fitted = DND.fitMulticlass(hero);
                 if (JSON.stringify(fitted) !== JSON.stringify(hero.multiclass)) hero.multiclass = fitted;
@@ -2780,7 +2959,7 @@
                 }
                 granted.value.forEach(s => { if (!hero.skillProfs.includes(s)) hero.skillProfs.push(s); });
             };
-            watch(() => [hero.edition, hero.race, hero.subrace, hero.classId, hero.subclass, hero.background, hero.level, JSON.stringify(hero.baseAbilities), JSON.stringify(hero.bonusPicks), JSON.stringify(hero.asi), JSON.stringify(hero.hpRolls), JSON.stringify(hero.multiclass)], refreshCharacter);
+            watch(() => [hero.edition, hero.race, hero.subrace, hero.classId, hero.subclass, hero.background, hero.level, JSON.stringify(hero.baseAbilities), JSON.stringify(hero.bonusPicks), JSON.stringify(hero.asi), JSON.stringify(hero.hpRolls), JSON.stringify(hero.multiclass), JSON.stringify(hero.items)], refreshCharacter);
 
             // 属性雷达图（六边形，满值 20）
             const radarPoint = (i, radius) => {
@@ -2857,8 +3036,11 @@ JSON 结构：
                         ...current, ...result,
                         id: current.id, edition: current.edition, avatar: current.avatar, history: current.history, badges: current.badges,
                         backstory: { ...current.backstory, ...(result.backstory || {}) },
+                        // AI 给的是武器、护甲字段：重建物品栏里的这些装备，保留原有的魔法物品和杂物
+                        items: ['weapons', 'armor', 'shield'].some(k => k in result) ? undefined : current.items,
                         maxHp: 0,
                     }));
+                    if (['weapons', 'armor', 'shield'].some(k => k in result)) hero.items = [...hero.items, ...current.items.filter(i => !DND.WEAPONS[i.ref] && !DND.ARMOR[i.ref] && i.ref !== 'shield')];
 
                     if (result.avatar_prompt) {
                         const avatarUrl = generateAvatarUrl(hero.avatar_prompt);
@@ -3249,6 +3431,8 @@ return {
     imageGenArtistPresetOptions, isImageGenArtistCustom, applyImageGenArtistPreset, onAvatarLoad, onAvatarError, settings, showToast,
     radarLabels, radarGrid, radarStatsPoints, showWeaponModal,
     abilityNames, editionList, alignments, weaponProps, backstoryFields, ed, cls, race, subrace, bg, granted, derived, skillChoices, weaponRows, weaponList, featureList, resourceList,
+    coinTypes, slotNames, rarityNames, rarityColor, encumbranceText, attuneMax, load, attunedCount, equipIssues, openItem, gearName, effectText, setArmor, setShield, addWeapon, unequipWeapon,
+    toggleAttune, addCustomItem, sentientOptions, toggleSentient, rollSentient, sentientMod, lib, openItemLibrary, libResults, addLibraryItem,
     primaryLevel, classSummary, multiclassIssues, hitDiceText, hasCaster, casterSummary, slotLabel, subclassUnlock, multiclassGainText, addMulticlass, hpRollRows, clearHpRolls,
     fightingStyles, hasStyle, asiLevels, feats, featOptions, setAsiMode, rollHp, startingGear, takeStartingGear, isSaveProf,
     showSpellModal, spellLevelFilter, spellSearch, chosenSpells, alwaysSpells, spellStats, spellOptions, spellMech, toggleSpell,

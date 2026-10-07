@@ -2438,6 +2438,18 @@
                                         </div>
                                     </div>
 
+                                    <!-- 装备与钱 -->
+                                    <div>
+                                        <h4 class="font-bold text-slate-500 text-[10px] mb-2 uppercase tracking-widest flex items-center gap-2">
+                                            <span class="w-1 h-1 rounded-full bg-slate-500"></span> 装备 · 负重 {{ heroStats.load.weight }}/{{ heroStats.load.capacity }} 磅
+                                        </h4>
+                                        <div v-if="heroStats.load.text" class="text-[10px] text-amber-400 mb-1">{{ heroStats.load.text }}</div>
+                                        <div class="flex flex-wrap gap-1 text-[10px]">
+                                            <span v-for="g in heroStats.gear" :key="g.name" class="px-1.5 py-0.5 rounded border" :class="g.magic ? 'border-violet-800/60 bg-violet-900/20 text-violet-200' : 'border-dark-700 bg-dark-800 text-slate-400'">{{ g.name }}<span v-if="g.attuned"> ✦</span><span v-if="g.sentient" class="text-fuchsia-300"> 智</span></span>
+                                        </div>
+                                        <div v-if="heroStats.coins" class="text-[10px] text-mystic-gold mt-1 font-mono">{{ heroStats.coins }}</div>
+                                    </div>
+
                                     <!-- 法术：点击施放 -->
                                     <div v-if="heroStats.spells.length">
                                         <h4 class="font-bold text-slate-500 text-[10px] mb-3 uppercase tracking-widest flex items-center gap-2">
@@ -4614,6 +4626,7 @@
                     { id: 'stat_updates', category: '机制处理', label: '自动状态变更', content: '更新角色状态 (核心)：角色受伤、治疗、消耗资源、获得状态或经验时，必须输出指令。格式：`@角色名 .st 项目 变化值`。项目可用：hp（受伤写负数，如 -7 或 -2d6）、临时、法术位1~法术位9（消耗写 +1）、状态（如 +中毒 / -中毒）、专注（如 `.st 专注 祝福术`，结束写 `.st 专注 结束`）、经验、金币、力竭。玩家施法用 `.cast 法术名 [N环] [@目标]`（系统自动扣法术位、处理专注、掷法术攻击或给出豁免 DC 与伤害、结算治疗），你按卡片结果叙事，不要再额外用 .st 扣法术位；消耗职业资源用 `@角色名 .use 资源名 [数量]`（如 `.use 狂暴`、`.use 圣疗池 5`）。休息用 `@角色名 .rest 长休` 或 `.rest 短休`，短休时玩家可用 `.hd 数量` 花生命骰回血。扣血前先按角色的抗性、易伤、免疫调整伤害（如狂暴中的野蛮人受到的钝击、穿刺、挥砍伤害减半）。系统会自动处理：生命降到 0 进入濒死并要求死亡豁免、濒死时受伤记失败、受伤时提示专注豁免 DC、状态带来的优势劣势与自动失败，你只需按结果叙事。', enabled: true },
                     { id: 'combat', category: '机制处理', label: '战斗指令', content: '战斗流程 (核心)：遭遇战斗时，先为每个敌人输出 `.monster 名称`（同类敌人用 A、B 区分名称，如 `.monster 哥布林A`）。怪物库中的生物会自动填入 AC、生命、先攻和经验：' + Object.values(DND.MONSTERS).map(m => m.name).join('、') + '；库外的生物写全数据 `.monster 名称 hp=生命 ac=护甲 init=先攻加值 xp=经验`。再输出 `.combat start`，系统会自动掷先攻并显示战斗面板。敌人受伤用 `.dmg 名称 伤害`（可写骰子，如 `.dmg 哥布林A 1d8+3`），治疗用 `.heal 名称 数值`；一个角色或敌人行动完毕后输出 `.next` 轮到下一位；战斗结束输出 `.combat end`，系统会把被击倒敌人的经验平均分给参战角色，不要再手动加经验。敌人的攻击由你按怪物数据掷骰并描述，对冒险者造成的伤害用 `.st hp` 扣除。', enabled: true },
                     { id: 'core_rules', category: '机制处理', label: '核心战斗规则', content: '严格按 D&D 5e 核心规则裁定：每回合一个动作、一个附赠动作（仅当能力允许时）、一次移动和每轮一次反应；离开敌人触及范围引发借机攻击（撤离动作可避免）；优势与劣势不叠加，同时具备则抵消；半掩护 AC 与敏捷豁免 +2，四分之三掩护 +5；未被发现的攻击者具有优势；远程攻击在长射程或敌人贴身时具有劣势；攻击掷出 20 必中并暴击（伤害骰翻倍），掷出 1 必失；专注期间再施展专注法术会结束前一个。按角色卡中的职业能力、资源次数和法术位裁定，不要让角色使用其尚未获得的能力。', enabled: true },
+                    { id: 'items', category: '机制处理', label: '物品与魔法物品', content: '物品与财宝：角色卡里有装备、背包、钱和负重。给予或消耗物品用 `@角色名 .st 物品 +名称*数量`（失去写 -），钱用 `.st 金币 +数值`（也可用 银币、铜币、银金币、白金币）。魔法物品按 SRD 规则处理：需要同调的物品要花一次短休专注才能同调，每人最多同时同调 3 件；装备栏位有限（例如只能戴一顶头盔、两枚戒指）。负重超过上限只能拖拽前进。智能物品有自己的意志和目标，由你扮演；当持有者的行为违背物品的阵营或目标时，让玩家用 `.conflict 物品名` 掷魅力对抗，物品胜出就会提出要求。', enabled: true },
                     { id: 'monsters', category: '机制处理', label: '怪物与遭遇', content: '怪物优先使用 SRD 中对应生物的数据（AC、生命、攻击加值、伤害、特殊能力），按队伍等级与人数设计难度合适的遭遇；敌人的行动要符合其智力与习性，不要无理由集火倒地的角色。战斗外解决的挑战（谈判、潜行绕过、解谜等）按相当的遭遇难度用 `.st 经验 +数值` 给经验。', enabled: true },
                     { id: 'multiplayer', category: '多人协作', label: '视角分隔处理', content: '多玩家处理：视角分隔。请使用分割线 `---` 和角色名标题区分不同玩家的视角。', enabled: true },
                     { id: 'plot_prog', category: '流程管理', label: '剧情循序渐进', content: '不要一次性倾倒所有信息。线索应逐步获得。扮演 NPC 时要鲜活立体。', enabled: true },
@@ -4621,7 +4634,7 @@
                     { id: 'game_end', category: '流程管理', label: '结团判定指令', content: '当模组剧情彻底结束时，请在回复的最后一行必须输出指令：`.game_end`。', enabled: true },
                     { id: 'report', category: '流程管理', label: '冒险结算生成', content: '当房主发送“确认结团...”指令时，请为每一位参与的冒险者分别生成一份冒险结算。输出格式为 JSON 数组：[{"type": "adventure_report", "moduleName": "...", "investigatorName": "角色名", "xp": 0, "gold": 0, "newItems": ["..."], "badge": {"name": "...", "desc": "...", "icon": "🏆"}, "summary": "..."}]。经验值参考遭遇难度与剧情贡献。', enabled: true }
                 ];
-                const KP_RULES_VERSION = 'dnd-4';
+                const KP_RULES_VERSION = 'dnd-5';
 
                 const IMAGE_GEN_ARTIST_PRESETS = {
                     '2.5d': {
@@ -5374,6 +5387,10 @@
                         hitDice: (() => { const pool = DND.hitDicePool(c); return `${pool.length - (parseInt(c.hitDiceUsed) || 0)}/${pool.length}${DND.isMulticlass(c) ? `（${DND.hitDiceText(pool)}）` : ''}`; })(),
                         spells: [...new Set([...(c.spellIds || []), ...DND.alwaysPreparedSpells(c)])].map(id => DND.spellBook(c.edition)[id]).filter(Boolean).sort((a, b) => a.level - b.level),
                         spellInfo: DND.casterSummary(c),
+                        // 装备中和已同调的物品、钱、负重
+                        gear: (c.items || []).filter(i => i.equipped || i.attuned).map(i => ({ name: i.name, magic: !!i.rarity, attuned: i.attuned, sentient: !!i.sentient })),
+                        coins: [['pp', '白金'], ['gp', '金'], ['ep', '银金'], ['sp', '银'], ['cp', '铜']].map(([k, n]) => [n, k === 'gp' ? c.gold : c.coins?.[k]]).filter(([, v]) => parseInt(v)).map(([n, v]) => `${n} ${v}`).join(' · '),
+                        load: (() => { const l = DND.encumbrance(c); return { ...l, text: DND.ENCUMBRANCE_TEXT[l.status] || '' }; })(),
                     };
                 });
                 const cocState = reactive({ combat: DND.combat.create(), mode: null, isCoj: false, module: null, tempModuleText: '', investigators: [], activeInvestigatorIndex: -1, gameState: 'idle', log: [], systemPrompt: '', pendingRolls: [], isGameEnded: false });
@@ -7358,7 +7375,7 @@ ${buildInvestigatorProfile(inv)}
                 // 骰子处理函数
                 // 掷骰可能改动角色（如死亡豁免），改动转成状态变更记录，便于显示和撤销
                 const processDiceCommand = (content, inv) => {
-                    const diceResult = content ? (DND.rollCheck(inv, content) || DND.castSpell(inv, content, cocState.investigators) || DND.rollExpr(content)) : null;
+                    const diceResult = content ? (DND.rollCheck(inv, content) || DND.castSpell(inv, content, cocState.investigators) || DND.itemConflict(inv, content) || DND.rollExpr(content)) : null;
                     const touched = [...(diceResult?.change ? [{ char: inv, ...diceResult.change }] : []), ...(diceResult?.changes || [])];
                     if (diceResult) { delete diceResult.change; delete diceResult.changes; }
                     const changes = { logs: [], rollbacks: [] };

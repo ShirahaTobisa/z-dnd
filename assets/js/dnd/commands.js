@@ -7,7 +7,8 @@
     const SKILL_BY_NAME = Object.fromEntries(Object.entries(D.SKILLS).flatMap(([id, s]) => [[id, id], [s.name, id]]));
 
     // 徒手攻击人人都能用，不必列在武器栏里
-    const findWeapon = (char, name) => (['徒手', '徒手攻击', 'unarmed'].includes(name) ? 'unarmed' : (char.weapons || []).find(id => id === name || D.WEAPONS[id]?.name === name));
+    const findWeapon = (char, name) => (['徒手', '徒手攻击', 'unarmed'].includes(name) ? 'unarmed'
+        : (char.weapons || []).find(id => id === name || D.WEAPONS[id]?.name === name) || (char.items || []).find(i => i.equipped && D.WEAPONS[i.ref] && i.name === name)?.ref);
     // 骰子取最大值，如 "2d8+3" → 19（至高治疗）
     const maxDice = (expr) => D.rollDice(String(expr).replace(/(\d*)d(\d+)/g, (m, n, d) => String((parseInt(n) || 1) * d))).total;
     const critDamage = (expr) => expr.replace(/(\d*)d(\d+)/g, (m, n, d) => `${(parseInt(n) || 1) * 2}d${d}`);
@@ -44,6 +45,7 @@
             else { if (isCheck && ex >= 1) dis.push(`力竭${ex}级`); if ((isAttack || isSave) && ex >= 3) dis.push(`力竭${ex}级`); }
         }
         if (char.raging && info.ability === 'STR' && (isCheck || info.kind === 'save')) adv.push('狂暴');
+        if (D.encumbrance(char).status === 'heavy' && (isAttack || ((isCheck || isSave) && ['STR', 'DEX', 'CON'].includes(info.ability)))) dis.push('重度负重');
         if (info.skill === 'stealth' && D.ARMOR[char.armor]?.stealth) dis.push('护甲');
         if (char.edition === '2024' && (D.subclassEntry(char, '勇士')?.level || 0) >= 3 && (info.kind === 'init' || info.skill === 'athletics')) adv.push('卓越运动员');
         const barbarian = D.classLevel(char, 'barbarian');
@@ -126,6 +128,7 @@
             extra += ` · 伤害 ${D.rollDice(dmgExpr).total} ${w.type}${rage ? `（含狂暴 +${rage}）` : ''}${brutal ? `（含重击额外 ${brutal} 骰）` : ''}${gwf ? '（巨武器战斗）' : ''}`;
             // 圣武士 11 级：近战武器命中另加 1d8 光耀（2014 精通至圣斩 / 2024 光耀打击）
             if (w.melee && !thrown && D.classLevel(char, 'paladin') >= 11) extra += ` · 命中另加 ${D.rollDice(crit ? '2d8' : '1d8').total} 光耀`;
+            if (w.magicExtra) extra += ` · 魔法武器额外 ${w.magicExtra}（按物品说明的条件）`;
             if (!w.proficient) extra += ' · 未熟练';
             const sneak = D.sneakAttackDice(char);
             if (sneak && w.finesseOrRanged) extra += ` · 满足条件可加偷袭 ${level === '重击' ? sneak * 2 : sneak}d6`;
@@ -195,10 +198,35 @@
     };
 
     // 返回 { ok, log, rollback } ；rollback 用于撤销
+    const COINS = { 铜币: 'cp', cp: 'cp', 银币: 'sp', sp: 'sp', 银金币: 'ep', ep: 'ep', 白金币: 'pp', pp: 'pp' };
+    const COIN_NAMES = { cp: '铜币', sp: '银币', ep: '银金币', pp: '白金币' };
     const applyStat = (char, prop, expr) => {
         if (!char || !prop || !expr) return { ok: false };
         const p = String(prop).trim(); const e = String(expr).trim();
         const ending = /^(-|结束|end|无)$/i.test(e);
+
+        if (COINS[p]) {
+            const k = COINS[p]; const rollback = snapshot(char, ['coins']);
+            const current = parseInt(char.coins?.[k]) || 0; const next = Math.max(0, evalChange(current, e) ?? current);
+            char.coins = { ...(char.coins || {}), [k]: next };
+            return { ok: true, log: `${char.name} 的${COIN_NAMES[k]}：${current} ➔ ${next}`, rollback };
+        }
+        // .st 物品 +治疗药水*2 / -治疗药水：增减背包里的物品数量
+        if (p === '物品' || p === 'item') {
+            const m = e.match(/^([+-])(.+?)(?:[*×x](\d+))?$/); if (!m) return { ok: false };
+            const rollback = snapshot(char, ['items']); const n = parseInt(m[3]) || 1; const name = m[2].trim();
+            const items = [...(char.items || [])]; const it = items.find(i => i.name === name);
+            if (m[1] === '+') {
+                if (it) it.qty = (parseInt(it.qty) || 0) + n;
+                else items.push({ uid: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`, name, cat: 'gear', qty: n, w: 0, equipped: false, attuned: false, slot: '' });
+            } else {
+                if (!it) return { ok: true, log: `${char.name} 的背包里没有「${name}」`, rollback: null };
+                it.qty = Math.max(0, (parseInt(it.qty) || 0) - n);
+                if (!it.qty) items.splice(items.indexOf(it), 1);
+            }
+            char.items = items; D.syncEquipment(char);
+            return { ok: true, log: `${char.name} ${m[1] === '+' ? '获得' : '失去'}「${name}」×${n}${it?.qty ? `（现有 ${it.qty}）` : ''}`, rollback };
+        }
 
         if (p === '专注') {
             const rollback = snapshot(char, ['concentration']);
@@ -522,6 +550,36 @@
         return Object.keys(groups).sort((a, b) => a - b).map(lv => `${+lv ? `${lv}环` : '戏法'} ${groups[lv].join('、')}`).join('；');
     };
 
+    // .conflict 物品名：智能物品与持有者冲突，物品的魅力检定对抗持有者的魅力检定
+    const itemConflict = (char, text) => {
+        const m = String(text || '').trim().match(/^[.。](?:conflict|冲突)\s*(.*)$/i);
+        if (!m || !char) return null;
+        const q = m[1].trim(); const item = (char.items || []).find(i => i.sentient && (!q || i.name === q || i.name.includes(q)));
+        if (!item) return { label: '智能物品冲突', roll: '-', level: '没有找到智能物品', success: null };
+        const it = D.d20Test({ mod: D.sentientCheckMod(item) });
+        const me = D.d20Test({ mod: D.abilityMod(char.abilities?.CHA) + D.halfProficiency(char, 'CHA', 'ability'), lucky: D.isLucky(char) });
+        const level = me.total > it.total ? '持有者占上风' : me.total === it.total ? '平手，维持现状' : '物品胜出，会提出要求';
+        return { label: `与「${item.name}」的意志冲突`, roll: me.total, target: it.total, level, success: me.total > it.total ? true : me.total < it.total ? false : null,
+            extra: `你 d20=${me.roll} ${D.signed(me.mod)} = ${me.total}；物品 d20=${it.roll} ${D.signed(it.mod)} = ${it.total}` };
+    };
+
+    // 物品栏摘要：装备中、同调、背包、钱、负重、智能物品
+    const inventoryText = (char) => {
+        const items = char.items || [];
+        const desc = (i) => `${i.name}${(parseInt(i.qty) || 1) > 1 ? `×${i.qty}` : ''}${i.attuned ? '(已同调)' : i.attune ? '(未同调)' : ''}`;
+        const eq = items.filter(i => i.equipped).map(desc); const bag = items.filter(i => !i.equipped).map(desc);
+        const coins = [['pp', '白金'], ['gp', '金'], ['ep', '银金'], ['sp', '银'], ['cp', '铜']].map(([k, n]) => [n, k === 'gp' ? char.gold : char.coins?.[k]]).filter(([, v]) => parseInt(v)).map(([n, v]) => `${n}${v}`).join(' ');
+        const load = D.encumbrance(char);
+        const sentient = items.filter(i => i.sentient).map(i => `${i.name}（智力${i.sentient.int} 感知${i.sentient.wis} 魅力${i.sentient.cha}，${i.sentient.alignment}，${i.sentient.communication}，${i.sentient.senses}，目标：${i.sentient.purpose}${i.sentient.personality ? `，性格：${i.sentient.personality}` : ''}）`);
+        return [
+            eq.length && `装备中：${eq.join('、')}`,
+            bag.length && `背包：${bag.slice(0, 40).join('、')}${bag.length > 40 ? ` 等 ${bag.length} 件` : ''}`,
+            (coins || char.inventory) && `${coins ? `钱：${coins}` : ''}${char.inventory ? `${coins ? ' | ' : ''}其他：${char.inventory}` : ''}`,
+            `负重 ${load.weight}/${load.capacity} 磅${load.status !== 'ok' ? `（${D.ENCUMBRANCE_TEXT[load.status]}）` : ''}`,
+            sentient.length && `智能物品：${sentient.join('；')}。冲突时让玩家用 .conflict 物品名 掷对抗`,
+        ].filter(Boolean).join('\n');
+    };
+
     // 发给 AI 的角色资料
     const profile = (char) => {
         const race = D.raceOf(char); const sub = D.subraceOf(char); const bg = D.backgroundOf(char); const ed = D.edition(char.edition);
@@ -529,7 +587,7 @@
         const skills = (char.skillProfs || []).map(id => `${D.SKILLS[id]?.name}${D.signed(D.skillMod(char, id))}${char.expertise?.includes(id) ? '(专精)' : ''}`).join('、');
         const slots = Object.entries(D.spellSlots(char)).map(([lv, n]) => `${D.slotLabel(lv)} ${n - (parseInt(char.slotsUsed?.[lv]) || 0)}/${n}`).join(' ');
         const subclasses = D.classEntries(char).filter(e => e.subclass).map(e => e.subclass).join('、');
-        const weapons = (char.weapons || []).map(id => D.weaponAttack(char, id)).filter(Boolean).map(w => `${w.name}(命中${D.signed(w.toHit)}, ${w.damage}${w.type}${w.range ? `, 射程${w.range}` : ''}${w.mastery ? `, 专精:${w.mastery}` : ''}${w.greatWeapon ? ', 巨武器战斗' : ''}${w.proficient ? '' : ', 未熟练'})`).join('、');
+        const weapons = (char.weapons || []).map(id => D.weaponAttack(char, id)).filter(Boolean).map(w => `${w.name}(命中${D.signed(w.toHit)}, ${w.damage}${w.type}${w.range ? `, 射程${w.range}` : ''}${w.mastery ? `, 专精:${w.mastery}` : ''}${w.magicExtra ? `, 额外${w.magicExtra}` : ''}${w.greatWeapon ? ', 巨武器战斗' : ''}${w.proficient ? '' : ', 未熟练'})`).join('、');
         const feats = D.characterFeats(char).map(id => D.FEATS[id]?.name).filter(Boolean);
         const style = D.FIGHTING_STYLES[char.fightingStyle];
         const features = D.classFeatures(char).filter(f => f.name !== '选择子职业' && f.name !== '属性值提升').map(f => f.name).join('、');
@@ -557,10 +615,10 @@
             char.spells && `法术备注：${char.spells}`,
             char.features && `专长与其他：${char.features}`,
             status && `当前状态：${status}`,
-            char.inventory && `物品：${char.inventory}${char.gold ? ` | 金币 ${char.gold}` : ''}`,
+            inventoryText(char),
             story && `背景故事：${story}`,
         ].filter(Boolean).join('\n');
     };
 
-    Object.assign(D, { rollCheck, rollExpr, castSpell, spellList, applyStat, undoStat, useResource, spendHitDice, rest, combat, runCombatCommands, profile });
+    Object.assign(D, { rollCheck, rollExpr, castSpell, itemConflict, inventoryText, spellList, applyStat, undoStat, useResource, spendHitDice, rest, combat, runCombatCommands, profile });
 })(typeof window !== 'undefined' ? window : globalThis);
