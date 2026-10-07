@@ -27,7 +27,7 @@
         if (ABILITY_BY_NAME[t]) { const ab = ABILITY_BY_NAME[t]; return { kind: 'ability', ability: ab, label: `${D.ABILITIES[ab]}检定`, mod: D.abilityMod(char.abilities?.[ab]) + D.halfProficiency(char, ab, 'ability') }; }
         if (SKILL_BY_NAME[t]) { const id = SKILL_BY_NAME[t]; return { kind: 'skill', skill: id, ability: D.SKILLS[id].ability, label: `${D.SKILLS[id].name}检定`, mod: D.skillMod(char, id) }; }
         const weaponId = findWeapon(char, t);
-        if (weaponId) { const w = D.weaponAttack(char, weaponId); return { kind: 'attack', ability: w.usesStr ? 'STR' : 'DEX', label: `${w.name}攻击`, mod: w.toHit, weapon: w }; }
+        if (weaponId) { const w = D.weaponAttack(char, weaponId); return { kind: 'attack', ability: w.usesStr ? 'STR' : 'DEX', label: w.name.endsWith('攻击') ? w.name : `${w.name}攻击`, mod: w.toHit, weapon: w }; }
         return null;
     };
 
@@ -524,7 +524,9 @@
             state.order.sort((a, b) => b.init - a.init);
             if (current) state.turn = state.order.indexOf(current);
         },
+        // 战斗进行中再次 start：只把新加的敌人放进先攻顺序，不重掷、不清空
         start(state, chars) {
+            if (state.active) { state.order.push(...state.pending || []); delete state.pending; combat.sort(state); return; }
             Object.assign(state, { active: true, round: 1, turn: 0 });
             state.order = chars.map(({ char, index }) => {
                 const mods = rollModifiers(char, { kind: 'init', ability: 'DEX' });
@@ -582,7 +584,7 @@
         const logs = []; const changes = [];
         for (const m of String(content || '').matchAll(COMBAT_RE)) {
             if (m[1]) {
-                if (/start|开始/i.test(m[2])) { combat.start(state, chars); logs.push(`⚔️ 战斗开始！先攻顺序：${state.order.map(e => `${e.name}(${e.init})`).join(' → ')}`); }
+                if (/start|开始/i.test(m[2])) { const going = state.active; combat.start(state, chars); logs.push(`⚔️ ${going ? '战斗进行中' : '战斗开始！'}先攻顺序：${state.order.map(e => `${e.name}(${e.init})`).join(' → ')}`); }
                 else { const r = combat.end(state, chars); logs.push(r.log); changes.push(...r.changes); }
             } else if (m[3]) {
                 const spec = Object.fromEntries([...m[5].matchAll(/(hp|ac|init|xp)=([+-]?\d+)/gi)].map(x => [x[1].toLowerCase(), x[2]]));
@@ -693,5 +695,59 @@
         ].filter(Boolean).join('\n');
     };
 
-    Object.assign(D, { rollCheck, rollExpr, castSpell, itemConflict, inventoryText, spellList, applyStat, undoStat, useResource, fontOfMagic, spendHitDice, rest, combat, runCombatCommands, profile });
+    // 指令手册：游戏内说明书和「复制给 AI」用同一份。改了指令记得同步这里
+    const COMMAND_GUIDE = [
+        { group: '玩家：检定与掷骰', items: [
+            { cmd: '.ra 项目 [优势/劣势] [dc数值] [行动描述]', desc: '掷 d20 检定，自动加属性、熟练、专精，并按状态（中毒、倒地、力竭、狂暴、负重、护甲不熟练等）自动给优势或劣势。项目可以是技能、属性、某属性豁免、先攻、死亡豁免。.rc、.check 效果相同。',
+              ex: ['.ra 察觉 我屏住呼吸，扫视走廊尽头', '.ra 敏捷豁免 dc15', '.ra 力量 优势', '.ra 先攻', '.ra 死亡豁免'] },
+            { cmd: '.ra 武器名 [优势/劣势] [投掷]', desc: '武器攻击：命中、重击和伤害一次掷完，自动算狂暴、战斗风格、魔法武器加值，并提示偷袭等额外伤害。投掷武器扔出去时加「投掷」。', ex: ['.ra 长剑', '.ra 手斧 投掷', '.ra 徒手'] },
+            { cmd: '.r 骰子表达式', desc: '单纯掷骰，不加任何调整值。', ex: ['.r 2d6+3', '.r d20'] },
+        ] },
+        { group: '玩家：施法、资源与休息', items: [
+            { cmd: '.cast 法术名 [N环] [仪式] [@目标]', desc: '施法：自动扣法术位（邪术师优先用契约法术位）、处理专注、掷法术攻击或给出豁免 DC 和伤害、结算治疗。升环写「N环」；能仪式施法的写「仪式」不耗法术位；治疗别人写 @目标。', ex: ['.cast 魔法飞弹 2环', '.cast 治疗伤口 @艾琳', '.cast 侦测魔法 仪式'] },
+            { cmd: '.use 资源名 [数量]', desc: '使用职业、子职业、种族、专长的次数资源。狂暴会进入狂暴状态，回气自动回血，吐息等会自动掷伤害，奥术回想自动恢复法术位。', ex: ['.use 狂暴', '.use 回气', '.use 圣疗池 5', '.use 吐息武器', '.use 奥术回想'] },
+            { cmd: '.font N环 / .font N环 换点', desc: '术士魔力泉源：花术法点做出一个法术位（可以超过上限，长休后消失），或把一个法术位换成术法点。', ex: ['.font 2环', '.font 3环 换点'] },
+            { cmd: '.rest 长休 / .rest 短休', desc: '长休：回满生命、法术位和资源，恢复生命骰，力竭减一级。短休：恢复短休资源和契约法术位。', ex: ['.rest 短休'] },
+            { cmd: '.hd 数量', desc: '短休时花生命骰回血（每颗 = 生命骰 + 体质调整值）。', ex: ['.hd 2'] },
+            { cmd: '.conflict [物品名]', desc: '和智能物品进行意志对抗（魅力对抗），物品赢了会提出要求。', ex: ['.conflict 黑刃'] },
+        ] },
+        { group: '玩家和 DM 通用：修改角色状态', note: '格式 .st 项目 变化值。带 + 或 - 是增减，不带是直接设成这个值，可以写骰子。前面加 @角色名 可以改别的角色。',
+          items: [
+            { cmd: '.st hp 变化 [伤害类型] [魔法]', desc: '生命值。受伤写负数；写上伤害类型会按抗性、免疫、易伤自动调整，魔法武器的物理伤害再加「魔法」。降到 0 自动进入濒死。', ex: ['.st hp -7 火焰', '.st hp -2d6 毒素', '.st hp -8 挥砍 魔法', '.st hp +5'] },
+            { cmd: '.st 临时 数值', desc: '临时生命，受伤时先扣。', ex: ['.st 临时 5'] },
+            { cmd: '.st 法术位N 变化', desc: '法术位（按已用数量算，用掉一个写 +1）。施法用 .cast 会自动扣，不用再写。', ex: ['.st 法术位1 +1'] },
+            { cmd: '.st 状态 +名称 / -名称', desc: '添加或移除状态，会自动影响掷骰。', ex: ['.st 状态 +中毒', '.st 状态 -倒地'] },
+            { cmd: '.st 专注 法术名 / 结束', desc: '设置或结束专注。', ex: ['.st 专注 祝福术', '.st 专注 结束'] },
+            { cmd: '.st 狂暴 结束', desc: '结束狂暴。', ex: ['.st 狂暴 结束'] },
+            { cmd: '.st 经验 / 金币 / 银币 / 铜币 / 银金币 / 白金币 变化', desc: '经验和钱。', ex: ['.st 经验 +300', '.st 金币 +25'] },
+            { cmd: '.st 物品 +名称*数量 / -名称*数量', desc: '获得或失去背包里的物品。', ex: ['.st 物品 +治疗药水*2', '.st 物品 -火把'] },
+            { cmd: '.st 力竭 / 生命骰 / 英雄激励 变化', desc: '力竭等级、已用生命骰数、英雄激励（1 有，0 用掉）。', ex: ['.st 力竭 +1', '.st 英雄激励 1'] },
+            { cmd: '.st 属性名 变化', desc: '直接改属性值（如魔法效果）。', ex: ['.st 力量 +2'] },
+          ] },
+        { group: 'DM（AI）专用：战斗与流程', items: [
+            { cmd: '@角色名 .ra 项目 dc难度', desc: '要求某个角色检定。DM 只写出要求，由玩家自己掷。', ex: ['@艾琳 .ra 隐匿 dc13', '@格罗 .ra 体质豁免 dc12'] },
+            { cmd: '.monster 名称 [hp= ac= init= xp=]', desc: '加入敌人。怪物库里的生物自动填 AC、生命、先攻、经验和抗性；库外的写全数据。同类敌人用 A、B 区分。', ex: ['.monster 哥布林A', '.monster 黑衣刺客 hp=27 ac=15 init=3 xp=450'] },
+            { cmd: '.combat start / .combat end', desc: '开始战斗（自动掷先攻、显示战斗面板）；结束战斗（自动平分被击败敌人的经验）。', ex: ['.combat start'] },
+            { cmd: '.dmg 名称 伤害 [伤害类型] [魔法]', desc: '敌人受伤，可写骰子；写上类型会按怪物抗性、免疫、易伤自动调整。', ex: ['.dmg 哥布林A 1d8+3 挥砍', '.dmg 石像鬼 9 钝击 魔法'] },
+            { cmd: '.heal 名称 数值', desc: '敌人回血。', ex: ['.heal 兽人B 6'] },
+            { cmd: '.next', desc: '轮到下一位行动。', ex: ['.next'] },
+            { cmd: '.game_end', desc: '模组剧情结束时放在回复最后一行。', ex: ['.game_end'] },
+        ] },
+    ];
+    // 参考清单：技能、属性、状态、伤害类型、怪物（按当前数据生成）
+    const guideLists = () => [
+        ['技能', Object.values(D.SKILLS).map(s => s.name)],
+        ['属性', Object.values(D.ABILITIES)],
+        ['状态', D.CONDITIONS],
+        ['伤害类型', D.DAMAGE_TYPES],
+        ['怪物库', [...new Set([...Object.values(D.monsterBook('2014')), ...Object.values(D.monsterBook('2024'))].map(m => m.name))]],
+    ];
+    // 纯文本版，复制给 AI 或发到群里
+    const commandGuideText = () => [
+        'Zarkto\'s Table D&D 5e 指令手册（2014 / 2024 版通用）',
+        ...COMMAND_GUIDE.flatMap(g => [`\n【${g.group}】${g.note ? `\n${g.note}` : ''}`, ...g.items.map(i => `${i.cmd}\n  ${i.desc}\n  例：${i.ex.join('；')}`)]),
+        '\n【参考清单】', ...guideLists().map(([name, list]) => `${name}：${list.join('、')}`),
+    ].join('\n');
+
+    Object.assign(D, { COMMAND_GUIDE, guideLists, commandGuideText, rollCheck, rollExpr, castSpell, itemConflict, inventoryText, spellList, applyStat, undoStat, useResource, fontOfMagic, spendHitDice, rest, combat, runCombatCommands, profile });
 })(typeof window !== 'undefined' ? window : globalThis);

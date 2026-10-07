@@ -3991,16 +3991,27 @@
                             <div class="space-y-8">
                                 <div class="space-y-4">
                                     <h4 class="text-slate-200 font-bold flex items-center gap-2"><span class="w-2 h-2 bg-mystic-green rounded-full"></span> 1. 快捷冒险者面板</h4>
-                                    <p class="text-sm text-slate-400 font-serif leading-relaxed">在跑团过程中，点击屏幕右上角的 <span class="text-mystic-green font-bold">「👤小人图标」</span>。您可以查看实时更新的属性表。<strong>重点：不需要打字！</strong> 只需直接点击面板上的数值（如“侦查 70”），系统会自动在下方的对话框中填入标准指令。您只需按下回车即可发起检定。</p>
+                                    <p class="text-sm text-slate-400 font-serif leading-relaxed">在跑团过程中，点击屏幕右上角的 <span class="text-mystic-green font-bold">「👤小人图标」</span>。您可以查看实时更新的属性表。<strong>重点：不需要打字！</strong> 只需直接点击面板上的技能或武器（如“察觉 +3”“长剑”），系统会自动在下方的对话框中填入标准指令，按下回车即可。点击法术会填入施法指令。</p>
                                 </div>
                                 <div class="space-y-4">
-                                    <h4 class="text-slate-200 font-bold flex items-center gap-2"><span class="w-2 h-2 bg-mystic-green rounded-full"></span> 2. 正确的检定语法</h4>
-                                    <p class="text-sm text-slate-400 font-serif leading-relaxed">若手动输入，格式如下。若格式不规范，地下城主（DM）将无法识别您的动作：</p>
-                                    <div class="bg-dark-900 border border-dark-700 p-5 rounded-xl font-mono text-sm shadow-inner group">
-                                        <div class="text-mystic-gold">.ra [检定项] [空格] [动作描述/RP]</div>
-                                        <div class="mt-3 text-slate-500 italic text-xs">示例：<span class="text-slate-200">.ra 侦查 我屏住呼吸，扫视黑暗的走廊尽头</span></div>
+                                    <div class="flex flex-wrap items-center justify-between gap-3">
+                                        <h4 class="text-slate-200 font-bold flex items-center gap-2"><span class="w-2 h-2 bg-mystic-green rounded-full"></span> 2. 指令手册</h4>
+                                        <button @click="copyCommandGuide" class="px-3 py-1.5 rounded-lg border border-mystic-green/40 text-mystic-green text-xs font-bold hover:bg-mystic-green/10">复制全部指令（发给 AI 或群里）</button>
                                     </div>
-                                    <p class="text-xs text-slate-500 font-serif">虽然动作描述可以省略，但我们强烈建议您写上一句，这能让 AI 地下城主给出更具代入感的反馈。</p>
+                                    <p class="text-sm text-slate-400 font-serif leading-relaxed">指令以英文句点 <code class="text-mystic-gold">.</code> 或中文句号 <code class="text-mystic-gold">。</code> 开头。检定时建议在后面写一句行动描述，DM 的反馈会更有代入感。</p>
+                                    <div v-for="g in commandGuide" :key="g.group" class="space-y-2">
+                                        <div class="text-mystic-green text-sm font-bold mt-4">{{ g.group }}</div>
+                                        <p v-if="g.note" class="text-xs text-slate-500">{{ g.note }}</p>
+                                        <div v-for="i in g.items" :key="i.cmd" class="bg-dark-900 border border-dark-700 p-4 rounded-xl text-sm">
+                                            <div class="text-mystic-gold font-mono break-all">{{ i.cmd }}</div>
+                                            <div class="text-slate-400 text-xs mt-1.5 leading-relaxed">{{ i.desc }}</div>
+                                            <div class="flex flex-wrap gap-1.5 mt-2"><code v-for="e in i.ex" :key="e" class="px-1.5 py-0.5 rounded bg-dark-800 text-slate-200 text-xs">{{ e }}</code></div>
+                                        </div>
+                                    </div>
+                                    <details class="text-xs text-slate-400 mt-4">
+                                        <summary class="cursor-pointer text-mystic-green font-bold">参考清单：技能、属性、状态、伤害类型、怪物库</summary>
+                                        <div v-for="[name, list] in commandLists" :key="name" class="mt-2 leading-relaxed"><span class="text-slate-300 font-bold">{{ name }}：</span>{{ list.join('、') }}</div>
+                                    </details>
                                 </div>
                             </div>
                         </div>
@@ -4724,6 +4735,10 @@
                 const activeModelPicker = ref('');
                 const modelSearchQuery = ref('');
                 const manualModelName = ref('');
+                // 说明书里的指令手册
+                const commandGuide = DND.COMMAND_GUIDE;
+                const commandLists = DND.guideLists();
+                const copyCommandGuide = () => copyToClipboard(DND.commandGuideText());
                 const providerDropdownOpen = ref(false);
                 const selectedApiProvider = Vue.computed(() => apiProviderPresets.find(provider => provider.id === settings.apiProvider) || apiProviderPresets[apiProviderPresets.length - 1]);
                 const serviceStatus = reactive({
@@ -8416,7 +8431,7 @@ ${buildInvestigatorProfile(inv)}
                     tavernState, importTavernSave, generateNovel, saveNovel, deleteNovel, viewNovel, exportNovel,
                     downloadReport, canViewReport,
                     isLocalDev, showDevLogin, isDevMode, verifyDevAccess,
-                    modelListStatus, fetchCustomModels, selectCustomModel, activeModelPicker, activeModelPickerLabel, activeModelValue, modelSearchQuery, manualModelName, filteredModelOptions, openModelPicker, closeModelPicker, selectTierModel, useManualTierModel, serviceStatus, checkServiceStatus, handleApiConfigChange,
+                    modelListStatus, fetchCustomModels, selectCustomModel, activeModelPicker, activeModelPickerLabel, activeModelValue, modelSearchQuery, manualModelName, commandGuide, commandLists, copyCommandGuide, filteredModelOptions, openModelPicker, closeModelPicker, selectTierModel, useManualTierModel, serviceStatus, checkServiceStatus, handleApiConfigChange,
                     apiProviderPresets, selectedApiProvider, providerDropdownOpen, applyApiProviderPreset,
                     storageStats, storageUsagePercent, refreshStorageStats, cleanupUnusedStorage, formatBytes, applyDisplaySettings,
                     bgmPlaylist, bgmTrackName, bgmPlaying, applyBgmVolume, handleBgmToggle, handleBgmFileUpload, removeBgmTrack, playBgmTrack, playAdjacentBgm, toggleBgmPlayback, changeBgmPlayMode,
