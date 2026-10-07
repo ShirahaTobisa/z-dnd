@@ -278,6 +278,28 @@
         return bad.length ? `未熟练：${bad.join('、')}` : '';
     };
 
+    // —— 伤害类型与抗性 ——
+    const DAMAGE_TYPES = ['钝击', '穿刺', '挥砍', '强酸', '冷冻', '火焰', '力场', '闪电', '黯蚀', '毒素', '心灵', '光耀', '雷鸣'];
+    // 子职业到某等级获得的抗性：{ 子职业: [职业等级, 类型...] }
+    const SUBCLASS_RESIST = {
+        '旧日支配者': [10, '心灵'], '旧日支配者宗主': [10, '心灵'], '死灵学派': [10, '黯蚀'], '天界宗主': [6, '光耀'],
+        '异界术法': [6, '心灵'], '灵能战士': [10, '心灵'], '战争领域': [17, '钝击', '穿刺', '挥砍'],
+    };
+    // { resist, immune, vuln }：种族、子种族、狂暴、子职业，加上手填的 char.resistances（如「火焰、免疫毒素、易伤光耀」）
+    const damageMods = (char) => {
+        const out = { resist: new Set(), immune: new Set(), vuln: new Set() };
+        const split = (text) => String(text || '').split(/[、，,\s]+/).filter(Boolean);
+        [raceOf(char), subraceOf(char)].forEach(r => split(r?.resist).forEach(t => out.resist.add(t)));
+        if (char.raging) ['钝击', '穿刺', '挥砍'].forEach(t => out.resist.add(t));
+        classEntries(char).forEach(e => { const [lv, ...types] = SUBCLASS_RESIST[e.subclass] || []; if (lv && e.level >= lv) types.forEach(t => out.resist.add(t)); });
+        split(char.resistances).forEach(t => { const m = t.match(/^(免疫|易伤)?(.+)$/); out[{ 免疫: 'immune', 易伤: 'vuln' }[m[1]] || 'resist'].add(m[2]); });
+        return out;
+    };
+    const damageModsText = (char) => {
+        const d = damageMods(char);
+        return [d.resist.size && `抗性 ${[...d.resist].join('、')}`, d.immune.size && `免疫 ${[...d.immune].join('、')}`, d.vuln.size && `易伤 ${[...d.vuln].join('、')}`].filter(Boolean).join('；');
+    };
+
     // —— 兼职 ——
     // 所有职业条目：[{ classId, subclass, level }]，起始职业在最前，等级 = 总等级减去兼职等级
     const classEntries = (char) => {
@@ -463,14 +485,18 @@
 
     // 职业资源：[{ id, name, max, used, left, recharge, shortRegain }]，max 为 99 表示不限次数
     // 兼职时各职业资源分别按职业等级算；同名资源（如牧师和圣武士的引导神力）不叠加次数，取多的那个
+    // 种族和专长的资源按角色总等级算；max 为 'pb' 表示等于熟练加值；roll 为使用时自动掷的骰子
     const classResources = (char) => {
         const out = {};
-        classEntries(char).forEach(e => (edition(char.edition).resources?.[e.classId] || []).filter(d => !d.subclass || d.subclass === e.subclass).forEach(d => {
-            const max = typeof d.max === 'function' ? d.max(e.level, char) : d.max;
-            const recharge = typeof d.recharge === 'function' ? d.recharge(e.level) : d.recharge;
-            const name = typeof d.name === 'function' ? d.name(e.level) : d.name;
-            if (max > (out[d.id]?.max || 0)) out[d.id] = { ...d, name, max, recharge };
-        }));
+        const add = (d, level) => {
+            const max = d.max === 'pb' ? profBonus(char.level) : typeof d.max === 'function' ? d.max(level, char) : d.max;
+            const recharge = typeof d.recharge === 'function' ? d.recharge(level) : d.recharge;
+            const name = typeof d.name === 'function' ? d.name(level) : d.name;
+            if (max > (out[d.id]?.max || 0)) out[d.id] = { ...d, name, max, recharge, roll: d.roll?.(level, char) || '' };
+        };
+        classEntries(char).forEach(e => (edition(char.edition).resources?.[e.classId] || []).filter(d => !d.subclass || d.subclass === e.subclass).forEach(d => add(d, e.level)));
+        [raceOf(char), subraceOf(char)].flatMap(r => r?.resources || []).concat(characterFeats(char).map(id => root.DND.FEATS?.[id]?.resource).filter(Boolean))
+            .forEach(d => add(d, clampLevel(char.level)));
         return Object.values(out).map(r => { const used = Math.min(r.max, parseInt(char.resourcesUsed?.[r.id]) || 0); return { ...r, used, left: r.max - used }; });
     };
 
@@ -615,7 +641,7 @@
         weapons: [], items: [], coins: { cp: 0, sp: 0, ep: 0, pp: 0 }, variantEncumbrance: false, slotsUsed: {}, spells: '', features: '', inventory: '', gold: 0,
         conditions: [], exhaustion: 0, deathSaves: { success: 0, fail: 0 }, dead: false,
         resourcesUsed: {}, raging: false, concentration: '', mageArmor: false, spellIds: [],
-        asi: {}, fightingStyle: '', hpRolls: {}, choices: {}, languages: '', tools: '',
+        asi: {}, fightingStyle: '', hpRolls: {}, choices: {}, languages: '', tools: '', resistances: '', inspiration: 0,
         backstory: { appearance: '', personality: '', ideals: '', bonds: '', flaws: '', story: '' },
         history: [], badges: [],
     });
@@ -650,5 +676,5 @@
         return char;
     };
 
-    root.DND = { ABILITIES, SKILLS, ALL_SKILLS, CLASSES, ARMOR, WEAPONS, CONDITIONS, XP_TABLE, STANDARD_ARRAY, POINT_BUY, editions, edition, classInfo, isLucky, speciesSpells, chose, subclassesOf, casterType, spellAbilityOf, hasStyle, armorTraining, armorIssue, GEAR_WEIGHT, SLOTS, ATTUNE_MAX, itemFromRef, activeItems, itemBonus, syncEquipment, encumbrance, ENCUMBRANCE_TEXT, equipmentIssues, sentientCheckMod, casterSummary, classEntries, classLevel, subclassEntry, isMulticlass, classSummary, hitDicePool, hitDiceText, multiclassIssues, fitMulticlass, MULTICLASS_REQ, slotLevel, slotLabel, weaponData, signed, abilityMod, profBonus, levelFromXp, rollDice, d20Test, saveProficient, saveMod, skillMod, passivePerception, armorClass, maxHp, spellSlots, spellSaveDc, spellAttack, weaponAttack, weaponProficient, initiativeMod, speed, halfProficiency, auraOfProtection, steps, critRange, rageDamage, sneakAttackDice, classFeatures, classResources, asiRecords, asiLevels, characterFeats, hasFeat, hasFightingStyle, cantripsKnown, spellsAllowed, maxSpellLevel, classSpells, alwaysPreparedSpells, spellCastingClass, raceOf, subraceOf, backgroundOf, subclassLevel, pointBuyCost, finalAbilities, grantedSkills, skillChoices, newCharacter, normalizeCharacter };
+    root.DND = { ABILITIES, SKILLS, ALL_SKILLS, CLASSES, ARMOR, WEAPONS, CONDITIONS, XP_TABLE, STANDARD_ARRAY, POINT_BUY, editions, edition, classInfo, isLucky, speciesSpells, chose, DAMAGE_TYPES, damageMods, damageModsText, subclassesOf, casterType, spellAbilityOf, hasStyle, armorTraining, armorIssue, GEAR_WEIGHT, SLOTS, ATTUNE_MAX, itemFromRef, activeItems, itemBonus, syncEquipment, encumbrance, ENCUMBRANCE_TEXT, equipmentIssues, sentientCheckMod, casterSummary, classEntries, classLevel, subclassEntry, isMulticlass, classSummary, hitDicePool, hitDiceText, multiclassIssues, fitMulticlass, MULTICLASS_REQ, slotLevel, slotLabel, weaponData, signed, abilityMod, profBonus, levelFromXp, rollDice, d20Test, saveProficient, saveMod, skillMod, passivePerception, armorClass, maxHp, spellSlots, spellSaveDc, spellAttack, weaponAttack, weaponProficient, initiativeMod, speed, halfProficiency, auraOfProtection, steps, critRange, rageDamage, sneakAttackDice, classFeatures, classResources, asiRecords, asiLevels, characterFeats, hasFeat, hasFightingStyle, cantripsKnown, spellsAllowed, maxSpellLevel, classSpells, alwaysPreparedSpells, spellCastingClass, raceOf, subraceOf, backgroundOf, subclassLevel, pointBuyCost, finalAbilities, grantedSkills, skillChoices, newCharacter, normalizeCharacter };
 })(typeof window !== 'undefined' ? window : globalThis);

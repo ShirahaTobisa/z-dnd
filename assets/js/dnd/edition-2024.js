@@ -41,8 +41,8 @@
         },
         // sizes 有多个时由玩家选择
         races: {
-            aasimar: { name: '阿斯莫', srd: false, sizes: ['中型', '小型'], speed: 30, darkvision: 60, traits: ['天界抗性', '治愈之手', '持光者', '天界启示'] },
-            dragonborn: { name: '龙裔', sizes: ['中型'], speed: 30, darkvision: 60, traits: ['龙族血统', '吐息武器（次数=熟练加值）', '伤害抗性', '龙翼飞行（5 级）'],
+            aasimar: { name: '阿斯莫', srd: false, sizes: ['中型', '小型'], speed: 30, darkvision: 60, resist: '黯蚀、光耀', resources: [{ id: 'healingHands', name: '治愈之手', max: 1, recharge: 'long', roll: (lv, c) => `${root.DND.profBonus(c.level)}d4` }, { id: 'celestialRevelation', name: '天界启示', max: (lv) => (lv >= 3 ? 1 : 0), recharge: 'long' }], traits: ['天界抗性', '治愈之手', '持光者', '天界启示'] },
+            dragonborn: { name: '龙裔', sizes: ['中型'], speed: 30, darkvision: 60, resources: [{ id: 'breath', name: '吐息武器', max: 'pb', recharge: 'long', roll: (lv) => `${root.DND.steps([[1, 1], [5, 2], [11, 3], [17, 4]])(lv)}d10` }, { id: 'draconicFlight', name: '龙翼飞行', max: (lv) => (lv >= 5 ? 1 : 0), recharge: 'long' }], traits: ['龙族血统', '吐息武器（次数=熟练加值）', '伤害抗性', '龙翼飞行（5 级）'],
                 subraces: {
                     black: { name: '黑龙血统', resist: '强酸', traits: ['强酸抗性', '强酸吐息'] },
                     blue: { name: '蓝龙血统', resist: '闪电', traits: ['闪电抗性', '闪电吐息'] },
@@ -55,7 +55,7 @@
                     silver: { name: '银龙血统', resist: '冷冻', traits: ['冷冻抗性', '冷冻吐息'] },
                     white: { name: '白龙血统', resist: '冷冻', traits: ['冷冻抗性', '冷冻吐息'] },
                 } },
-            dwarf: { name: '矮人', sizes: ['中型'], speed: 30, darkvision: 120, traits: ['矮人韧性', '矮人坚韧', '石工知识'], hpPerLevel: 1 },
+            dwarf: { name: '矮人', sizes: ['中型'], speed: 30, darkvision: 120, resist: '毒素', resources: [{ id: 'stonecunning', name: '石工知识（震颤感知）', max: 'pb', recharge: 'long' }], traits: ['矮人韧性', '矮人坚韧', '石工知识'], hpPerLevel: 1 },
             elf: { name: '精灵', sizes: ['中型'], speed: 30, darkvision: 60, skillChoice: 1, skillOptions: ['insight', 'perception', 'survival'], traits: ['精灵血系', '精类血统', '敏锐感官', '出神'],
                 subraces: {
                     drow: { name: '卓尔血系', darkvision: 120, traits: ['黑暗视觉 120 尺'], spells: { 1: ['dancingLights'], 3: ['faerieFire'], 5: ['darkness'] } },
@@ -67,7 +67,7 @@
                     forest: { name: '林侏儒血系', traits: ['与小动物交谈（次数=熟练加值）'], spells: { 1: ['minorIllusion', 'speakWithAnimals'] } },
                     rock: { name: '岩侏儒血系', traits: ['发条装置'], spells: { 1: ['mending', 'prestidigitation'] } },
                 } },
-            goliath: { name: '歌利亚', sizes: ['中型'], speed: 35, traits: ['巨人血统', '巨化（5 级）', '强健体格'],
+            goliath: { name: '歌利亚', sizes: ['中型'], speed: 35, resources: [{ id: 'giantAncestry', name: '巨人血统', max: 'pb', recharge: 'long' }, { id: 'largeForm', name: '巨化', max: (lv) => (lv >= 5 ? 1 : 0), recharge: 'long' }], traits: ['巨人血统', '巨化（5 级）', '强健体格'],
                 subraces: {
                     cloud: { name: '云巨人血统', traits: ['云之瞬移：附赠动作传送 30 尺（次数=熟练加值）'] },
                     fire: { name: '火巨人血统', traits: ['火之灼烧：命中时额外 1d10 火焰（次数=熟练加值）'] },
@@ -78,7 +78,7 @@
                 } },
             halfling: { name: '半身人', sizes: ['小型'], speed: 30, traits: ['勇敢', '半身人灵巧', '幸运', '天生隐匿'] },
             human: { name: '人类', sizes: ['中型', '小型'], speed: 30, skillChoice: 1, traits: ['足智多谋', '多才多艺（额外起源专长）'] },
-            orc: { name: '兽人', sizes: ['中型'], speed: 30, darkvision: 120, traits: ['肾上腺素爆发', '坚韧不屈'] },
+            orc: { name: '兽人', sizes: ['中型'], speed: 30, darkvision: 120, resources: [{ id: 'adrenaline', name: '肾上腺素激增', max: 'pb', recharge: 'short' }, { id: 'relentless', name: '坚韧不屈', max: 1, recharge: 'long' }], traits: ['肾上腺素爆发', '坚韧不屈'] },
             tiefling: { name: '提夫林', sizes: ['中型', '小型'], speed: 30, darkvision: 60, traits: ['邪魔传承', '异界存在（奇术）'], spells: { 1: ['thaumaturgy'] },
                 subraces: {
                     abyssal: { name: '深渊传承', resist: '毒素', traits: ['毒素抗性'], spells: { 1: ['poisonSpray'], 3: ['rayOfSickness'], 5: ['holdPerson'] } },

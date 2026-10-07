@@ -33,7 +33,7 @@
         },
         // bonuses：固定加值；bonusChoice：自选加值；skills：赠送技能熟练；skillChoice：自选技能数量
         races: {
-            dwarf: { name: '矮人', size: '中型', speed: 25, darkvision: 60, bonuses: { CON: 2 }, traits: ['矮人韧性', '战斗训练', '石工知识'], weapons: ['战斧', '手斧', '轻锤', '战锤'],
+            dwarf: { name: '矮人', size: '中型', speed: 25, darkvision: 60, bonuses: { CON: 2 }, resist: '毒素', traits: ['矮人韧性', '战斗训练', '石工知识'], weapons: ['战斧', '手斧', '轻锤', '战锤'],
                 subraces: {
                     hill: { name: '丘陵矮人', bonuses: { WIS: 1 }, traits: ['矮人坚韧'], hpPerLevel: 1 },
                     mountain: { name: '山地矮人', srd: false, bonuses: { STR: 2 }, traits: ['矮人护甲训练（轻甲、中甲）'] },
@@ -47,10 +47,10 @@
             halfling: { name: '半身人', size: '小型', speed: 25, bonuses: { DEX: 2 }, traits: ['幸运', '勇敢', '半身人灵巧'],
                 subraces: {
                     lightfoot: { name: '轻足半身人', bonuses: { CHA: 1 }, traits: ['天生隐匿'] },
-                    stout: { name: '强魄半身人', srd: false, bonuses: { CON: 1 }, traits: ['强魄韧性（毒素豁免优势与抗性）'] },
+                    stout: { name: '强魄半身人', srd: false, bonuses: { CON: 1 }, resist: '毒素', traits: ['强魄韧性（毒素豁免优势与抗性）'] },
                 } },
             human: { name: '人类', size: '中型', speed: 30, bonuses: { STR: 1, DEX: 1, CON: 1, INT: 1, WIS: 1, CHA: 1 }, traits: ['额外语言'] },
-            dragonborn: { name: '龙裔', size: '中型', speed: 30, bonuses: { STR: 2, CHA: 1 }, traits: ['龙族血统', '吐息武器', '伤害抗性'],
+            dragonborn: { name: '龙裔', size: '中型', speed: 30, bonuses: { STR: 2, CHA: 1 }, resources: [{ id: 'breath', name: '吐息武器', max: 1, recharge: 'short', roll: (lv) => `${root.DND.steps([[1, 2], [6, 3], [11, 4], [16, 5]])(lv)}d6` }], traits: ['龙族血统', '吐息武器', '伤害抗性'],
                 subraces: {
                     black: { name: '黑龙血统', resist: '强酸', traits: ['强酸抗性', '强酸吐息（5×30 尺线，敏捷豁免）'] },
                     blue: { name: '蓝龙血统', resist: '闪电', traits: ['闪电抗性', '闪电吐息（5×30 尺线，敏捷豁免）'] },
@@ -69,7 +69,7 @@
                     forest: { name: '林侏儒', srd: false, bonuses: { DEX: 1 }, spells: { 1: ['minorIllusion'] }, traits: ['天生幻术师', '与小动物交谈'] },
                 } },
             halfElf: { name: '半精灵', size: '中型', speed: 30, darkvision: 60, bonuses: { CHA: 2 }, bonusChoice: { count: 2, amount: 1, exclude: ['CHA'] }, skillChoice: 2, traits: ['精类血统', '多才多艺'] },
-            halfOrc: { name: '半兽人', size: '中型', speed: 30, darkvision: 60, bonuses: { STR: 2, CON: 1 }, skills: ['intimidation'], traits: ['坚韧不屈', '凶蛮攻击'] },
+            halfOrc: { name: '半兽人', size: '中型', speed: 30, darkvision: 60, bonuses: { STR: 2, CON: 1 }, skills: ['intimidation'], resources: [{ id: 'relentless', name: '坚韧不屈', max: 1, recharge: 'long' }], traits: ['坚韧不屈', '凶蛮攻击'] },
             tiefling: { name: '提夫林', size: '中型', speed: 30, darkvision: 60, bonuses: { CHA: 2, INT: 1 }, resist: '火焰', traits: ['地狱抗性', '炼狱传承'], spells: { 1: ['thaumaturgy'], 3: ['hellishRebuke'], 5: ['darkness'] } },
         },
         // custom：自定义背景，玩家自选技能

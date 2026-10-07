@@ -2450,6 +2450,8 @@
                                             <span v-for="g in heroStats.gear" :key="g.name" class="px-1.5 py-0.5 rounded border" :class="g.magic ? 'border-violet-800/60 bg-violet-900/20 text-violet-200' : 'border-dark-700 bg-dark-800 text-slate-400'">{{ g.name }}<span v-if="g.attuned"> ✦</span><span v-if="g.sentient" class="text-fuchsia-300"> 智</span></span>
                                         </div>
                                         <div v-if="heroStats.coins" class="text-[10px] text-mystic-gold mt-1 font-mono">{{ heroStats.coins }}</div>
+                                        <div v-if="heroStats.defense" class="text-[10px] text-sky-300 mt-1">{{ heroStats.defense }}</div>
+                                        <div v-if="heroStats.inspiration" class="text-[10px] text-amber-300 mt-1">★ 英雄激励</div>
                                     </div>
 
                                     <!-- 法术：点击施放 -->
@@ -4625,7 +4627,7 @@
                     { id: 'dice_narrative', category: '机制处理', label: '结果叙事化', content: '检定结果叙事化：不要只报数字和“成功/失败”，要把结果转化为生动的描写；需要时可以简短提及命中与伤害数值。', enabled: true },
                     { id: 'honesty', category: '机制处理', label: '如实叙事', content: '如实叙事：你的旁白不能欺骗玩家——角色看到、听到、察觉到的就是真实情况；不该让玩家知道的可以不说，但不能说假话。NPC 可以撒谎、隐瞒、伪装，玩家可以用洞悉对抗其欺瞒来识破。你既不是玩家的对手，也不替玩家兜底：不偏袒、不刁难，危险和后果照实结算。', enabled: true },
                     { id: 'checks', category: '机制处理', label: '主动引导检定', content: '主动要求检定 (核心)：只在三种情况下要求掷骰——失败有真实代价（受伤、暴露、错过、损失）、有人或环境在对抗（追兵、守卫、风暴）、需要超常发挥（赶时间、极限动作）。三者都不沾就直接成功并描述过程，例如正常赶路、翻自己的背包、时间充裕可以慢慢做的事（只是多花时间）、远低于角色能力的事、同样情况下已经成功过的事。要求检定前先想清楚失败会怎样；玩家只报了检定没说要做什么时，按当前场景理解他的目的。一段连续行动只检定最关键的一次。格式：`@角色名 .ra 技能或属性 dc难度`，例如 `@艾琳 .ra 隐匿 dc13`；豁免写 `.ra 敏捷豁免 dc15`；攻击写 `.ra 武器名`（把投掷武器扔出去时写 `.ra 标枪 投掷`）；有优势或劣势时在后面加“优势”或“劣势”。难度参考：非常简单 5、简单 10、中等 15、困难 20、非常困难 25、几乎不可能 30。对抗检定让双方各掷一次比总值，平手则维持原状。失败后用同样的方法不能立刻无代价重试，必须换方法、多花时间或承担新的风险。', enabled: true },
-                    { id: 'stat_updates', category: '机制处理', label: '自动状态变更', content: '更新角色状态 (核心)：角色受伤、治疗、消耗资源、获得状态或经验时，必须输出指令。格式：`@角色名 .st 项目 变化值`。项目可用：hp（受伤写负数，如 -7 或 -2d6）、临时、法术位1~法术位9（消耗写 +1）、状态（如 +中毒 / -中毒）、专注（如 `.st 专注 祝福术`，结束写 `.st 专注 结束`）、经验、金币、力竭。玩家施法用 `.cast 法术名 [N环] [@目标]`（系统自动扣法术位、处理专注、掷法术攻击或给出豁免 DC 与伤害、结算治疗），你按卡片结果叙事，不要再额外用 .st 扣法术位；消耗职业资源用 `@角色名 .use 资源名 [数量]`（如 `.use 狂暴`、`.use 圣疗池 5`）。休息用 `@角色名 .rest 长休` 或 `.rest 短休`，短休时玩家可用 `.hd 数量` 花生命骰回血。扣血前先按角色的抗性、易伤、免疫调整伤害（如狂暴中的野蛮人受到的钝击、穿刺、挥砍伤害减半）。系统会自动处理：生命降到 0 进入濒死并要求死亡豁免、濒死时受伤记失败、受伤时提示专注豁免 DC、状态带来的优势劣势与自动失败，你只需按结果叙事。', enabled: true },
+                    { id: 'stat_updates', category: '机制处理', label: '自动状态变更', content: '更新角色状态 (核心)：角色受伤、治疗、消耗资源、获得状态或经验时，必须输出指令。格式：`@角色名 .st 项目 变化值`。项目可用：hp（受伤写负数，如 -7 或 -2d6）、临时、法术位1~法术位9（消耗写 +1）、状态（如 +中毒 / -中毒）、专注（如 `.st 专注 祝福术`，结束写 `.st 专注 结束`）、经验、金币、力竭。玩家施法用 `.cast 法术名 [N环] [@目标]`（系统自动扣法术位、处理专注、掷法术攻击或给出豁免 DC 与伤害、结算治疗），你按卡片结果叙事，不要再额外用 .st 扣法术位；消耗职业资源用 `@角色名 .use 资源名 [数量]`（如 `.use 狂暴`、`.use 圣疗池 5`）。休息用 `@角色名 .rest 长休` 或 `.rest 短休`，短休时玩家可用 `.hd 数量` 花生命骰回血。受到伤害时把伤害类型写在数值后面，如 `.st hp -7 火焰`、`.st hp -2d6 毒素`，系统会按角色的抗性、免疫、易伤（种族、狂暴、子职业等）自动调整，不要自己先减半。术士用 `.font N环` 花术法点做出法术位，`.font N环 换点` 把法术位换成术法点。英雄激励用 `.st 英雄激励 1` 给予、`.st 英雄激励 0` 用掉。系统会自动处理：生命降到 0 进入濒死并要求死亡豁免、濒死时受伤记失败、受伤时提示专注豁免 DC、状态带来的优势劣势与自动失败，你只需按结果叙事。', enabled: true },
                     { id: 'combat', category: '机制处理', label: '战斗指令', content: '战斗流程 (核心)：遭遇战斗时，先为每个敌人输出 `.monster 名称`（同类敌人用 A、B 区分名称，如 `.monster 哥布林A`）。怪物库中的生物会自动填入 AC、生命、先攻和经验：' + Object.values(DND.MONSTERS).map(m => m.name).join('、') + '；库外的生物写全数据 `.monster 名称 hp=生命 ac=护甲 init=先攻加值 xp=经验`。再输出 `.combat start`，系统会自动掷先攻并显示战斗面板。敌人受伤用 `.dmg 名称 伤害`（可写骰子，如 `.dmg 哥布林A 1d8+3`），治疗用 `.heal 名称 数值`；一个角色或敌人行动完毕后输出 `.next` 轮到下一位；战斗结束输出 `.combat end`，系统会把被击倒敌人的经验平均分给参战角色，不要再手动加经验。敌人的攻击由你按怪物数据掷骰并描述，对冒险者造成的伤害用 `.st hp` 扣除。', enabled: true },
                     { id: 'core_rules', category: '机制处理', label: '核心战斗规则', content: '严格按 D&D 5e 核心规则裁定：每回合一个动作、一个附赠动作（仅当能力允许时）、一次移动和每轮一次反应；离开敌人触及范围引发借机攻击（撤离动作可避免）；优势与劣势不叠加，同时具备则抵消；半掩护 AC 与敏捷豁免 +2，四分之三掩护 +5；未被发现的攻击者具有优势；远程攻击在长射程或敌人贴身时具有劣势；攻击掷出 20 必中并暴击（伤害骰翻倍），掷出 1 必失；专注期间再施展专注法术会结束前一个。按角色卡中的职业能力、资源次数和法术位裁定，不要让角色使用其尚未获得的能力。', enabled: true },
                     { id: 'items', category: '机制处理', label: '物品与魔法物品', content: '物品与财宝：角色卡里有装备、背包、钱和负重。给予或消耗物品用 `@角色名 .st 物品 +名称*数量`（失去写 -），钱用 `.st 金币 +数值`（也可用 银币、铜币、银金币、白金币）。魔法物品按 SRD 规则处理：需要同调的物品要花一次短休专注才能同调，每人最多同时同调 3 件；装备栏位有限（例如只能戴一顶头盔、两枚戒指）。负重超过上限只能拖拽前进。智能物品有自己的意志和目标，由你扮演；当持有者的行为违背物品的阵营或目标时，让玩家用 `.conflict 物品名` 掷魅力对抗，物品胜出就会提出要求。', enabled: true },
@@ -4636,7 +4638,7 @@
                     { id: 'game_end', category: '流程管理', label: '结团判定指令', content: '当模组剧情彻底结束时，请在回复的最后一行必须输出指令：`.game_end`。', enabled: true },
                     { id: 'report', category: '流程管理', label: '冒险结算生成', content: '当房主发送“确认结团...”指令时，请为每一位参与的冒险者分别生成一份冒险结算。输出格式为 JSON 数组：[{"type": "adventure_report", "moduleName": "...", "investigatorName": "角色名", "xp": 0, "gold": 0, "newItems": ["..."], "badge": {"name": "...", "desc": "...", "icon": "🏆"}, "summary": "..."}]。经验值参考遭遇难度与剧情贡献。', enabled: true }
                 ];
-                const KP_RULES_VERSION = 'dnd-5';
+                const KP_RULES_VERSION = 'dnd-6';
 
                 const IMAGE_GEN_ARTIST_PRESETS = {
                     '2.5d': {
@@ -5393,6 +5395,8 @@
                         gear: (c.items || []).filter(i => i.equipped || i.attuned).map(i => ({ name: i.name, magic: !!i.rarity, attuned: i.attuned, sentient: !!i.sentient })),
                         coins: [['pp', '白金'], ['gp', '金'], ['ep', '银金'], ['sp', '银'], ['cp', '铜']].map(([k, n]) => [n, k === 'gp' ? c.gold : c.coins?.[k]]).filter(([, v]) => parseInt(v)).map(([n, v]) => `${n} ${v}`).join(' · '),
                         load: (() => { const l = DND.encumbrance(c); return { ...l, text: DND.ENCUMBRANCE_TEXT[l.status] || '' }; })(),
+                        defense: DND.damageModsText(c),
+                        inspiration: parseInt(c.inspiration) > 0,
                     };
                 });
                 const cocState = reactive({ combat: DND.combat.create(), mode: null, isCoj: false, module: null, tempModuleText: '', investigators: [], activeInvestigatorIndex: -1, gameState: 'idle', log: [], systemPrompt: '', pendingRolls: [], isGameEnded: false });
@@ -6238,18 +6242,18 @@ const handleAuth = async () => {
                     return cocState.investigators.findIndex(i => i.name === name || i.name.includes(name));
                 };
 
-                // 执行 .st / .rest / .use / .hd 指令（规则见 assets/js/dnd/commands.js），返回日志和撤销数据
+                // 执行 .st / .rest / .use / .hd / .font 指令（规则见 assets/js/dnd/commands.js），返回日志和撤销数据；扣血可带伤害类型（.st hp -7 火焰）
                 const applyStCommands = (content, defaultInvIndex = -1) => {
                     const logs = []; const rollbacks = [];
                     if (!content) return { logs, rollbacks };
-                    const regex = /(?:@([^\s.。]+)\s+)?[.。](st|rest|use|hd)\s+(\S+)(?:\s+([+-]?[^\s，。,]+))?/gi;
+                    const regex = new RegExp(`(?:@([^\\s.。]+)\\s+)?[.。](st|rest|use|hd|font)[ \\t]+(\\S+)(?:[ \\t]+([+-]?[^\\s，。,]+(?:[ \\t]*(?:${DND.DAMAGE_TYPES.join('|')}))?))?`, 'gi');
                     for (const m of removeCot(content).matchAll(regex)) {
                         const found = findInvestigatorIndexByName(m[1]);
                         const invIndex = found !== -1 ? found : defaultInvIndex;
                         const inv = cocState.investigators[invIndex];
                         if (!inv) continue;
                         const cmd = m[2].toLowerCase();
-                        const result = cmd === 'rest' ? DND.rest(inv, m[3]) : cmd === 'use' ? DND.useResource(inv, m[3], m[4]) : cmd === 'hd' ? DND.spendHitDice(inv, m[3]) : DND.applyStat(inv, m[3], m[4]);
+                        const result = cmd === 'rest' ? DND.rest(inv, m[3]) : cmd === 'use' ? DND.useResource(inv, m[3], m[4]) : cmd === 'hd' ? DND.spendHitDice(inv, m[3]) : cmd === 'font' ? DND.fontOfMagic(inv, m[3], m[4]) : DND.applyStat(inv, m[3], m[4]);
                         if (result.ok) { logs.push(`🔧 ${result.log}`); if (result.rollback) rollbacks.push({ invIndex, data: result.rollback }); }
                     }
                     if (logs.length) {

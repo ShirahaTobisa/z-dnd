@@ -1251,6 +1251,10 @@
                         <label class="text-xs text-slate-400">语言
                             <div class="flex gap-1 mt-0.5"><input v-model="hero.languages" class="input input-bordered input-xs ws-field flex-1 min-w-0" :placeholder="suggestedLanguages" /><button class="btn btn-xs btn-ghost text-mystic-gold" title="按种族、背景、职业填入建议" @click="hero.languages = suggestedLanguages">填入</button></div>
                         </label>
+                        <label class="text-xs text-slate-400 sm:col-span-2">伤害抗性（手填，如「火焰、免疫毒素、易伤光耀」；种族、子职业的会自动算）
+                            <input v-model="hero.resistances" class="input input-bordered input-xs ws-field w-full mt-0.5" :placeholder="defenseText || '无'" />
+                            <span v-if="defenseText" class="text-[10px] text-sky-300">当前：{{ defenseText }}</span>
+                        </label>
                         <label class="text-xs text-slate-400">工具熟练
                             <div class="flex gap-1 mt-0.5"><input v-model="hero.tools" class="input input-bordered input-xs ws-field flex-1 min-w-0" :placeholder="suggestedTools || '无'" /><button class="btn btn-xs btn-ghost text-mystic-gold" title="按背景、职业填入建议" @click="hero.tools = suggestedTools">填入</button></div>
                         </label>
@@ -2889,6 +2893,7 @@
             const suggestedTools = computed(() => DND.suggestedTools(hero));
             const expertiseAllowed = computed(() => DND.expertiseAllowed(hero));
             const armorIssue = computed(() => DND.armorIssue(hero));
+            const defenseText = computed(() => DND.damageModsText(hero));
 
             // 起始装备：武器、护甲、盾牌、物品清单与金币（职业 + 背景）
             const startingGear = computed(() => ed.value.startingGear?.[hero.classId]);
@@ -3486,7 +3491,7 @@ return {
     imageGenArtistPresetOptions, isImageGenArtistCustom, applyImageGenArtistPreset, onAvatarLoad, onAvatarError, settings, showToast,
     radarLabels, radarGrid, radarStatsPoints, showWeaponModal,
     abilityNames, editionList, alignments, weaponProps, backstoryFields, ed, cls, race, subrace, bg, granted, derived, skillChoices, weaponRows, weaponList, featureList, resourceList,
-    choiceList, picks, setChoice, toggleChoice, suggestedLanguages, suggestedTools, expertiseAllowed, armorIssue,
+    choiceList, picks, setChoice, toggleChoice, suggestedLanguages, suggestedTools, expertiseAllowed, armorIssue, defenseText,
     coinTypes, slotNames, rarityNames, rarityColor, encumbranceText, attuneMax, load, attunedCount, equipIssues, openItem, gearName, effectText, setArmor, setShield, addWeapon, unequipWeapon,
     toggleAttune, addCustomItem, sentientOptions, toggleSentient, rollSentient, sentientMod, lib, openItemLibrary, libResults, addLibraryItem,
     primaryLevel, classSummary, multiclassIssues, hitDiceText, hasCaster, casterSummary, slotLabel, subclassUnlock, subclassOptions, multiclassGainText, addMulticlass, hpRollRows, clearHpRolls,

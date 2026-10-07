@@ -160,8 +160,9 @@
         xp: 'xp', 经验: 'xp', gold: 'gold', 金币: 'gold',
         力竭: 'exhaustion', exhaustion: 'exhaustion', 生命骰: 'hitDiceUsed',
         状态: 'conditions', condition: 'conditions',
+        激励: 'inspiration', 英雄激励: 'inspiration', inspiration: 'inspiration',
     };
-    const STAT_NAMES = { hp: '生命值', tempHp: '临时生命', xp: '经验', gold: '金币', exhaustion: '力竭', hitDiceUsed: '已用生命骰', conditions: '状态' };
+    const STAT_NAMES = { hp: '生命值', tempHp: '临时生命', xp: '经验', gold: '金币', exhaustion: '力竭', hitDiceUsed: '已用生命骰', conditions: '状态', inspiration: '英雄激励' };
     const HP_KEYS = ['hp', 'tempHp', 'deathSaves', 'conditions', 'dead', 'raging', 'concentration'];
 
     // 带符号表示增减，不带符号表示直接设为该值；支持骰子表达式
@@ -173,11 +174,19 @@
     };
 
     // 生命变化：临时生命先抵伤害；降到 0 进入濒死，伤害溢出达到上限直接死亡；濒死时受伤记失败；受伤提示专注豁免
+    // 「-12 火焰」带伤害类型时按抗性减半、免疫为 0、易伤加倍
     const changeHp = (char, expr) => {
-        const current = parseInt(char.hp) || 0; let next = evalChange(current, expr);
+        const typed = String(expr).match(new RegExp(`^(-.+?)\\s*(${D.DAMAGE_TYPES.join('|')})$`));
+        const current = parseInt(char.hp) || 0; let next = evalChange(current, typed ? typed[1] : expr);
         if (next == null) return { ok: false };
         const rollback = snapshot(char, HP_KEYS);
         const max = char.maxHp || Infinity; const notes = [];
+        if (typed && next < current) {
+            const mods = D.damageMods(char); const type = typed[2]; const raw = current - next;
+            const dealt = mods.immune.has(type) ? 0 : Math.floor(raw / (mods.resist.has(type) ? 2 : 1)) * (mods.vuln.has(type) ? 2 : 1);
+            if (dealt !== raw) notes.push(`${type}${mods.immune.has(type) ? '免疫' : [mods.resist.has(type) && '抗性', mods.vuln.has(type) && '易伤'].filter(Boolean).join('、')}：${raw} ➔ ${dealt}`);
+            next = current - dealt;
+        }
         if (char.dead && next > current) return { ok: true, log: `${char.name} 已经死亡，普通治疗无效，需要复活类法术`, rollback };
         if (next < current && char.tempHp > 0) {
             const absorbed = Math.min(char.tempHp, current - next);
@@ -280,7 +289,7 @@
         const next = evalChange(current, e);
         if (next == null) return { ok: false };
         const old = { [key]: char[key] };
-        const max = key === 'exhaustion' ? 6 : key === 'hitDiceUsed' ? (parseInt(char.level) || 1) : Infinity;
+        const max = key === 'exhaustion' ? 6 : key === 'hitDiceUsed' ? (parseInt(char.level) || 1) : key === 'inspiration' ? 1 : Infinity;
         char[key] = Math.max(0, Math.min(max, next));
         let note = '';
         if (key === 'exhaustion' && char[key] >= 6) { old.dead = char.dead; char.dead = true; note = '（力竭 6 级，死亡）'; }
@@ -303,6 +312,16 @@
             char.raging = true;
             log += `，进入狂暴：力量伤害 +${D.rageDamage(char)}，力量检定和豁免优势，抵抗钝击、穿刺、挥砍伤害`;
         }
+        if (r.roll) log += `，掷出 ${D.rollDice(r.roll).total}（${r.roll}）`;
+        if (r.id === 'layOnHands') log += `，可治疗 ${n} 点生命（给谁治疗就对谁用 .st hp +${n}）`;
+        // 奥术回想：恢复总环阶不超过法师等级一半（向上取整）的已用法术位，6 环以上不行，优先恢复高环
+        if (r.id === 'arcaneRecovery') {
+            let budget = Math.ceil(D.classLevel(char, 'wizard') / 2); const back = [];
+            const used = { ...(char.slotsUsed || {}) };
+            for (let lv = 5; lv >= 1; lv--) while (budget >= lv && (parseInt(used[lv]) || 0) > 0) { used[lv] -= 1; budget -= lv; back.push(`${lv}环`); }
+            char.slotsUsed = used;
+            log += back.length ? `，恢复法术位：${back.join('、')}` : '，没有可恢复的法术位';
+        }
         if (r.id === 'secondWind') {
             const heal = D.rollDice(`1d10+${D.classLevel(char, 'fighter')}`).total;
             const before = parseInt(char.hp) || 0; char.hp = Math.min(char.maxHp || Infinity, before + heal);
@@ -310,6 +329,28 @@
             log += `，回复 ${heal} 点生命（${before} ➔ ${char.hp}）`;
         }
         return { ok: true, log, rollback };
+    };
+
+    // .font 2环：花术法点做出一个法术位；.font 2环 换点：消耗一个法术位换成术法点（法术位环阶 = 点数）
+    const FONT_COST = { 1: 2, 2: 3, 3: 5, 4: 6, 5: 7 };
+    const fontOfMagic = (char, slotText, mode) => {
+        const lv = parseInt(slotText); const sp = D.classResources(char).find(r => r.id === 'sorceryPoints');
+        if (!sp?.max || !lv) return { ok: false };
+        const slots = D.spellSlots(char); const used = parseInt(char.slotsUsed?.[lv]) || 0;
+        const rollback = snapshot(char, ['slotsUsed', 'resourcesUsed']);
+        if (/换点|点数|points?/i.test(mode || '')) {
+            if (!slots[lv] || used >= slots[lv]) return { ok: true, log: `${char.name} 没有可用的 ${lv} 环法术位`, rollback: null };
+            char.slotsUsed = { ...(char.slotsUsed || {}), [lv]: used + 1 };
+            char.resourcesUsed = { ...(char.resourcesUsed || {}), sorceryPoints: Math.max(0, sp.used - lv) };
+            return { ok: true, log: `${char.name} 把一个 ${lv} 环法术位转成 ${lv} 术法点（术法点 ${Math.min(sp.max, sp.left + lv)}/${sp.max}）`, rollback };
+        }
+        const cost = FONT_COST[lv];
+        if (!cost) return { ok: true, log: '魔力泉源最多只能做出 5 环法术位', rollback: null };
+        if (sp.left < cost) return { ok: true, log: `${char.name} 的术法点不足（需要 ${cost}，剩余 ${sp.left}）`, rollback: null };
+        if (!used) return { ok: true, log: `${char.name} 的 ${lv} 环法术位没有消耗，不用转化`, rollback: null };
+        char.slotsUsed = { ...char.slotsUsed, [lv]: used - 1 };
+        char.resourcesUsed = { ...(char.resourcesUsed || {}), sorceryPoints: sp.used + cost };
+        return { ok: true, log: `${char.name} 花 ${cost} 术法点做出一个 ${lv} 环法术位（术法点剩余 ${sp.left - cost}/${sp.max}）`, rollback };
     };
 
     // .hd 数量：短休时花费生命骰回复生命（每枚 = 生命骰 + 体质调整值，最少 0）；兼职有多种生命骰时先用大的
@@ -335,7 +376,7 @@
     // 长休：回满生命与法术位，恢复全部职业资源与生命骰（2014 版恢复一半），力竭 -1
     // 短休：恢复短休资源、契约法术位，长休资源中注明 shortRegain 的恢复对应次数
     const rest = (char, type) => {
-        const rollback = snapshot(char, ['slotsUsed', 'hitDiceUsed', 'exhaustion', 'resourcesUsed', 'mageArmor', ...HP_KEYS]);
+        const rollback = snapshot(char, ['slotsUsed', 'hitDiceUsed', 'exhaustion', 'resourcesUsed', 'mageArmor', 'inspiration', ...HP_KEYS]);
         const resources = D.classResources(char);
         char.raging = false;
         if (/长|long/i.test(type)) {
@@ -345,7 +386,10 @@
             const level = parseInt(char.level) || 1;
             char.hitDiceUsed = D.edition(char.edition).longRestHitDice === 'all' ? 0 : Math.max(0, (parseInt(char.hitDiceUsed) || 0) - Math.max(1, Math.floor(level / 2)));
             char.exhaustion = Math.max(0, (parseInt(char.exhaustion) || 0) - 1);
-            return { ok: true, log: `${char.name} 完成长休：生命值、法术位、职业资源全部恢复，剩余生命骰 ${level - char.hitDiceUsed}/${level}`, rollback };
+            // 2024 版人类「多才多艺」：每次长休获得英雄激励
+            const resourceful = char.edition === '2024' && char.race === 'human' && !char.inspiration;
+            if (resourceful) char.inspiration = 1;
+            return { ok: true, log: `${char.name} 完成长休：生命值、法术位、职业资源全部恢复，剩余生命骰 ${level - char.hitDiceUsed}/${level}${resourceful ? '，获得英雄激励' : ''}`, rollback };
         }
         const restored = [];
         const used = { ...(char.resourcesUsed || {}) };
@@ -636,10 +680,12 @@
             inventoryText(char),
             choiceText(char),
             (char.languages || char.tools) && `语言：${char.languages || '未填'} | 工具：${char.tools || '未填'}`,
+            D.damageModsText(char) && `伤害${D.damageModsText(char)}（扣血时写类型，如 .st hp -7 火焰，系统自动计算）`,
+            parseInt(char.inspiration) > 0 && `有英雄激励（${char.edition === '2024' ? '可花掉来重掷一次 d20' : '可花掉让一次检定、攻击或豁免获得优势'}，用掉后 .st 英雄激励 0）`,
             D.armorIssue(char) && `护甲（${D.armorIssue(char)}）：力量、敏捷的检定、豁免和攻击具有劣势，不能施法`,
             story && `背景故事：${story}`,
         ].filter(Boolean).join('\n');
     };
 
-    Object.assign(D, { rollCheck, rollExpr, castSpell, itemConflict, inventoryText, spellList, applyStat, undoStat, useResource, spendHitDice, rest, combat, runCombatCommands, profile });
+    Object.assign(D, { rollCheck, rollExpr, castSpell, itemConflict, inventoryText, spellList, applyStat, undoStat, useResource, fontOfMagic, spendHitDice, rest, combat, runCombatCommands, profile });
 })(typeof window !== 'undefined' ? window : globalThis);
