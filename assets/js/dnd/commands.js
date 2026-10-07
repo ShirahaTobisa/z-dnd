@@ -176,15 +176,14 @@
     // 生命变化：临时生命先抵伤害；降到 0 进入濒死，伤害溢出达到上限直接死亡；濒死时受伤记失败；受伤提示专注豁免
     // 「-12 火焰」带伤害类型时按抗性减半、免疫为 0、易伤加倍
     const changeHp = (char, expr) => {
-        const typed = String(expr).match(new RegExp(`^(-.+?)\\s*(${D.DAMAGE_TYPES.join('|')})$`));
+        const typed = String(expr).match(new RegExp(`^(-.+?)\\s*(${D.DAMAGE_TYPES.join('|')})\\s*(魔法)?$`));
         const current = parseInt(char.hp) || 0; let next = evalChange(current, typed ? typed[1] : expr);
         if (next == null) return { ok: false };
         const rollback = snapshot(char, HP_KEYS);
         const max = char.maxHp || Infinity; const notes = [];
         if (typed && next < current) {
-            const mods = D.damageMods(char); const type = typed[2]; const raw = current - next;
-            const dealt = mods.immune.has(type) ? 0 : Math.floor(raw / (mods.resist.has(type) ? 2 : 1)) * (mods.vuln.has(type) ? 2 : 1);
-            if (dealt !== raw) notes.push(`${type}${mods.immune.has(type) ? '免疫' : [mods.resist.has(type) && '抗性', mods.vuln.has(type) && '易伤'].filter(Boolean).join('、')}：${raw} ➔ ${dealt}`);
+            const { dealt, note } = D.adjustDamage(current - next, typed[2], D.damageMods(char), !!typed[3]);
+            if (note) notes.push(note);
             next = current - dealt;
         }
         if (char.dead && next > current) return { ok: true, log: `${char.name} 已经死亡，普通治疗无效，需要复活类法术`, rollback };
@@ -310,7 +309,7 @@
         let log = `${char.name} 使用${r.name}${n > 1 ? ` ${n} 点` : ''}（剩余 ${left}）`;
         if (r.id === 'rage') {
             char.raging = true;
-            log += `，进入狂暴：力量伤害 +${D.rageDamage(char)}，力量检定和豁免优势，抵抗钝击、穿刺、挥砍伤害`;
+            log += `，进入狂暴：力量伤害 +${D.rageDamage(char)}，力量检定和豁免优势，抵抗${D.damageModsText(char).match(/抗性 ([^；]+)/)?.[1] || '钝击、穿刺、挥砍'}伤害`;
         }
         if (r.roll) log += `，掷出 ${D.rollDice(r.roll).total}（${r.roll}）`;
         if (r.id === 'layOnHands') log += `，可治疗 ${n} 点生命（给谁治疗就对谁用 .st hp +${n}）`;
@@ -333,6 +332,7 @@
 
     // .font 2环：花术法点做出一个法术位；.font 2环 换点：消耗一个法术位换成术法点（法术位环阶 = 点数）
     const FONT_COST = { 1: 2, 2: 3, 3: 5, 4: 6, 5: 7 };
+    const FONT_MIN_2024 = { 1: 2, 2: 3, 3: 5, 4: 7, 5: 9 };
     const fontOfMagic = (char, slotText, mode) => {
         const lv = parseInt(slotText); const sp = D.classResources(char).find(r => r.id === 'sorceryPoints');
         if (!sp?.max || !lv) return { ok: false };
@@ -346,11 +346,12 @@
         }
         const cost = FONT_COST[lv];
         if (!cost) return { ok: true, log: '魔力泉源最多只能做出 5 环法术位', rollback: null };
+        if (char.edition === '2024' && D.classLevel(char, 'sorcerer') < FONT_MIN_2024[lv]) return { ok: true, log: `做出 ${lv} 环法术位需要术士 ${FONT_MIN_2024[lv]} 级`, rollback: null };
         if (sp.left < cost) return { ok: true, log: `${char.name} 的术法点不足（需要 ${cost}，剩余 ${sp.left}）`, rollback: null };
-        if (!used) return { ok: true, log: `${char.name} 的 ${lv} 环法术位没有消耗，不用转化`, rollback: null };
-        char.slotsUsed = { ...char.slotsUsed, [lv]: used - 1 };
+        char.slotsUsed = { ...(char.slotsUsed || {}), [lv]: used - 1 };
         char.resourcesUsed = { ...(char.resourcesUsed || {}), sorceryPoints: sp.used + cost };
-        return { ok: true, log: `${char.name} 花 ${cost} 术法点做出一个 ${lv} 环法术位（术法点剩余 ${sp.left - cost}/${sp.max}）`, rollback };
+        const left = (slots[lv] || 0) - used + 1;
+        return { ok: true, log: `${char.name} 花 ${cost} 术法点做出一个 ${lv} 环法术位（现有 ${left}/${slots[lv] || 0}${left > (slots[lv] || 0) ? '，多出的长休后消失' : ''}；术法点剩余 ${sp.left - cost}/${sp.max}）`, rollback };
     };
 
     // .hd 数量：短休时花费生命骰回复生命（每枚 = 生命骰 + 体质调整值，最少 0）；兼职有多种生命骰时先用大的
@@ -442,8 +443,9 @@
                 // 契约法术位固定环阶；邪术师法术优先用契约位，其他法术优先用普通位，没有时可以互相借用
                 const wanted = parseInt(rest.match(/(\d)\s*环/)?.[1]) || spell.level;
                 const left = (key) => (slots[key] || 0) - (parseInt(char.slotsUsed?.[key]) || 0);
-                const pactKey = Object.keys(slots).find(k => k.startsWith('p') && D.slotLevel(k) >= spell.level && left(k) > 0);
-                const normalKey = Object.keys(slots).filter(k => !k.startsWith('p') && +k >= Math.max(spell.level, wanted) && left(k) > 0).sort((a, b) => a - b)[0];
+                const keys = [...new Set([...Object.keys(slots), ...Object.keys(char.slotsUsed || {})])];
+                const pactKey = keys.find(k => k.startsWith('p') && D.slotLevel(k) >= spell.level && left(k) > 0);
+                const normalKey = keys.filter(k => !k.startsWith('p') && +k >= Math.max(spell.level, wanted) && left(k) > 0).sort((a, b) => a - b)[0];
                 const key = castClass === 'warlock' ? pactKey || normalKey : normalKey || pactKey;
                 if (!key) return card(`没有可用的 ${Math.max(spell.level, wanted)} 环或更高的法术位`);
                 slotLevel = D.slotLevel(key);
@@ -573,7 +575,8 @@
     };
 
     // 解析 DM 回复中的战斗指令，按出现顺序执行。chars: [{ char, index }] 参战的玩家角色
-    const COMBAT_RE = /[.。](combat)\s+(start|end|开始|结束)|[.。](monster)\s+(\S+)((?:\s+(?:hp|ac|init|xp)=[+-]?\d+)*)|[.。](dmg|heal)\s+(\S+)\s+(\S+)|[.。](next)\b/gi;
+    // .dmg 名称 伤害 [类型] [魔法]：怪物库里的生物按抗性、免疫、易伤调整伤害
+    const COMBAT_RE = new RegExp(`[.。](combat)\\s+(start|end|开始|结束)|[.。](monster)\\s+(\\S+)((?:\\s+(?:hp|ac|init|xp)=[+-]?\\d+)*)|[.。](dmg|heal)\\s+(\\S+)[ \\t]+([^\\s，。,]+?)(?:[ \\t]*(${D.DAMAGE_TYPES.join('|')}))?(?:[ \\t]*(魔法))?(?=[\\s，。,]|$)|[.。](next)\\b`, 'gi');
     // 返回 { logs, changes }，changes 是结算经验时对角色的改动（可撤回）
     const runCombatCommands = (state, content, chars) => {
         const logs = []; const changes = [];
@@ -588,10 +591,13 @@
                 const cr = e.monster ? `，CR ${D.monsterBook(e.edition)[e.monster].cr}` : '';
                 logs.push(`👹 ${e.name} 加入战斗（AC ${e.ac}，生命 ${e.hp}${cr}${state.active ? `，先攻 ${e.init}` : ''}）`);
             } else if (m[6]) {
-                const r = D.rollDice(m[8]);
-                const e = r && combat.damage(state, m[7], m[6].toLowerCase() === 'heal' ? -r.total : r.total);
-                if (e) logs.push(`${m[6].toLowerCase() === 'heal' ? '💚' : '💥'} ${e.name} ${m[6].toLowerCase() === 'heal' ? '回复' : '受到'} ${r.total} 点，剩余 ${e.hp}/${e.maxHp}${e.hp === 0 ? '，倒下了' : ''}`);
-            } else if (m[9] && state.active) {
+                const r = D.rollDice(m[8]); const heal = m[6].toLowerCase() === 'heal';
+                const target = state.order.find(e => !e.pc && e.name === m[7]);
+                const lib = target?.monster && D.monsterBook(target.edition)[target.monster];
+                const adj = r && !heal && m[9] ? D.adjustDamage(r.total, m[9], D.parseDefense(lib?.defense), !!m[10]) : { dealt: r?.total, note: '' };
+                const e = r && combat.damage(state, m[7], heal ? -r.total : adj.dealt);
+                if (e) logs.push(`${heal ? '💚' : '💥'} ${e.name} ${heal ? '回复' : '受到'} ${heal ? r.total : adj.dealt} 点${m[9] && !heal ? ` ${m[9]}` : ''}${adj.note ? `（${adj.note}）` : ''}，剩余 ${e.hp}/${e.maxHp}${e.hp === 0 ? '，倒下了' : ''}`);
+            } else if (m[11] && state.active) {
                 combat.next(state);
                 logs.push(`➡️ 第 ${state.round} 轮，轮到 ${state.order[state.turn]?.name}`);
             }

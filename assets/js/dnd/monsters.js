@@ -119,13 +119,19 @@ hellHound|地狱犬|3|中型邪魔|15|58|9d8+18|1|50|多重攻击：两次咬；
 imp|小恶魔|1|微型邪魔|13|21|6d4+6|3|20，飞行40|尾刺 +5 1d6+3 穿刺 +2d6 毒素|随意隐形；变形；魔法抗性；抗非魔法物理伤害
 quasit|夸塞魔|1|微型邪魔|13|25|10d4|3|40|撕扯 +5 1d4+3 挥砍，目标中毒到它下回合开始；惊吓 20 尺内 DC10 感知豁免，失败恐慌|隐形；变形；魔法抗性
 `;
+    // 伤害抗性、免疫（前缀「免疫」）、易伤（前缀「易伤」）；带 * 的只对非魔法攻击有效。数据取自 SRD（以 dnd5eapi 为准）
+    const DEFENSE = {
+        '2014': { skeleton: '免疫毒素、易伤钝击', zombie: '免疫毒素', ghoul: '免疫毒素', ghast: '黯蚀、免疫毒素', shadow: '强酸、冷冻、火焰、闪电、雷鸣、钝击*、穿刺*、挥砍*、免疫黯蚀、免疫毒素、易伤光耀', wight: '黯蚀、钝击*、穿刺*、挥砍*、免疫毒素', mummy: '钝击*、穿刺*、挥砍*、免疫黯蚀、免疫毒素、易伤火焰', vampireSpawn: '黯蚀、钝击*、穿刺*、挥砍*', gargoyle: '钝击*、穿刺*、挥砍*、免疫毒素', animatedArmor: '免疫毒素、免疫心灵', mimic: '免疫强酸', whiteDragonWyrmling: '免疫冷冻', blackDragonWyrmling: '免疫强酸', redDragonWyrmling: '免疫火焰', youngRedDragon: '免疫火焰', hellHound: '免疫火焰', imp: '冷冻、钝击*、穿刺*、挥砍*、免疫火焰、免疫毒素', quasit: '冷冻、火焰、闪电、钝击*、穿刺*、挥砍*、免疫毒素' },
+        '2024': { skeleton: '免疫毒素、易伤钝击', zombie: '免疫毒素', ghoul: '免疫毒素', ghast: '黯蚀、免疫毒素', shadow: '强酸、冷冻、火焰、闪电、雷鸣、免疫黯蚀、免疫毒素、易伤光耀', wight: '黯蚀、免疫毒素', mummy: '免疫黯蚀、免疫毒素、易伤火焰', vampireSpawn: '黯蚀', gargoyle: '免疫毒素', animatedArmor: '免疫毒素、免疫心灵', mimic: '免疫强酸', gelatinousCube: '免疫强酸', whiteDragonWyrmling: '免疫冷冻', blackDragonWyrmling: '免疫强酸', redDragonWyrmling: '免疫火焰', youngRedDragon: '免疫火焰', hellHound: '免疫火焰', imp: '冷冻、免疫火焰、免疫毒素', quasit: '冷冻、火焰、闪电、免疫毒素' },
+    };
     const parse = (data) => Object.fromEntries(data.trim().split('\n').map(line => {
         const [id, names, cr, type, ac, hp, hpDice, init, speed, actions, traits] = line.split('|');
         const [name, ...aliases] = names.split('/');
         return [id, { id, name, aliases, cr, type, ac: +ac, hp: +hp, hpDice, init: +init, speed, actions, traits, xp: XP_BY_CR[cr] ?? 0 }];
     }));
-    const MONSTERS = parse(DATA);
-    const MONSTERS_2024 = { ...MONSTERS, ...parse(DATA_2024) };
+    const withDefense = (book, ed) => Object.fromEntries(Object.entries(book).map(([id, m]) => [id, { ...m, defense: DEFENSE[ed][id] || '' }]));
+    const MONSTERS = withDefense(parse(DATA), '2014');
+    const MONSTERS_2024 = withDefense({ ...parse(DATA), ...parse(DATA_2024) }, '2024');
     const monsterBook = (edition) => (edition === '2024' ? MONSTERS_2024 : MONSTERS);
 
     // 按名称找怪物：允许编号后缀，如「哥布林A」「狼2」「骷髅甲」
@@ -134,7 +140,7 @@ quasit|夸塞魔|1|微型邪魔|13|25|10d4|3|40|撕扯 +5 1d4+3 挥砍，目标�
         return Object.values(monsterBook(edition)).find(m => m.name === name || m.name === base || m.aliases.includes(name) || m.aliases.includes(base));
     };
     // 给 DM 的简要数据
-    const monsterBrief = (m) => `${m.name}（CR ${m.cr}，AC ${m.ac}，速度 ${m.speed}）：${m.actions}${m.traits ? `；${m.traits}` : ''}`;
+    const monsterBrief = (m) => `${m.name}（CR ${m.cr}，AC ${m.ac}，速度 ${m.speed}${m.defense ? `，伤害抗性 ${m.defense}` : ''}）：${m.actions}${m.traits ? `；${m.traits}` : ''}`;
 
     Object.assign(D, { MONSTERS, monsterBook, XP_BY_CR, findMonster, monsterBrief });
 })(typeof window !== 'undefined' ? window : globalThis);

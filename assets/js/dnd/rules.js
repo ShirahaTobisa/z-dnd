@@ -237,9 +237,11 @@
         const coins = Object.values(char.coins || {}).reduce((a, b) => a + (parseInt(b) || 0), 0) + (parseInt(char.gold) || 0);
         const weight = Math.round(((char.items || []).reduce((sum, i) => sum + (parseFloat(i.w) || 0) * (parseInt(i.qty) || 0), 0) + coins / 50) * 100) / 100;
         const str = parseInt(char.abilities?.STR) || 10;
-        const capacity = str * 15 * (SIZE_CARRY[char.size] || 1);
+        // 2014 版图腾武者 6 级熊之相：负重翻倍
+        const bear = subclassEntry(char, '图腾武者道途')?.level >= 6 && chose(char, 'totemAspect', 'bear') ? 2 : 1;
+        const capacity = str * 15 * (SIZE_CARRY[char.size] || 1) * bear;
         // 超过上限只能拖拽；2014 版可选的细化负重：超过力量 ×5 负重、×10 重度负重
-        const status = weight > capacity ? 'over' : char.edition === '2014' && char.variantEncumbrance ? (weight > str * 10 ? 'heavy' : weight > str * 5 ? 'encumbered' : 'ok') : 'ok';
+        const status = weight > capacity ? 'over' : char.edition === '2014' && char.variantEncumbrance ? (weight > str * 10 * bear ? 'heavy' : weight > str * 5 * bear ? 'encumbered' : 'ok') : 'ok';
         return { weight, capacity, status };
     };
     const ENCUMBRANCE_TEXT = { over: '超出负重上限：只能拖拽，速度 5 尺', heavy: '重度负重：速度 -20 尺，力量/敏捷/体质检定、攻击、豁免劣势', encumbered: '负重：速度 -10 尺' };
@@ -285,14 +287,30 @@
         '旧日支配者': [10, '心灵'], '旧日支配者宗主': [10, '心灵'], '死灵学派': [10, '黯蚀'], '天界宗主': [6, '光耀'],
         '异界术法': [6, '心灵'], '灵能战士': [10, '心灵'], '战争领域': [17, '钝击', '穿刺', '挥砍'],
     };
-    // { resist, immune, vuln }：种族、子种族、狂暴、子职业，加上手填的 char.resistances（如「火焰、免疫毒素、易伤光耀」）
+    // 抗性文本「火焰、钝击*、免疫毒素、易伤光耀」→ { resist, immune, vuln }；带 * 的只对非魔法攻击有效
+    const splitTypes = (text) => String(text || '').split(/[、，,\s]+/).filter(Boolean);
+    const parseDefense = (text, out = { resist: new Set(), immune: new Set(), vuln: new Set() }) => {
+        splitTypes(text).forEach(t => { const m = t.match(/^(免疫|易伤)?(.+)$/); out[{ 免疫: 'immune', 易伤: 'vuln' }[m[1]] || 'resist'].add(m[2]); });
+        return out;
+    };
+    // 按抗性调整伤害：免疫为 0，抗性减半（向下取整），易伤加倍；返回 { dealt, note }
+    const adjustDamage = (amount, type, mods, magical = false) => {
+        const has = (set) => set.has(type) || (!magical && set.has(`${type}*`));
+        const immune = has(mods.immune); const resist = has(mods.resist); const vuln = has(mods.vuln);
+        const dealt = immune ? 0 : Math.floor(amount / (resist ? 2 : 1)) * (vuln ? 2 : 1);
+        return { dealt, note: dealt === amount ? '' : `${type}${immune ? '免疫' : [resist && '抗性', vuln && '易伤'].filter(Boolean).join('、')}：${amount} ➔ ${dealt}` };
+    };
+    // 狂暴时的熊图腾：2014 版抗心灵以外所有伤害；2024 版抗力场、黯蚀、心灵、光耀以外的伤害
+    const BEAR_RAGE = { '2014': ['心灵'], '2024': ['力场', '黯蚀', '心灵', '光耀'] };
+    const bearRage = (char) => char.raging && ((char.edition === '2014' && subclassEntry(char, '图腾武者道途') && chose(char, 'totemSpirit', 'bear'))
+        || (char.edition === '2024' && subclassEntry(char, '狂野之心道途') && chose(char, 'wildRage', 'bear')));
+    // 角色的抗性：种族、子种族、狂暴、子职业，加上手填的 char.resistances
     const damageMods = (char) => {
-        const out = { resist: new Set(), immune: new Set(), vuln: new Set() };
-        const split = (text) => String(text || '').split(/[、，,\s]+/).filter(Boolean);
-        [raceOf(char), subraceOf(char)].forEach(r => split(r?.resist).forEach(t => out.resist.add(t)));
+        const out = parseDefense(char.resistances);
+        [raceOf(char), subraceOf(char)].forEach(r => splitTypes(r?.resist).forEach(t => out.resist.add(t)));
         if (char.raging) ['钝击', '穿刺', '挥砍'].forEach(t => out.resist.add(t));
+        if (bearRage(char)) DAMAGE_TYPES.filter(t => !BEAR_RAGE[char.edition].includes(t)).forEach(t => out.resist.add(t));
         classEntries(char).forEach(e => { const [lv, ...types] = SUBCLASS_RESIST[e.subclass] || []; if (lv && e.level >= lv) types.forEach(t => out.resist.add(t)); });
-        split(char.resistances).forEach(t => { const m = t.match(/^(免疫|易伤)?(.+)$/); out[{ 免疫: 'immune', 易伤: 'vuln' }[m[1]] || 'resist'].add(m[2]); });
         return out;
     };
     const damageModsText = (char) => {
@@ -676,5 +694,5 @@
         return char;
     };
 
-    root.DND = { ABILITIES, SKILLS, ALL_SKILLS, CLASSES, ARMOR, WEAPONS, CONDITIONS, XP_TABLE, STANDARD_ARRAY, POINT_BUY, editions, edition, classInfo, isLucky, speciesSpells, chose, DAMAGE_TYPES, damageMods, damageModsText, subclassesOf, casterType, spellAbilityOf, hasStyle, armorTraining, armorIssue, GEAR_WEIGHT, SLOTS, ATTUNE_MAX, itemFromRef, activeItems, itemBonus, syncEquipment, encumbrance, ENCUMBRANCE_TEXT, equipmentIssues, sentientCheckMod, casterSummary, classEntries, classLevel, subclassEntry, isMulticlass, classSummary, hitDicePool, hitDiceText, multiclassIssues, fitMulticlass, MULTICLASS_REQ, slotLevel, slotLabel, weaponData, signed, abilityMod, profBonus, levelFromXp, rollDice, d20Test, saveProficient, saveMod, skillMod, passivePerception, armorClass, maxHp, spellSlots, spellSaveDc, spellAttack, weaponAttack, weaponProficient, initiativeMod, speed, halfProficiency, auraOfProtection, steps, critRange, rageDamage, sneakAttackDice, classFeatures, classResources, asiRecords, asiLevels, characterFeats, hasFeat, hasFightingStyle, cantripsKnown, spellsAllowed, maxSpellLevel, classSpells, alwaysPreparedSpells, spellCastingClass, raceOf, subraceOf, backgroundOf, subclassLevel, pointBuyCost, finalAbilities, grantedSkills, skillChoices, newCharacter, normalizeCharacter };
+    root.DND = { ABILITIES, SKILLS, ALL_SKILLS, CLASSES, ARMOR, WEAPONS, CONDITIONS, XP_TABLE, STANDARD_ARRAY, POINT_BUY, editions, edition, classInfo, isLucky, speciesSpells, chose, DAMAGE_TYPES, damageMods, damageModsText, parseDefense, adjustDamage, subclassesOf, casterType, spellAbilityOf, hasStyle, armorTraining, armorIssue, GEAR_WEIGHT, SLOTS, ATTUNE_MAX, itemFromRef, activeItems, itemBonus, syncEquipment, encumbrance, ENCUMBRANCE_TEXT, equipmentIssues, sentientCheckMod, casterSummary, classEntries, classLevel, subclassEntry, isMulticlass, classSummary, hitDicePool, hitDiceText, multiclassIssues, fitMulticlass, MULTICLASS_REQ, slotLevel, slotLabel, weaponData, signed, abilityMod, profBonus, levelFromXp, rollDice, d20Test, saveProficient, saveMod, skillMod, passivePerception, armorClass, maxHp, spellSlots, spellSaveDc, spellAttack, weaponAttack, weaponProficient, initiativeMod, speed, halfProficiency, auraOfProtection, steps, critRange, rageDamage, sneakAttackDice, classFeatures, classResources, asiRecords, asiLevels, characterFeats, hasFeat, hasFightingStyle, cantripsKnown, spellsAllowed, maxSpellLevel, classSpells, alwaysPreparedSpells, spellCastingClass, raceOf, subraceOf, backgroundOf, subclassLevel, pointBuyCost, finalAbilities, grantedSkills, skillChoices, newCharacter, normalizeCharacter };
 })(typeof window !== 'undefined' ? window : globalThis);

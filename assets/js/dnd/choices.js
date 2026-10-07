@@ -45,6 +45,18 @@
         ['tacticalAssessment', '战术评估', '调查、历史或洞悉检定加骰。', '2024'], ['tripAttack', '绊摔攻击', '命中加骰伤害，大型或更小目标力量豁免失败则倒地。'],
     ];
 
+    // 图腾武者（2014）与狂野之心（2024）的动物选择，说明为自行概括
+    const ANIMALS = {
+        totemSpirit: [['bear', '熊', '狂暴时抗心灵以外的所有伤害（系统自动计算）。'], ['eagle', '鹰', '狂暴且没穿重甲时，敌人对你的借机攻击有劣势，疾走可用附赠动作。'], ['wolf', '狼', '狂暴时，你 5 尺内的盟友攻击你的敌人有优势。']],
+        totemAspect: [['bear', '熊', '负重上限翻倍（系统自动计算），推、拉、举、破坏物品的力量检定有优势。'], ['eagle', '鹰', '能看清 1 里外的细节，昏暗光线不影响感知（察觉）检定。'], ['wolf', '狼', '能以快速步调追踪，以正常步调潜行。']],
+        totemAttunement: [['bear', '熊', '狂暴时，5 尺内看得见你的敌人攻击你以外的目标有劣势。'], ['eagle', '鹰', '狂暴时获得等于步行速度的飞行速度（回合结束要落地）。'], ['wolf', '狼', '狂暴时命中大型或更小的生物，可用附赠动作把它击倒。']],
+        wildRage: [['bear', '熊', '这次狂暴抗力场、黯蚀、心灵、光耀以外的所有伤害（系统自动计算）。'], ['eagle', '鹰', '进入狂暴时和之后每回合可用附赠动作同时疾走和撤离。'], ['wolf', '狼', '狂暴时，你 5 尺内的盟友攻击你的敌人有优势。']],
+        wildAspect: [['owl', '猫头鹰', '黑暗视觉 60 尺（已有则加 60 尺）。'], ['panther', '黑豹', '获得等于步行速度的攀爬速度。'], ['salmon', '鲑鱼', '获得等于步行速度的游泳速度。']],
+        wildPower: [['falcon', '隼', '狂暴且没穿重甲时，获得等于步行速度的飞行速度。'], ['lion', '狮', '狂暴时，5 尺内的敌人攻击你以外的目标有劣势。'], ['ram', '公羊', '狂暴时近战命中大型或更小的生物，可让它倒地。']],
+    };
+    const animal = (id, label, subName, level, editions, hint) => ({ id, label, source: `${subName} ${level} 级`, editions, hint, when: (c) => sub(c, subName) >= level,
+        options: () => opt(ANIMALS[id]) });
+
     // 选择定义（按版本过滤）
     const DEFS = [
         { id: 'weaponMastery', label: '武器专精', source: '职业', editions: ['2024'], many: true,
@@ -75,6 +87,12 @@
         { id: 'maneuvers', label: '战技', source: '战斗大师', many: true, when: (c) => sub(c, '战斗大师') >= 3,
           count: (c) => steps([[3, 3], [7, 5], [10, 7], [15, 9]], sub(c, '战斗大师')),
           options: (c) => MANEUVERS.filter(([, , , ed]) => !ed || ed === c.edition).map(([id, name, desc]) => ({ id, name, desc })) },
+        animal('totemSpirit', '图腾之灵', '图腾武者道途', 3, ['2014']),
+        animal('totemAspect', '野兽之相', '图腾武者道途', 6, ['2014']),
+        animal('totemAttunement', '图腾共鸣', '图腾武者道途', 14, ['2014']),
+        animal('wildRage', '狂野之怒（这次狂暴）', '狂野之心道途', 3, ['2024'], '每次进入狂暴时可以换，换了再 .use 狂暴'),
+        animal('wildAspect', '野性之相', '狂野之心道途', 6, ['2024'], '每次长休后可以换'),
+        animal('wildPower', '野性之力（这次狂暴）', '狂野之心道途', 14, ['2024'], '每次进入狂暴时可以换'),
         { id: 'primalKnowledge', label: '原初知识（技能）', source: '野蛮人 3 级', editions: ['2024'], when: (c) => lv(c, 'barbarian') >= 3, skills: true,
           options: () => skillOptions(D.CLASSES.barbarian.skills) },
         { id: 'loreSkills', label: '额外熟练（技能）', source: '逸闻学院', many: true, count: () => 3, when: (c) => sub(c, '逸闻学院') >= 3, skills: true,
