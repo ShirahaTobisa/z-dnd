@@ -604,6 +604,102 @@
         },
     };
 
+    // —— 地图与时间 ——
+    // world：{ day, minute（当天第几分钟）, maps: [{ name, kind, unit, desc, places: [{ name, x, y, note }] }], map 当前地图, here 当前地点 }
+    // 坐标单位：地区地图是英里，城市和场景是尺。x 向东、y 向北
+    const MAP_KINDS = ['地区', '城市', '场景'];
+    const UNIT_NAMES = { mile: '英里', foot: '尺' };
+    // 旅行速度：每小时英里（每天走 8 小时），城市和场景里按每分钟尺
+    const PACES = { 快速: { mph: 4, fpm: 400 }, 正常: { mph: 3, fpm: 300 }, 慢速: { mph: 2, fpm: 200 } };
+    const PACE_NOTES = { '2014': { 快速: '被动察觉 -5', 慢速: '可以边走边潜行' }, '2024': { 快速: '察觉、生存检定劣势', 慢速: '察觉、生存检定优势' } };
+    const two = (n) => String(n).padStart(2, '0');
+    const duration = (min) => {
+        const d = Math.floor(min / 1440), h = Math.floor((min % 1440) / 60), m = Math.round(min % 60);
+        return [d && `${d} 天`, h && `${h} 小时`, m && `${m} 分钟`].filter(Boolean).join(' ') || '不到 1 分钟';
+    };
+    const world = {
+        create: () => ({ day: 1, minute: 8 * 60, maps: [], map: '', here: '' }),
+        clock: (w) => `第 ${w.day} 天 ${two(Math.floor(w.minute / 60))}:${two(w.minute % 60)}`,
+        advance(w, min) { const t = w.minute + Math.round(min); w.day = Math.max(1, w.day + Math.floor(t / 1440)); w.minute = ((t % 1440) + 1440) % 1440; },
+        map: (w, name = w.map) => w.maps.find(m => m.name === name),
+        place: (m, name) => m?.places.find(p => p.name === name),
+        // 新建或切换地图
+        openMap(w, name, kind, unit) {
+            let m = world.map(w, name);
+            if (!m) { m = { name, kind: kind || '地区', unit: unit || (kind && kind !== '地区' ? 'foot' : 'mile'), desc: '', places: [] }; w.maps.push(m); }
+            else { if (kind) m.kind = kind; if (unit) m.unit = unit; }
+            return m;
+        },
+        // 旅行估算：{ from, to, distance, unit, minutes, nights } 或 { error }
+        plan(w, toName, pace = '正常', difficult = false, mapName = w.map) {
+            const m = world.map(w, mapName); const to = world.place(m, toName); const from = world.place(m, w.here);
+            if (!m || !to) return { error: `地图上没有「${toName}」` };
+            if (!from || mapName !== w.map) return { to, minutes: 0, error: '' };
+            const distance = Math.round(Math.hypot(to.x - from.x, to.y - from.y) * 10) / 10;
+            const speed = PACES[pace] || PACES.正常; const slow = difficult ? 2 : 1;
+            if (m.unit === 'foot') return { from, to, distance, unit: m.unit, minutes: Math.max(1, Math.round(distance / speed.fpm * slow)), nights: 0 };
+            // 每天走 8 小时，其余时间扎营
+            const hours = distance / speed.mph * slow; const nights = Math.max(0, Math.ceil(hours / 8) - 1);
+            return { from, to, distance, unit: m.unit, minutes: Math.round(hours * 60) + nights * 16 * 60, nights };
+        },
+        travel(w, toName, pace = '正常', difficult = false, edition = '2014') {
+            const plan = world.plan(w, toName, pace, difficult);
+            if (plan.error) return plan.error;
+            const m = world.map(w);
+            if (!plan.from) { w.here = toName; return `🧭 队伍来到「${toName}」（${m.name}）`; }
+            if (plan.from === plan.to) return `🧭 队伍已经在「${toName}」`;
+            world.advance(w, plan.minutes); w.here = toName;
+            const note = m.unit === 'mile' ? [PACE_NOTES[edition]?.[pace], plan.nights && `途中露营 ${plan.nights} 晚`].filter(Boolean).join('，') : '';
+            const sub = world.map(w, toName) && toName !== w.map ? `；「${toName}」有自己的地图，可以进入` : '';
+            return `🧭 以${pace}速度${difficult ? '穿过困难地形' : ''}从「${plan.from.name}」前往「${toName}」：${plan.distance} ${UNIT_NAMES[m.unit]}，用时 ${duration(plan.minutes)}${note ? `（${note}）` : ''}，到达时间 ${world.clock(w)}${sub}`;
+        },
+        // 给 DM 的地图与时间摘要
+        note(w) {
+            if (!w) return '';
+            const m = world.map(w);
+            const places = m ? m.places.slice(0, 80).map(p => `${p.name}(${p.x},${p.y}${p.note ? `：${p.note}` : ''})`).join('、') : '';
+            const others = w.maps.filter(x => x !== m).map(x => `${x.name}（${x.kind}）`).join('、');
+            return `\n<world_status>现在是${world.clock(w)}。${m ? `当前地图「${m.name}」（${m.kind}，坐标单位${UNIT_NAMES[m.unit]}，x 向东、y 向北）${m.desc ? `：${m.desc.slice(0, 1500)}` : ''}。地点：${places || '还没有标注'}。队伍位置：${w.here || '未定'}。` : '还没有地图。'}${others ? `其他地图：${others}。` : ''}</world_status>`;
+        },
+    };
+    // 地图与时间指令，按出现顺序执行：.map 名称 [类型] [英里|尺] / .place 名称 x,y [说明] / .here 名称 / .travel 名称 [快速|正常|慢速] [困难] / .time +2小时 或 第3天 08:00
+    const WORLD_RE = /[.。]map(?![a-z])[ \t]+(\S+)(?:[ \t]+(地区|城市|场景))?(?:[ \t]+(英里|尺))?|[.。]place[ \t]+(\S+)[ \t]+(-?\d+(?:\.\d+)?)[,，][ \t]*(-?\d+(?:\.\d+)?)(?:[ \t]+([^\n]+))?|[.。]here[ \t]+(\S+)|[.。]travel[ \t]+(\S+)(?:[ \t]+(快速|正常|慢速))?(?:[ \t]*(困难))?|[.。]time[ \t]+([^\n]+)/gi;
+    const runWorldCommands = (w, content, edition = '2014') => {
+        const logs = [];
+        for (const m of String(content || '').matchAll(WORLD_RE)) {
+            if (m[1]) {
+                const map = world.openMap(w, m[1], m[2], m[3] && (m[3] === '尺' ? 'foot' : 'mile'));
+                const changed = w.map !== map.name; w.map = map.name;
+                if (changed) w.here = world.place(map, w.here) ? w.here : '';
+                logs.push(`🗺️ ${changed ? '进入' : '当前'}地图「${map.name}」（${map.kind}，单位${UNIT_NAMES[map.unit]}）`);
+            } else if (m[4]) {
+                if (!w.map) { world.openMap(w, '世界', '地区'); w.map = '世界'; }
+                const map = world.map(w); const old = world.place(map, m[4]);
+                const data = { name: m[4], x: +m[5], y: +m[6], note: (m[7] || old?.note || '').trim() };
+                if (old) Object.assign(old, data); else map.places.push(data);
+                logs.push(`📍 ${old ? '更新' : '标注'}「${m[4]}」(${data.x},${data.y})${data.note ? `：${data.note}` : ''}`);
+            } else if (m[8]) {
+                w.here = m[8];
+                logs.push(`🧭 队伍位置：${m[8]}${world.place(world.map(w), m[8]) ? '' : '（地图上还没有这个地点的坐标）'}`);
+            } else if (m[9]) {
+                logs.push(world.travel(w, m[9], m[10] || '正常', !!m[11], edition));
+            } else if (m[12]) {
+                const t = m[12].trim(); const before = world.clock(w);
+                const set = t.match(/^第\s*(\d+)\s*天\s*(?:(\d{1,2})[:：](\d{2}))?$|^(\d{1,2})[:：](\d{2})$/);
+                if (set) {
+                    if (set[1]) { w.day = +set[1]; if (set[2]) w.minute = +set[2] * 60 + +set[3]; }
+                    else { const next = +set[4] * 60 + +set[5]; if (next < w.minute) w.day += 1; w.minute = next; }
+                } else {
+                    const parts = [...t.matchAll(/([+-]?\d+(?:\.\d+)?)\s*(天|小时|分钟|分)/g)];
+                    if (!parts.length) continue;
+                    world.advance(w, parts.reduce((sum, [, n, u]) => sum + +n * { 天: 1440, 小时: 60, 分钟: 1, 分: 1 }[u], 0));
+                }
+                logs.push(`🕰️ 时间：${before} ➔ ${world.clock(w)}`);
+            }
+        }
+        return logs;
+    };
+
     // 解析 DM 回复中的战斗指令，按出现顺序执行。chars: [{ char, index }] 参战的玩家角色
     // .dmg 名称 伤害 [类型] [魔法]：怪物库里的生物按抗性、免疫、易伤调整伤害
     const COMBAT_RE = new RegExp(`[.。](combat)\\s+(start|end|开始|结束)|[.。](monster)\\s+(\\S+)((?:\\s+(?:hp|ac|init|xp)=[+-]?\\d+)*)|[.。](dmg|heal)\\s+(\\S+)[ \\t]+([^\\s，。,]+?)(?:[ \\t]*(${D.DAMAGE_TYPES.join('|')}))?(?:[ \\t]*(魔法))?(?=[\\s，。,]|$)|[.。](next)\\b`, 'gi');
@@ -752,6 +848,14 @@
             { cmd: '.st 力竭 / 生命骰 / 英雄激励 变化', desc: '力竭等级、已用生命骰数、英雄激励（1 有，0 用掉）。', ex: ['.st 力竭 +1', '.st 英雄激励 1'] },
             { cmd: '.st 属性名 变化', desc: '直接改属性值（如魔法效果）。', ex: ['.st 力量 +2'] },
           ] },
+        { group: '地图与时间', note: '地区地图坐标单位是英里，城市和场景是尺；x 向东、y 向北。同名的地点和地图会连起来：走到「凤凰镇」后可以进入「凤凰镇」地图。也可以在游戏上方的地图面板里直接点地点出发。',
+          items: [
+            { cmd: '.map 名称 [地区|城市|场景] [英里|尺]', desc: '新建或进入一张地图（DM 用）。', ex: ['.map 银溪谷 地区', '.map 凤凰镇 城市'] },
+            { cmd: '.place 名称 x,y [说明]', desc: '在当前地图上标注或更新一个地点（DM 用）。', ex: ['.place 凤凰镇 0,0 起点小镇', '.place 黑石堡 18,-6 废弃要塞'] },
+            { cmd: '.here 名称', desc: '设置队伍当前所在地点（DM 用）。', ex: ['.here 凤凰镇'] },
+            { cmd: '.travel 地点 [快速|正常|慢速] [困难]', desc: '前往当前地图上的地点，按距离和速度自动推进时间（地区地图每天走 8 小时，其余扎营；困难地形用时加倍）。', ex: ['.travel 黑石堡', '.travel 黑石堡 慢速 困难'] },
+            { cmd: '.time +时长 / 第N天 时:分', desc: '推进或设置游戏时间（休息、调查、等待等）。', ex: ['.time +1小时', '.time +8小时', '.time 第3天 06:00'] },
+          ] },
         { group: 'DM（AI）专用：战斗与流程', items: [
             { cmd: '@角色名 .ra 项目 dc难度', desc: '要求某个角色检定。DM 只写出要求，由玩家自己掷。', ex: ['@艾琳 .ra 隐匿 dc13', '@格罗 .ra 体质豁免 dc12'] },
             { cmd: '.monster 名称 [hp= ac= init= xp=]', desc: '加入敌人。怪物库里的生物自动填 AC、生命、先攻、经验和抗性；库外的写全数据。同类敌人用 A、B 区分。', ex: ['.monster 哥布林A', '.monster 黑衣刺客 hp=27 ac=15 init=3 xp=450'] },
@@ -777,5 +881,5 @@
         '\n【参考清单】', ...guideLists().map(([name, list]) => `${name}：${list.join('、')}`),
     ].join('\n');
 
-    Object.assign(D, { COMMAND_GUIDE, guideLists, commandGuideText, rollCheck, rollExpr, castSpell, itemConflict, inventoryText, spellList, applyStat, undoStat, useResource, fontOfMagic, spendHitDice, rest, combat, runCombatCommands, profile });
+    Object.assign(D, { world, runWorldCommands, travelDuration: duration, MAP_KINDS, UNIT_NAMES, PACES, COMMAND_GUIDE, guideLists, commandGuideText, rollCheck, rollExpr, castSpell, itemConflict, inventoryText, spellList, applyStat, undoStat, useResource, fontOfMagic, spendHitDice, rest, combat, runCombatCommands, profile });
 })(typeof window !== 'undefined' ? window : globalThis);
