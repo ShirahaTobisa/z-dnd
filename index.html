@@ -834,7 +834,7 @@
         .z-system-ui .settings-mobile-row:hover .settings-mobile-chevron { transform: translateX(2px); color: var(--z-gold); }
         @media (min-width: 768px) {
             .z-system-ui .app-sidebar { margin: 12px 0 12px 12px; height: calc(100dvh - 24px); border: 1px solid var(--z-line); border-radius: 24px; overflow: hidden; }
-            .z-system-ui .app-right-sidebar { margin: 12px 12px 12px 0; height: calc(100dvh - 24px); border: 1px solid var(--z-line); border-radius: 24px; overflow: hidden; }
+            .z-system-ui .app-right-sidebar { margin: 12px 12px 12px 0; height: calc(100dvh - 24px); border: 1px solid var(--z-line); border-radius: 24px; overflow-x: hidden; overflow-y: auto; }
         }
         @media (max-width: 767px) {
             .z-system-ui .app-mobile-header { margin: 7px 8px 0; min-height: 60px; border-radius: 18px; }
@@ -2355,20 +2355,21 @@
 
                             <!-- Sidebar Info (Desktop & Mobile) -->
                             <div :class="['app-right-sidebar fixed inset-y-0 right-0 z-30 w-72 bg-dark-900 border-l border-dark-800 transform transition-transform duration-300 md:relative md:translate-x-0 flex flex-col shadow-2xl md:shadow-none overflow-y-auto safe-pb', showMobileRightSidebar ? 'translate-x-0' : 'translate-x-full']">
-                                <div v-if="cocState.mode === 'multi' && multiplayerState.isSpectator" class="px-5 pt-4 flex flex-wrap gap-1.5">
-                                    <div class="w-full text-[10px] text-slate-500">👁 旁观中，点名字查看角色卡</div>
-                                    <button v-for="(inv, i) in cocState.investigators" :key="i" @click="cocState.activeInvestigatorIndex = i" class="px-2 py-0.5 rounded border text-xs" :class="cocState.activeInvestigatorIndex === i ? 'border-mystic-gold text-mystic-gold' : 'border-dark-700 text-slate-400 hover:text-slate-200'">{{ inv.name }}</button>
+                                <div v-if="cocState.investigators.length > 1" class="px-5 pt-4 flex flex-wrap gap-1.5">
+                                    <div class="w-full text-[10px] text-slate-500">{{ multiplayerState.isSpectator ? '👁 旁观中，' : '' }}点名字查看队友的角色卡</div>
+                                    <button v-for="(inv, i) in cocState.investigators" :key="i" @click="viewInvestigatorIndex = i === cocState.activeInvestigatorIndex ? -1 : i" class="px-2 py-0.5 rounded border text-xs" :class="shownIndex === i ? 'border-mystic-gold text-mystic-gold' : 'border-dark-700 text-slate-400 hover:text-slate-200'">{{ inv.name }}{{ i === cocState.activeInvestigatorIndex ? '（你）' : '' }}</button>
+                                    <div v-if="viewingOther && !multiplayerState.isSpectator" class="w-full text-[10px] text-amber-300">正在看队友的角色卡（只读），点自己的名字回来</div>
                                 </div>
-                                <div v-if="cocState.activeInvestigatorIndex !== -1 && cocState.investigators[cocState.activeInvestigatorIndex]" class="p-5 space-y-6">
+                                <div v-if="activeHero" class="p-5 space-y-6">
                                     <!-- 头像 & 基础信息 -->
                                     <div class="flex items-center gap-4 pb-4 border-b border-dark-800">
                                         <div class="w-16 h-16 rounded-xl bg-dark-800 overflow-hidden border-2 border-dark-700 shadow-[0_0_15px_rgba(0,0,0,0.5)] relative group cursor-pointer">
-                                            <img v-if="cocState.investigators[cocState.activeInvestigatorIndex].avatar" :src="cocState.investigators[cocState.activeInvestigatorIndex].avatar" :alt="`${cocState.investigators[cocState.activeInvestigatorIndex].name || '冒险者'}的头像`" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110">
-                                            <div v-else class="w-full h-full flex items-center justify-center text-2xl font-bold text-dark-600 font-serif">{{ cocState.investigators[cocState.activeInvestigatorIndex].name.charAt(0) }}</div>
+                                            <img v-if="activeHero.avatar" :src="activeHero.avatar" :alt="`${activeHero.name || '冒险者'}的头像`" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110">
+                                            <div v-else class="w-full h-full flex items-center justify-center text-2xl font-bold text-dark-600 font-serif">{{ activeHero.name.charAt(0) }}</div>
                                             <div class="absolute inset-0 ring-1 ring-inset ring-white/10 rounded-xl"></div>
                                         </div>
                                         <div class="flex-1 min-w-0">
-                                            <div class="font-bold text-lg font-serif text-mystic-gold truncate">{{ cocState.investigators[cocState.activeInvestigatorIndex].name }}</div>
+                                            <div class="font-bold text-lg font-serif text-mystic-gold truncate">{{ activeHero.name }}</div>
                                             <div class="text-xs text-slate-500 font-mono truncate mt-0.5">{{ heroStats.title }}</div>
                                             <div class="flex items-center gap-2 mt-2">
                                                  <span v-if="activeHero.age" class="px-1.5 py-0.5 rounded bg-dark-800 border border-dark-700 text-[10px] text-slate-400 font-mono">{{ activeHero.age }} 岁</span>
@@ -2406,7 +2407,7 @@
                                         <div v-else-if="activeHero.hp === 0" class="px-2 py-1.5 rounded bg-red-950/40 border border-red-900/50 text-xs text-red-300 flex items-center justify-between gap-2">
                                             <span class="font-bold">濒死</span>
                                             <span class="font-mono">成功 {{ activeHero.deathSaves?.success || 0 }}/3 · 失败 {{ activeHero.deathSaves?.fail || 0 }}/3</span>
-                                            <button class="px-2 py-0.5 rounded border border-red-800 hover:bg-red-900/40" @click="cocInput = '.ra 死亡豁免'">掷</button>
+                                            <button class="px-2 py-0.5 rounded border border-red-800 hover:bg-red-900/40" @click="fillCommand('.ra 死亡豁免')">掷</button>
                                         </div>
                                         <div v-if="activeHero.raging || activeHero.concentration" class="flex flex-wrap gap-1.5 text-[10px]">
                                             <span v-if="activeHero.raging" class="px-1.5 py-0.5 rounded bg-orange-900/30 border border-orange-800/50 text-orange-300">狂暴中</span>
@@ -2420,10 +2421,10 @@
                                             <span class="w-1 h-1 rounded-full bg-slate-500"></span> 属性 · 豁免
                                         </h4>
                                         <div class="grid grid-cols-3 gap-2">
-                                            <div v-for="a in heroStats.abilities" :key="a.key" class="bg-dark-800/50 hover:bg-mystic-gold/5 border border-dark-700/50 hover:border-mystic-gold/30 rounded p-2 text-center cursor-pointer transition-all group" @click="cocInput = `.ra ${a.name}`" title="点击属性检定">
+                                            <div v-for="a in heroStats.abilities" :key="a.key" class="bg-dark-800/50 hover:bg-mystic-gold/5 border border-dark-700/50 hover:border-mystic-gold/30 rounded p-2 text-center cursor-pointer transition-all group" @click="fillCommand(`.ra ${a.name}`)" title="点击属性检定">
                                                 <div class="text-[9px] text-slate-500 font-bold tracking-wider mb-0.5 group-hover:text-mystic-gold/70">{{ a.name }}</div>
                                                 <div class="font-bold text-sm text-slate-300 font-mono group-hover:text-mystic-gold">{{ a.score }} <span class="text-[10px] text-mystic-gold">{{ a.mod }}</span></div>
-                                                <button class="text-[9px] font-mono hover:text-mystic-gold" :class="a.saveProf ? 'text-mystic-gold' : 'text-slate-600'" @click.stop="cocInput = `.ra ${a.name}豁免`" title="点击豁免检定">豁免 {{ a.save }}</button>
+                                                <button class="text-[9px] font-mono hover:text-mystic-gold" :class="a.saveProf ? 'text-mystic-gold' : 'text-slate-600'" @click.stop="fillCommand(`.ra ${a.name}豁免`)" title="点击豁免检定">豁免 {{ a.save }}</button>
                                             </div>
                                         </div>
                                     </div>
@@ -2434,7 +2435,7 @@
                                             <span class="w-1 h-1 rounded-full bg-slate-500"></span> 武器
                                         </h4>
                                         <div class="flex flex-col gap-1.5">
-                                            <button v-for="(w, wIdx) in heroStats.weapons" :key="wIdx" class="px-2.5 py-1.5 bg-dark-800 hover:bg-red-900/10 border border-dark-700 hover:border-red-800/50 rounded text-xs text-slate-300 flex justify-between transition-all" @click="cocInput = `.ra ${w.name}`" title="点击攻击">
+                                            <button v-for="(w, wIdx) in heroStats.weapons" :key="wIdx" class="px-2.5 py-1.5 bg-dark-800 hover:bg-red-900/10 border border-dark-700 hover:border-red-800/50 rounded text-xs text-slate-300 flex justify-between transition-all" @click="fillCommand(`.ra ${w.name}`)" title="点击攻击">
                                                 <span>{{ w.name }}<span v-if="!w.proficient" class="text-[10px] text-amber-500"> 未熟练</span></span><span class="font-mono text-slate-500">{{ signed(w.toHit) }} · {{ w.damage }}</span>
                                             </button>
                                         </div>
@@ -2460,7 +2461,7 @@
                                             <span class="w-1 h-1 rounded-full bg-slate-500"></span> 法术 · {{ heroStats.spellInfo }}
                                         </h4>
                                         <div class="flex flex-wrap gap-1.5">
-                                            <button v-for="sp in heroStats.spells" :key="sp.id" @click="cocInput = `.cast ${sp.name}`" :title="`${sp.level ? sp.level + '环' : '戏法'} · ${sp.time} · ${sp.range} · ${sp.duration}${sp.concentration ? ' · 专注' : ''}\n${sp.desc}`" class="px-2 py-1 rounded border border-indigo-800/50 bg-indigo-900/10 text-xs text-indigo-200 hover:bg-indigo-900/30 transition-all">
+                                            <button v-for="sp in heroStats.spells" :key="sp.id" @click="fillCommand(`.cast ${sp.name}`)" :title="`${sp.level ? sp.level + '环' : '戏法'} · ${sp.time} · ${sp.range} · ${sp.duration}${sp.concentration ? ' · 专注' : ''}\n${sp.desc}`" class="px-2 py-1 rounded border border-indigo-800/50 bg-indigo-900/10 text-xs text-indigo-200 hover:bg-indigo-900/30 transition-all">
                                                 <span class="text-[10px] text-indigo-400 font-mono">{{ sp.level || '戏' }}</span> {{ sp.name }}
                                             </button>
                                         </div>
@@ -2472,11 +2473,11 @@
                                             <span class="w-1 h-1 rounded-full bg-slate-500"></span> 资源 · 生命骰 {{ heroStats.hitDice }}
                                         </h4>
                                         <div class="flex flex-wrap gap-1.5">
-                                            <button v-for="r in heroStats.resources" :key="r.id" @click="cocInput = `.use ${r.name}`" :title="`${r.recharge === 'short' ? '短休' : '长休'}恢复，点击使用`" class="px-2 py-1 rounded border text-xs transition-all" :class="r.left > 0 ? 'border-amber-700/50 text-amber-200 bg-amber-900/10 hover:bg-amber-900/30' : 'border-dark-700 text-slate-600'">
+                                            <button v-for="r in heroStats.resources" :key="r.id" @click="fillCommand(`.use ${r.name}`)" :title="`${r.recharge === 'short' ? '短休' : '长休'}恢复，点击使用`" class="px-2 py-1 rounded border text-xs transition-all" :class="r.left > 0 ? 'border-amber-700/50 text-amber-200 bg-amber-900/10 hover:bg-amber-900/30' : 'border-dark-700 text-slate-600'">
                                                 {{ r.name }} <span class="font-mono">{{ r.max === 99 ? '∞' : `${r.left}/${r.max}` }}</span>
                                             </button>
-                                            <button @click="cocInput = '.rest 短休'" class="px-2 py-1 rounded border border-dark-700 text-xs text-slate-400 hover:text-mystic-gold hover:border-mystic-gold/40">短休</button>
-                                            <button @click="cocInput = '.rest 长休'" class="px-2 py-1 rounded border border-dark-700 text-xs text-slate-400 hover:text-mystic-gold hover:border-mystic-gold/40">长休</button>
+                                            <button @click="fillCommand('.rest 短休')" class="px-2 py-1 rounded border border-dark-700 text-xs text-slate-400 hover:text-mystic-gold hover:border-mystic-gold/40">短休</button>
+                                            <button @click="fillCommand('.rest 长休')" class="px-2 py-1 rounded border border-dark-700 text-xs text-slate-400 hover:text-mystic-gold hover:border-mystic-gold/40">长休</button>
                                         </div>
                                     </div>
 
@@ -2498,19 +2499,19 @@
                                             <span class="w-1 h-1 rounded-full bg-slate-500"></span> 技能
                                         </h4>
                                         <div class="flex flex-wrap gap-2">
-                                            <button v-for="sk in heroStats.skills" :key="sk.id" class="px-2.5 py-1 bg-dark-800 hover:bg-mystic-green/10 border rounded text-xs transition-all flex items-center gap-2" :class="sk.prof ? 'border-mystic-green/40 text-slate-200' : 'border-dark-700 text-slate-500'" @click="cocInput = `.ra ${sk.name}`" title="点击检定">
+                                            <button v-for="sk in heroStats.skills" :key="sk.id" class="px-2.5 py-1 bg-dark-800 hover:bg-mystic-green/10 border rounded text-xs transition-all flex items-center gap-2" :class="sk.prof ? 'border-mystic-green/40 text-slate-200' : 'border-dark-700 text-slate-500'" @click="fillCommand(`.ra ${sk.name}`)" title="点击检定">
                                                 <span>{{ sk.name }}</span><span class="font-mono font-bold">{{ sk.mod }}</span>
                                             </button>
                                         </div>
                                     </div>
 
                                     <!-- Badges -->
-                                    <div v-if="cocState.investigators[cocState.activeInvestigatorIndex].badges && cocState.investigators[cocState.activeInvestigatorIndex].badges.length > 0">
+                                    <div v-if="activeHero.badges && activeHero.badges.length > 0">
                                         <h4 class="font-bold text-slate-500 text-[10px] mb-3 uppercase tracking-widest flex items-center gap-2">
                                             <span class="w-1 h-1 rounded-full bg-slate-500"></span> 勋章墙
                                         </h4>
                                         <div class="flex flex-wrap gap-2">
-                                            <div v-for="(badge, bIdx) in cocState.investigators[cocState.activeInvestigatorIndex].badges" :key="bIdx" class="group relative w-9 h-9 flex items-center justify-center bg-dark-800 rounded-lg border border-mystic-gold/20 hover:border-mystic-gold/50 cursor-help transition-all hover:shadow-[0_0_10px_rgba(212,175,55,0.2)]">
+                                            <div v-for="(badge, bIdx) in activeHero.badges" :key="bIdx" class="group relative w-9 h-9 flex items-center justify-center bg-dark-800 rounded-lg border border-mystic-gold/20 hover:border-mystic-gold/50 cursor-help transition-all hover:shadow-[0_0_10px_rgba(212,175,55,0.2)]">
                                                 <span class="text-lg medal-icon select-none" v-html="sanitizeBadgeIcon(badge.icon)"></span>
                                                 <!-- Tooltip -->
                                                 <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-3 bg-dark-900/95 backdrop-blur-md border border-mystic-gold/30 rounded-lg text-[10px] opacity-0 group-hover:opacity-100 transition-all pointer-events-none z-50 shadow-2xl scale-95 group-hover:scale-100 origin-bottom">
@@ -4641,7 +4642,7 @@
                     { id: 'stat_updates', category: '机制处理', label: '自动状态变更', content: '更新角色状态 (核心)：角色受伤、治疗、消耗资源、获得状态或经验时，必须输出指令。格式：`@角色名 .st 项目 变化值`。项目可用：hp（受伤写负数，如 -7 或 -2d6）、临时、法术位1~法术位9（消耗写 +1）、状态（如 +中毒 / -中毒）、专注（如 `.st 专注 祝福术`，结束写 `.st 专注 结束`）、经验、金币、力竭。玩家施法用 `.cast 法术名 [N环] [@目标]`（系统自动扣法术位、处理专注、掷法术攻击或给出豁免 DC 与伤害、结算治疗），你按卡片结果叙事，不要再额外用 .st 扣法术位；消耗职业资源用 `@角色名 .use 资源名 [数量]`（如 `.use 狂暴`、`.use 圣疗池 5`）。休息用 `@角色名 .rest 长休` 或 `.rest 短休`，短休时玩家可用 `.hd 数量` 花生命骰回血。受到伤害时把伤害类型写在数值后面，如 `.st hp -7 火焰`、`.st hp -2d6 毒素`（魔法武器的物理伤害写 `.st hp -8 挥砍 魔法`），系统会按角色的抗性、免疫、易伤（种族、狂暴、子职业等）自动调整，不要自己先减半。术士用 `.font N环` 花术法点做出法术位，`.font N环 换点` 把法术位换成术法点。英雄激励用 `.st 英雄激励 1` 给予、`.st 英雄激励 0` 用掉。系统会自动处理：生命降到 0 进入濒死并要求死亡豁免、濒死时受伤记失败、受伤时提示专注豁免 DC、状态带来的优势劣势与自动失败，你只需按结果叙事。', enabled: true },
                     { id: 'combat', category: '机制处理', label: '战斗指令', content: '战斗流程 (核心)：遭遇战斗时，先为每个敌人输出 `.monster 名称`（同类敌人用 A、B 区分名称，如 `.monster 哥布林A`）。怪物库中的生物会自动填入 AC、生命、先攻和经验：' + Object.values(DND.MONSTERS).map(m => m.name).join('、') + '；库外的生物写全数据 `.monster 名称 hp=生命 ac=护甲 init=先攻加值 xp=经验`。再输出 `.combat start`，系统会自动掷先攻并显示战斗面板。敌人受伤用 `.dmg 名称 伤害 类型`（可写骰子，如 `.dmg 哥布林A 1d8+3 挥砍`），写上伤害类型后系统会按怪物库里的抗性、免疫、易伤自动调整，魔法武器或法术的物理伤害在类型后加「魔法」（如 `.dmg 石像鬼 9 钝击 魔法`），治疗用 `.heal 名称 数值`；一个角色或敌人行动完毕后输出 `.next` 轮到下一位；战斗结束输出 `.combat end`，系统会把被击倒敌人的经验平均分给参战角色，不要再手动加经验。敌人的攻击由你按怪物数据掷骰并描述，对冒险者造成的伤害用 `.st hp` 扣除。', enabled: true },
                     { id: 'core_rules', category: '机制处理', label: '核心战斗规则', content: '严格按 D&D 5e 核心规则裁定：每回合一个动作、一个附赠动作（仅当能力允许时）、一次移动和每轮一次反应；离开敌人触及范围引发借机攻击（撤离动作可避免）；优势与劣势不叠加，同时具备则抵消；半掩护 AC 与敏捷豁免 +2，四分之三掩护 +5；未被发现的攻击者具有优势；远程攻击在长射程或敌人贴身时具有劣势；攻击掷出 20 必中并暴击（伤害骰翻倍），掷出 1 必失；专注期间再施展专注法术会结束前一个。按角色卡中的职业能力、资源次数和法术位裁定，不要让角色使用其尚未获得的能力。', enabled: true },
-                    { id: 'items', category: '机制处理', label: '物品与魔法物品', content: '物品与财宝：角色卡里有装备、背包、钱和负重。给予或消耗物品用 `@角色名 .st 物品 +名称*数量`（失去写 -），钱用 `.st 金币 +数值`（也可用 银币、铜币、银金币、白金币）。魔法物品按 SRD 规则处理：需要同调的物品要花一次短休专注才能同调，每人最多同时同调 3 件；装备栏位有限（例如只能戴一顶头盔、两枚戒指）。负重超过上限只能拖拽前进。智能物品有自己的意志和目标，由你扮演；当持有者的行为违背物品的阵营或目标时，让玩家用 `.conflict 物品名` 掷魅力对抗，物品胜出就会提出要求。', enabled: true },
+                    { id: 'items', category: '机制处理', label: '物品与魔法物品', content: '物品与财宝：角色卡里有装备、背包、钱和负重。给予或消耗物品用 `@角色名 .st 物品 +名称*数量`（失去写 -），钱用 `.st 金币 +数值`（也可用 银币、铜币、银金币、白金币），花钱时某种币不够系统会自动用其他钱付并找零。魔法物品按 SRD 规则处理：需要同调的物品要花一次短休专注才能同调，每人最多同时同调 3 件；装备栏位有限（例如只能戴一顶头盔、两枚戒指）。负重超过上限只能拖拽前进。智能物品有自己的意志和目标，由你扮演；当持有者的行为违背物品的阵营或目标时，让玩家用 `.conflict 物品名` 掷魅力对抗，物品胜出就会提出要求。', enabled: true },
                     { id: 'monsters', category: '机制处理', label: '怪物与遭遇', content: '怪物优先使用 SRD 中对应生物的数据（AC、生命、攻击加值、伤害、特殊能力），按队伍等级与人数设计难度合适的遭遇；敌人的行动要符合其智力与习性，不要无理由集火倒地的角色。战斗外解决的挑战（谈判、潜行绕过、解谜等）按相当的遭遇难度用 `.st 经验 +数值` 给经验。', enabled: true },
                     { id: 'multiplayer', category: '多人协作', label: '视角分隔处理', content: '多玩家处理：视角分隔。请使用分割线 `---` 和角色名标题区分不同玩家的视角。', enabled: true },
                     { id: 'plot_prog', category: '流程管理', label: '剧情循序渐进', content: '不要一次性倾倒所有信息。线索应逐步获得。扮演 NPC 时要鲜活立体。', enabled: true },
@@ -5382,7 +5383,13 @@
                     }
                 };
 
-                const activeHero = Vue.computed(() => cocState.investigators[cocState.activeInvestigatorIndex]);
+                // 侧栏显示的角色：默认是自己，可以点名字看队友（只读）
+                const viewInvestigatorIndex = ref(-1);
+                const shownIndex = Vue.computed(() => (cocState.investigators[viewInvestigatorIndex.value] ? viewInvestigatorIndex.value : cocState.activeInvestigatorIndex));
+                const viewingOther = Vue.computed(() => shownIndex.value !== cocState.activeInvestigatorIndex);
+                const activeHero = Vue.computed(() => cocState.investigators[shownIndex.value]);
+                // 侧栏点击填入指令；看队友时不填，免得用别人的数值
+                const fillCommand = (text) => { if (viewingOther.value) return showToast('这是队友的角色卡，点自己的名字再操作', 'warning'); cocInput.value = text; };
                 // 兼职时写成「人类 战士 2 / 法师 3」，单职业写「人类 战士 5 级」
                 const heroTitle = (c) => `${DND.subraceOf(c)?.name || DND.raceOf(c)?.name || ''} ${DND.classSummary(c)}${DND.isMulticlass(c) ? '' : ` ${c.level || 1} 级`}`.trim();
                 // 侧栏展示用的角色数据
@@ -6893,6 +6900,18 @@ ${buildInvestigatorProfile(inv)}
                     });
                 };
                 const buildInvestigatorProfile = (inv) => DND.profile(inv);
+                // 队伍资料：多人模式取所有已分配的角色，单人模式取玩家角色和 AI 队友。每次 DM 回复前重新生成，保证生命、法术位等是最新的
+                const buildPartyProfiles = () => {
+                    const entry = (inv, tag = '') => `\n---\n【冒险者：${inv.name}${tag}】\n${buildInvestigatorProfile(inv)}`;
+                    const assigned = Object.keys(multiplayerState.assignments).map(Number);
+                    const list = cocState.mode === 'multi'
+                        ? (assigned.length ? assigned : cocState.investigators.map((_, i) => i)).map(i => cocState.investigators[i] && entry(cocState.investigators[i], multiplayerState.assignments[i]?.startsWith('ai_') ? ' (AI队友)' : ''))
+                        : [cocState.investigators[cocState.activeInvestigatorIndex] && entry(cocState.investigators[cocState.activeInvestigatorIndex], ' (玩家)'),
+                           ...assigned.filter(i => i !== cocState.activeInvestigatorIndex && multiplayerState.assignments[i]?.startsWith('ai_') && cocState.investigators[i]).map(i => entry(cocState.investigators[i], ' (AI队友)'))];
+                    return list.filter(Boolean).join('');
+                };
+                // 把系统提示里的队伍资料换成最新的
+                const livePrompt = () => (cocState.systemPrompt || 'You are a Dungeon Master.').replace(/(<investigator_profiles>)[\s\S]*?(<\/investigator_profiles>)/, (m, a, b) => `${a}\n${buildPartyProfiles()}\n    ${b}`);
 
                 const confirmEndGame = () => {
                     if (cocState.mode === 'multi' && !multiplayerState.isHost) return showToast('仅房主可以确认结团', 'warning');
@@ -7168,43 +7187,7 @@ ${chunkLogs}
                     })();
                     
                     // Insert Inv Profile & Module
-                    let investigatorsProfiles = '';
-                    if (cocState.mode === 'multi') {
-                        // 多人模式：遍历所有已分配的角色
-                        Object.keys(multiplayerState.assignments).forEach(idx => {
-                            const investigator = cocState.investigators[idx];
-                            if (investigator) {
-                                investigatorsProfiles += `\n---\n【冒险者：${investigator.name}】\n${buildInvestigatorProfile(investigator)}`;
-                            }
-                        });
-                    } else {
-                        // 单人模式：依然可能存在 AI 队友，不仅是 activeInvestigatorIndex
-                        // 检查是否有 assignments (AI 托管)
-                        const aiIndices = Object.keys(multiplayerState.assignments).filter(k => multiplayerState.assignments[k] && multiplayerState.assignments[k].startsWith('ai_'));
-                        
-                        // 添加玩家角色
-                        const playerInv = cocState.investigators[cocState.activeInvestigatorIndex];
-                        if (playerInv) {
-                            investigatorsProfiles += `\n---\n【冒险者：${playerInv.name} (玩家)】\n${buildInvestigatorProfile(playerInv)}`;
-                        }
-                        
-                        // 添加 AI 队友
-                        aiIndices.forEach(idx => {
-                            // 避免重复添加玩家角色（如果玩家角色也被标记为 AI，虽然逻辑上不应发生）
-                            if (parseInt(idx) !== cocState.activeInvestigatorIndex) {
-                                const aiInv = cocState.investigators[idx];
-                                if (aiInv) {
-                                    investigatorsProfiles += `\n---\n【冒险者：${aiInv.name} (AI队友)】\n${buildInvestigatorProfile(aiInv)}`;
-                                }
-                            }
-                        });
-                    }
-                    
-                    if (!investigatorsProfiles) {
-                        // Fallback
-                        const inv = cocState.investigators[cocState.activeInvestigatorIndex];
-                        investigatorsProfiles = `\n\n【当前冒险者资料】\n${buildInvestigatorProfile(inv)}`;
-                    }
+                    const investigatorsProfiles = buildPartyProfiles();
 
                     const moduleLimit = Math.max(0, parseInt(settings.moduleContextLimit) || 0);
                     const moduleText = moduleLimit ? cocState.module.content.slice(0, moduleLimit) : cocState.module.content;
@@ -7589,7 +7572,7 @@ ${buildInvestigatorProfile(inv)}
 
                         const generatedContent = await requestChatCompletion({
                             tier: 'quality',
-                            messages: [{role:'system', content: (cocState.systemPrompt || 'You are a Dungeon Master.') + combatStatusNote()}, ...validMessages],
+                            messages: [{role:'system', content: livePrompt() + combatStatusNote()}, ...validMessages],
                             onChunk: (_, fullContent) => {
                                 assistantMsg.content = fullContent;
                                 scrollToBottom();
@@ -8426,7 +8409,7 @@ ${buildInvestigatorProfile(inv)}
                     charReviewState, startCharReview, importReviewModule, importReviewInvestigator,
                     toggleReady, allPlayersReady, handleInvestigatorClick, toggleAiPlayer,
                     openLibrary, openCocCard,
-                    hasCot, getCotContent, removeCot, toggleCot, regenerateLastResponse, lastAssistantIndex, hideSystemCommands, activeHero, heroTitle, heroStats, combatNext, combatEnd, signed: DND.signed, sanitizeBadgeIcon, formatStLog, parseStLogDiff,
+                    hasCot, getCotContent, removeCot, toggleCot, regenerateLastResponse, lastAssistantIndex, hideSystemCommands, activeHero, viewInvestigatorIndex, shownIndex, viewingOther, fillCommand, heroTitle, heroStats, combatNext, combatEnd, signed: DND.signed, sanitizeBadgeIcon, formatStLog, parseStLogDiff,
                     settlementState, confirmEndGame,
                     tavernState, importTavernSave, generateNovel, saveNovel, deleteNovel, viewNovel, exportNovel,
                     downloadReport, canViewReport,

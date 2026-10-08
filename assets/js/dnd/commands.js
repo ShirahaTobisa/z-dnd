@@ -157,12 +157,12 @@
     const STAT_KEYS = {
         hp: 'hp', 生命: 'hp', 生命值: 'hp', 血量: 'hp',
         temp: 'tempHp', 临时: 'tempHp', 临时生命: 'tempHp',
-        xp: 'xp', 经验: 'xp', gold: 'gold', 金币: 'gold',
+        xp: 'xp', 经验: 'xp',
         力竭: 'exhaustion', exhaustion: 'exhaustion', 生命骰: 'hitDiceUsed',
         状态: 'conditions', condition: 'conditions',
         激励: 'inspiration', 英雄激励: 'inspiration', inspiration: 'inspiration',
     };
-    const STAT_NAMES = { hp: '生命值', tempHp: '临时生命', xp: '经验', gold: '金币', exhaustion: '力竭', hitDiceUsed: '已用生命骰', conditions: '状态', inspiration: '英雄激励' };
+    const STAT_NAMES = { hp: '生命值', tempHp: '临时生命', xp: '经验', exhaustion: '力竭', hitDiceUsed: '已用生命骰', conditions: '状态', inspiration: '英雄激励' };
     const HP_KEYS = ['hp', 'tempHp', 'deathSaves', 'conditions', 'dead', 'raging', 'concentration'];
 
     // 带符号表示增减，不带符号表示直接设为该值；支持骰子表达式
@@ -213,18 +213,46 @@
     };
 
     // 返回 { ok, log, rollback } ；rollback 用于撤销
-    const COINS = { 铜币: 'cp', cp: 'cp', 银币: 'sp', sp: 'sp', 银金币: 'ep', ep: 'ep', 白金币: 'pp', pp: 'pp' };
-    const COIN_NAMES = { cp: '铜币', sp: '银币', ep: '银金币', pp: '白金币' };
+    // 钱：金币存在 char.gold，其他存在 char.coins。按铜币折算：银 10、银金 50、金 100、白金 1000
+    const COINS = { 铜币: 'cp', cp: 'cp', 银币: 'sp', sp: 'sp', 银金币: 'ep', ep: 'ep', 金币: 'gp', gold: 'gp', gp: 'gp', 白金币: 'pp', pp: 'pp' };
+    const COIN_NAMES = { cp: '铜币', sp: '银币', ep: '银金币', gp: '金币', pp: '白金币' };
+    const COIN_VALUE = { cp: 1, sp: 10, ep: 50, gp: 100, pp: 1000 };
+    const COIN_ORDER = ['cp', 'sp', 'ep', 'gp', 'pp'];
+    const purse = (char) => Object.fromEntries(COIN_ORDER.map(k => [k, Math.max(0, parseInt(k === 'gp' ? char.gold : char.coins?.[k]) || 0)]));
+    // 把若干铜币的价值换成金、银、铜（找零或收到零头时用）
+    const breakDown = (cp, out) => { for (const k of ['gp', 'sp', 'cp']) { const n = Math.floor(cp / COIN_VALUE[k]); out[k] += n; cp -= n * COIN_VALUE[k]; } return out; };
+    // 付钱：先用同种币，再用更小的币凑，还不够就拆一枚更大的币找零；钱不够返回 null
+    const pay = (wallet, k, costCp) => {
+        if (COIN_ORDER.reduce((sum, c) => sum + wallet[c] * COIN_VALUE[c], 0) < costCp) return null;
+        const out = { ...wallet }; let left = costCp;
+        const take = (c, n) => { out[c] -= n; left -= n * COIN_VALUE[c]; };
+        take(k, Math.min(out[k], Math.floor(left / COIN_VALUE[k])));
+        [...COIN_ORDER].reverse().filter(c => COIN_VALUE[c] < COIN_VALUE[k]).forEach(c => take(c, Math.min(out[c], Math.floor(left / COIN_VALUE[c]))));
+        COIN_ORDER.filter(c => COIN_VALUE[c] >= COIN_VALUE[k]).forEach(c => { while (left > 0 && out[c] > 0) take(c, 1); });
+        return left < 0 ? breakDown(-left, out) : out;
+    };
     const applyStat = (char, prop, expr) => {
         if (!char || !prop || !expr) return { ok: false };
         const p = String(prop).trim(); const e = String(expr).trim();
         const ending = /^(-|结束|end|无)$/i.test(e);
 
+        // .st 银币 -5：自己的银币不够会自动用别的钱付并找零；可以写小数（.st 金币 -0.5）
         if (COINS[p]) {
-            const k = COINS[p]; const rollback = snapshot(char, ['coins']);
-            const current = parseInt(char.coins?.[k]) || 0; const next = Math.max(0, evalChange(current, e) ?? current);
-            char.coins = { ...(char.coins || {}), [k]: next };
-            return { ok: true, log: `${char.name} 的${COIN_NAMES[k]}：${current} ➔ ${next}`, rollback };
+            const k = COINS[p]; const rollback = snapshot(char, ['coins', 'gold']);
+            const before = purse(char); const op = /^[+-]/.test(e) ? e[0] : '=';
+            const amount = /^[+-]?\d*\.?\d+$/.test(e) ? Math.abs(parseFloat(e)) : D.rollDice(op === '=' ? e : e.slice(1))?.total;
+            if (amount == null || Number.isNaN(amount)) return { ok: false };
+            const cost = Math.round(amount * COIN_VALUE[k]);
+            let after;
+            if (op === '=') after = { ...before, [k]: Math.floor(amount) };
+            else if (op === '+') after = Number.isInteger(amount) ? { ...before, [k]: before[k] + amount } : breakDown(cost, { ...before });
+            else after = pay(before, k, cost);
+            const total = (w) => COIN_ORDER.reduce((sum, c) => sum + w[c] * COIN_VALUE[c], 0);
+            if (!after) return { ok: true, log: `${char.name} 的钱不够：需要 ${amount} ${COIN_NAMES[k]}，全部的钱折合 ${total(before) / 100} 金币`, rollback: null };
+            char.gold = after.gp; char.coins = { ...(char.coins || {}), cp: after.cp, sp: after.sp, ep: after.ep, pp: after.pp };
+            const changed = COIN_ORDER.filter(c => before[c] !== after[c]).reverse().map(c => `${COIN_NAMES[c]} ${before[c]} ➔ ${after[c]}`);
+            const verb = op === '-' ? `付出 ${amount} ${COIN_NAMES[k]}` : op === '+' ? `获得 ${amount} ${COIN_NAMES[k]}` : `${COIN_NAMES[k]}设为 ${Math.floor(amount)}`;
+            return { ok: true, log: `${char.name} ${verb}：${changed.join('，') || '没有变化'}`, rollback };
         }
         // .st 物品 +治疗药水*2 / -治疗药水：增减背包里的物品数量
         if (p === '物品' || p === 'item') {
@@ -719,7 +747,7 @@
             { cmd: '.st 状态 +名称 / -名称', desc: '添加或移除状态，会自动影响掷骰。', ex: ['.st 状态 +中毒', '.st 状态 -倒地'] },
             { cmd: '.st 专注 法术名 / 结束', desc: '设置或结束专注。', ex: ['.st 专注 祝福术', '.st 专注 结束'] },
             { cmd: '.st 狂暴 结束', desc: '结束狂暴。', ex: ['.st 狂暴 结束'] },
-            { cmd: '.st 经验 / 金币 / 银币 / 铜币 / 银金币 / 白金币 变化', desc: '经验和钱。', ex: ['.st 经验 +300', '.st 金币 +25'] },
+            { cmd: '.st 经验 / 金币 / 银币 / 铜币 / 银金币 / 白金币 变化', desc: '经验和钱。花钱时这种币不够，会自动用其他的钱付并找零；可以写小数。', ex: ['.st 经验 +300', '.st 金币 +25', '.st 铜币 -5', '.st 金币 -1.5'] },
             { cmd: '.st 物品 +名称*数量 / -名称*数量', desc: '获得或失去背包里的物品。', ex: ['.st 物品 +治疗药水*2', '.st 物品 -火把'] },
             { cmd: '.st 力竭 / 生命骰 / 英雄激励 变化', desc: '力竭等级、已用生命骰数、英雄激励（1 有，0 用掉）。', ex: ['.st 力竭 +1', '.st 英雄激励 1'] },
             { cmd: '.st 属性名 变化', desc: '直接改属性值（如魔法效果）。', ex: ['.st 力量 +2'] },
