@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'z-coc-shell-v24';
+const CACHE_VERSION = 'z-coc-shell-v25';
 const APP_SHELL = [
     './',
     './index.html',
@@ -18,13 +18,14 @@ const APP_SHELL = [
     './assets/js/dnd/choices.js',
     './assets/js/dnd/commands.js',
     './assets/js/module-file.js',
+    './assets/js/stale-guard.js',
     './assets/art/generated/launch-ritual-moon-archive-v1.webp'
 ];
 
 self.addEventListener('install', (event) => {
     event.waitUntil(
         caches.open(CACHE_VERSION)
-            .then((cache) => cache.addAll(APP_SHELL))
+            .then((cache) => cache.addAll(APP_SHELL.map((url) => new Request(url, { cache: 'reload' }))))
             .then(() => self.skipWaiting())
     );
 });
@@ -83,6 +84,12 @@ self.addEventListener('fetch', (event) => {
         return response;
     };
 
+    // 脚本和样式要和页面同一版本：先走网络，断网时才用缓存
+    if (['script', 'style'].includes(request.destination)) {
+        event.respondWith(fetchAndCache().catch(async () => (await caches.match(request)) || Response.error()));
+        return;
+    }
+    // 图片、字体、音频：先用缓存，后台更新
     const cachedResponse = caches.match(request);
     const networkResponse = fetchAndCache();
     event.waitUntil(networkResponse.then(() => undefined).catch(() => undefined));

@@ -32,7 +32,11 @@ SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1
     Header always set X-Permitted-Cross-Domain-Policies "none"
     Header always set Content-Security-Policy "base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self'"
 
-    <FilesMatch "\.(?:css|js|svg|webp|png|jpg|jpeg|gif|woff2?|mp3)$">
+    # 页面、脚本、样式、数据文件的网址不带版本号，必须每次和服务器核对（没变只回 304），否则更新后新页面会配上旧脚本
+    <FilesMatch "\.(?:html|css|js|json)$">
+        Header set Cache-Control "no-cache"
+    </FilesMatch>
+    <FilesMatch "\.(?:svg|webp|png|jpg|jpeg|gif|woff2?|mp3)$">
         Header set Cache-Control "public, max-age=604800, stale-while-revalidate=86400"
     </FilesMatch>
 

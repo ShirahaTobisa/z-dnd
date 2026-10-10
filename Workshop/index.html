@@ -7,6 +7,7 @@
     <link rel="icon" href="../favicon.svg" type="image/svg+xml">
     <link href="https://fonts.googleapis.com/css2?family=Grenze+Gotisch:wght@500;600;700&family=Noto+Serif+SC:wght@300;400;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
     <link rel="stylesheet" href="../assets/css/tailwind.css">
+    <script src="../assets/js/stale-guard.js"></script>
     <script src="../assets/js/app-runtime.js"></script>
     <script src="../assets/js/dnd/rules.js"></script>
     <script src="../assets/js/dnd/features.js"></script>
@@ -1920,7 +1921,7 @@
 <script>
     const { createApp, ref, reactive, computed, watch, onMounted, onBeforeUnmount } = Vue;
 
-    createApp({
+    window.zAppGuard.mount(createApp({
         setup() {
 
             const showDiffConfirmation = ref(false);
@@ -3502,7 +3503,7 @@ return {
     signed: DND.signed, abilityMod: DND.abilityMod
 };
 }
-}).mount('#app');
+}), '#app');
 </script>
 </body>
 </html>
