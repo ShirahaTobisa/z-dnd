@@ -36,6 +36,7 @@ const (
 	sendLimit  = 120
 
 	resumeMaxPages = 20 // 续传最多补发 20 页（每页 PollLimit 条）
+	roomCloseDelay = 500 * time.Millisecond
 )
 
 // Hub 是本实例的房间连接注册表：map[roomID]*room。
@@ -294,7 +295,8 @@ func (h *Hub) CloseRoom(roomID string) {
 	if data, err := marshalFrame(errorFrame{Type: TypeError, Code: roommsg.CodeRoomNotFound, Message: "Room closed"}); err == nil {
 		rm.broadcast(data)
 	}
-	rm.closeAll()
+	// 稍等再断开：立刻断开会把还在发送队列里的通知丢掉，前端就不知道房间没了
+	time.AfterFunc(roomCloseDelay, rm.closeAll)
 }
 
 // handleResume 补发 since 之后的消息；消息多于一页时继续翻页，避免断线久了漏消息。
