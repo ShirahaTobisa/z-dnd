@@ -8823,7 +8823,7 @@ ${buildInvestigatorProfile(inv)}
                 // 移入旁观会释放其角色；恢复为玩家后需要重新选角色
                 const setSpectator = (id, value) => {
                     const member = multiplayerState.members.find(m => m.id === id);
-                    if (!multiplayerState.isHost || !member) return;
+                    if (!multiplayerState.isHost || !member || member.isHost) return; // 房主不能把自己移入旁观
                     member.isSpectator = value;
                     member.isReady = false;
                     if (value) releaseAssignment(id);
@@ -8833,7 +8833,7 @@ ${buildInvestigatorProfile(inv)}
                 };
                 const kickPlayer = async (id) => {
                     const member = multiplayerState.members.find(m => m.id === id);
-                    if (!multiplayerState.isHost || !member || !await showConfirm(`把 ${member.name} 请出房间？取消踢出前他无法再进来。`, '踢出')) return;
+                    if (!multiplayerState.isHost || !member || member.isHost || !await showConfirm(`把 ${member.name} 请出房间？取消踢出前他无法再进来。`, '踢出')) return;
                     releaseAssignment(id);
                     multiplayerState.members = multiplayerState.members.filter(m => m.id !== id);
                     multiplayerState.kickedMembers.push({ id, name: member.name });
