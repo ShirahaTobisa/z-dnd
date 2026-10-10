@@ -1,0 +1,437 @@
+package httpapi
+
+import (
+	"encoding/json"
+	"net/http"
+	"strings"
+	"time"
+	"unicode/utf8"
+
+	"github.com/ShirahaTobisa/z-dnd/internal/auth"
+	"github.com/ShirahaTobisa/z-dnd/internal/roommsg"
+	"github.com/ShirahaTobisa/z-dnd/internal/store"
+	"github.com/ShirahaTobisa/z-dnd/internal/validate"
+)
+
+const maxRoomSmallBodyBytes = 64 * 1024
+
+func (s *Server) handleRoomAPI(w http.ResponseWriter, r *http.Request) {
+	switch r.URL.Query().Get("action") {
+	case "create":
+		s.roomCreate(w, r)
+	case "join":
+		s.roomJoin(w, r)
+	case "push":
+		s.roomPush(w, r)
+	case "pull":
+		s.roomPull(w, r)
+	case "set_public":
+		s.roomSetPublic(w, r)
+	case "set_name":
+		s.roomSetName(w, r)
+	case "close":
+		s.roomClose(w, r)
+	case "list_public":
+		s.roomListPublic(w, r)
+	default:
+		errorJSON(w, http.StatusNotFound, "Unknown action")
+	}
+}
+
+func (s *Server) roomCreate(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodPost) {
+		return
+	}
+	if !s.rateLimit(w, r, "room_create", 30, 300) {
+		return
+	}
+	data, ok := readJSONBody(w, r, maxRoomSmallBodyBytes)
+	if !ok {
+		return
+	}
+	roomID, ok := validate.RoomID(asString(data["room_id"]))
+	if !ok {
+		errorJSON(w, http.StatusBadRequest, "Invalid room id")
+		return
+	}
+	hostID, ok := validate.SenderID(asString(data["user_id"]))
+	if !ok {
+		errorJSON(w, http.StatusBadRequest, "Invalid sender")
+		return
+	}
+
+	hostToken := auth.NewToken()
+	hostHash := auth.Sha256Hex(hostToken)
+
+	isPublic := isTruthy(data["is_public"])
+
+	exists, err := s.store.RoomExistsActive(r.Context(), roomID, s.cfg.RoomTTLHours)
+	if err != nil {
+		errorJSON(w, http.StatusInternalServerError, "Room create failed")
+		return
+	}
+	if exists {
+		errorJSON(w, http.StatusConflict, "Room already exists")
+		return
+	}
+	if err := s.store.UpsertRoom(r.Context(), roomID, hostID, hostHash, isPublic); err != nil {
+		errorJSON(w, http.StatusInternalServerError, "Room create failed")
+		return
+	}
+	if err := s.store.DeleteRoomMessages(r.Context(), roomID); err != nil {
+		errorJSON(w, http.StatusInternalServerError, "Room reset failed")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"status":     "success",
+		"last_id":    0,
+		"host_token": hostToken,
+	})
+}
+
+func (s *Server) roomJoin(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodPost) {
+		return
+	}
+	if !s.rateLimit(w, r, "room_join", 120, 300) {
+		return
+	}
+	data, ok := readJSONBody(w, r, maxRoomSmallBodyBytes)
+	if !ok {
+		return
+	}
+	roomID, ok := validate.RoomID(asString(data["room_id"]))
+	if !ok {
+		errorJSON(w, http.StatusBadRequest, "Invalid room id")
+		return
+	}
+	room, err := s.store.GetActiveRoom(r.Context(), roomID, s.cfg.RoomTTLHours)
+	if err != nil {
+		errorJSON(w, http.StatusInternalServerError, "Room not found or expired")
+		return
+	}
+	if room == nil {
+		errorJSON(w, http.StatusNotFound, "Room not found or expired")
+		return
+	}
+	_ = s.store.TouchRoom(r.Context(), roomID)
+	lastID, err := s.store.MaxMessageID(r.Context(), roomID)
+	if err != nil {
+		errorJSON(w, http.StatusInternalServerError, "Room not found or expired")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"status": "success", "last_id": lastID})
+}
+
+func (s *Server) roomPush(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodPost) {
+		return
+	}
+	if !s.rateLimit(w, r, "room_push", 600, 300) {
+		return
+	}
+	data, ok := readJSONBody(w, r, s.cfg.MaxPayloadBytes+32768)
+	if !ok {
+		return
+	}
+	roomID, ok := validate.RoomID(asString(data["room_id"]))
+	if !ok {
+		errorJSON(w, http.StatusBadRequest, "Invalid room id")
+		return
+	}
+	senderID, ok := validate.SenderID(asString(data["sender_id"]))
+	if !ok {
+		errorJSON(w, http.StatusBadRequest, "Invalid sender")
+		return
+	}
+	room, err := s.store.GetActiveRoom(r.Context(), roomID, s.cfg.RoomTTLHours)
+	if err != nil {
+		errorJSON(w, http.StatusInternalServerError, "Room not found or expired")
+		return
+	}
+	if room == nil {
+		errorJSON(w, http.StatusNotFound, "Room not found or expired")
+		return
+	}
+
+	payloadRaw, present := data["payload"]
+	_, payloadJSON, verr := roommsg.ValidatePush(
+		payloadRaw, present, senderID, asString(data["host_token"]),
+		room.HostID, room.HostTokenHash, s.cfg.MaxPayloadBytes,
+	)
+	if verr != nil {
+		switch verr.Code {
+		case roommsg.CodeHostAuthFailed:
+			writeJSON(w, http.StatusForbidden, map[string]any{
+				"status":  "error",
+				"code":    verr.Code,
+				"message": verr.Message,
+			})
+		case roommsg.CodeSenderMismatch:
+			errorJSON(w, http.StatusForbidden, verr.Message)
+		case roommsg.CodePayloadTooLarge:
+			errorJSON(w, http.StatusRequestEntityTooLarge, verr.Message)
+		default:
+			errorJSON(w, http.StatusBadRequest, verr.Message)
+		}
+		return
+	}
+
+	newID, err := s.store.InsertMessage(r.Context(), roomID, senderID, string(payloadJSON))
+	if err != nil {
+		errorJSON(w, http.StatusInternalServerError, "Message send failed")
+		return
+	}
+	_ = s.store.PruneMessages(r.Context(), roomID, s.cfg.MaxRoomMessages)
+	_ = s.store.TouchRoom(r.Context(), roomID)
+	// 走 HTTP 的消息也推给 WS 连接，两条通道互通
+	s.hub.Publish(roomID, newID, senderID, payloadJSON)
+
+	writeJSON(w, http.StatusOK, map[string]any{"status": "success", "id": newID})
+}
+
+func (s *Server) roomPull(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodGet) {
+		return
+	}
+	if !s.rateLimit(w, r, "room_pull", 900, 300) {
+		return
+	}
+	roomID, ok := validate.RoomID(r.URL.Query().Get("room_id"))
+	if !ok {
+		errorJSON(w, http.StatusBadRequest, "Invalid room id")
+		return
+	}
+	room, err := s.store.GetActiveRoom(r.Context(), roomID, s.cfg.RoomTTLHours)
+	if err != nil {
+		errorJSON(w, http.StatusInternalServerError, "Room not found or expired")
+		return
+	}
+	if room == nil {
+		errorJSON(w, http.StatusNotFound, "Room not found or expired")
+		return
+	}
+
+	since := phpAtoi(r.URL.Query().Get("since"))
+	if since < 0 {
+		since = 0
+	}
+
+	rows, err := s.store.ListMessages(r.Context(), roomID, since, s.cfg.PollLimit)
+	if err != nil {
+		errorJSON(w, http.StatusInternalServerError, "Room pull failed")
+		return
+	}
+	messages := make([]map[string]any, 0, len(rows))
+	for _, row := range rows {
+		var payload any
+		if err := json.Unmarshal([]byte(row.Payload), &payload); err != nil {
+			payload = nil
+		}
+		messages = append(messages, map[string]any{
+			"id":        row.ID,
+			"sender_id": row.SenderID,
+			"payload":   payload,
+		})
+	}
+
+	if presenceUser, ok := validate.SenderID(r.URL.Query().Get("user_id")); ok {
+		_ = s.store.UpsertPresence(r.Context(), roomID, presenceUser)
+	}
+
+	presenceRows, err := s.store.ListPresence(r.Context(), roomID)
+	if err != nil {
+		errorJSON(w, http.StatusInternalServerError, "Room pull failed")
+		return
+	}
+	presence := make([]map[string]any, 0, len(presenceRows))
+	for _, p := range presenceRows {
+		presence = append(presence, map[string]any{"user_id": p.UserID, "seen_at": p.SeenAt})
+	}
+
+	_ = s.store.TouchRoom(r.Context(), roomID)
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"status":   "success",
+		"messages": messages,
+		"presence": presence,
+		"now":      time.Now().Unix(),
+	})
+}
+
+func (s *Server) roomSetPublic(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodPost) {
+		return
+	}
+	if !s.rateLimit(w, r, "room_set_public", 60, 300) {
+		return
+	}
+	data, ok := readJSONBody(w, r, maxRoomSmallBodyBytes)
+	if !ok {
+		return
+	}
+	roomID, ok := validate.RoomID(asString(data["room_id"]))
+	if !ok {
+		errorJSON(w, http.StatusBadRequest, "Invalid room id")
+		return
+	}
+	userID, ok := validate.SenderID(asString(data["user_id"]))
+	if !ok {
+		errorJSON(w, http.StatusBadRequest, "Invalid sender")
+		return
+	}
+	room, err := s.store.GetActiveRoom(r.Context(), roomID, s.cfg.RoomTTLHours)
+	if err != nil {
+		errorJSON(w, http.StatusInternalServerError, "Room not found or expired")
+		return
+	}
+	if room == nil {
+		errorJSON(w, http.StatusNotFound, "Room not found or expired")
+		return
+	}
+	if !requireHost(w, data, room, userID, "Only host can change visibility") {
+		return
+	}
+	if err := s.store.SetRoomPublic(r.Context(), roomID, isTruthy(data["is_public"])); err != nil {
+		errorJSON(w, http.StatusInternalServerError, "Room update failed")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"status": "success"})
+}
+
+func (s *Server) roomSetName(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodPost) {
+		return
+	}
+	if !s.rateLimit(w, r, "room_set_name", 60, 300) {
+		return
+	}
+	data, ok := readJSONBody(w, r, maxRoomSmallBodyBytes)
+	if !ok {
+		return
+	}
+	roomID, ok := validate.RoomID(asString(data["room_id"]))
+	if !ok {
+		errorJSON(w, http.StatusBadRequest, "Invalid room id")
+		return
+	}
+	userID, ok := validate.SenderID(asString(data["user_id"]))
+	if !ok {
+		errorJSON(w, http.StatusBadRequest, "Invalid sender")
+		return
+	}
+	name := strings.TrimSpace(asString(data["name"]))
+	if utf8.RuneCountInString(name) > 120 {
+		errorJSON(w, http.StatusBadRequest, "Room name too long")
+		return
+	}
+	room, err := s.store.GetActiveRoom(r.Context(), roomID, s.cfg.RoomTTLHours)
+	if err != nil {
+		errorJSON(w, http.StatusInternalServerError, "Room not found or expired")
+		return
+	}
+	if room == nil {
+		errorJSON(w, http.StatusNotFound, "Room not found or expired")
+		return
+	}
+	if !requireHost(w, data, room, userID, "Only host can rename the room") {
+		return
+	}
+	if err := s.store.SetRoomName(r.Context(), roomID, name); err != nil {
+		errorJSON(w, http.StatusInternalServerError, "Room rename failed")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"status": "success"})
+}
+
+func (s *Server) roomClose(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodPost) {
+		return
+	}
+	if !s.rateLimit(w, r, "room_close", 60, 300) {
+		return
+	}
+	data, ok := readJSONBody(w, r, maxRoomSmallBodyBytes)
+	if !ok {
+		return
+	}
+	roomID, ok := validate.RoomID(asString(data["room_id"]))
+	if !ok {
+		errorJSON(w, http.StatusBadRequest, "Invalid room id")
+		return
+	}
+	userID, ok := validate.SenderID(asString(data["user_id"]))
+	if !ok {
+		errorJSON(w, http.StatusBadRequest, "Invalid sender")
+		return
+	}
+	room, err := s.store.GetActiveRoom(r.Context(), roomID, s.cfg.RoomTTLHours)
+	if err != nil {
+		errorJSON(w, http.StatusInternalServerError, "Room not found or expired")
+		return
+	}
+	if room == nil {
+		writeJSON(w, http.StatusOK, map[string]any{"status": "success"})
+		return
+	}
+	if !requireHost(w, data, room, userID, "Only host can close the room") {
+		return
+	}
+	if err := s.store.CloseRoom(r.Context(), roomID); err != nil {
+		errorJSON(w, http.StatusInternalServerError, "Room close failed")
+		return
+	}
+	s.hub.CloseRoom(roomID)
+	writeJSON(w, http.StatusOK, map[string]any{"status": "success"})
+}
+
+func (s *Server) roomListPublic(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodGet) {
+		return
+	}
+	if !s.rateLimit(w, r, "room_lobby", 240, 300) {
+		return
+	}
+	rooms, err := s.store.ListPublicRooms(r.Context(), s.cfg.RoomTTLHours)
+	if err != nil {
+		errorJSON(w, http.StatusInternalServerError, "Lobby list failed")
+		return
+	}
+	out := make([]map[string]any, 0, len(rooms))
+	for _, room := range rooms {
+		members := make([]map[string]any, 0, len(room.Members))
+		for _, m := range room.Members {
+			members = append(members, map[string]any{
+				"user_id": m.UUID,
+				"name":    m.Name,
+				"avatar":  m.Avatar,
+				"is_host": m.IsHost,
+			})
+		}
+		out = append(out, map[string]any{
+			"room_id":      room.RoomID,
+			"host_id":      room.HostID,
+			"host_name":    room.HostName,
+			"host_avatar":  room.HostAvatar,
+			"member_count": room.MemberCount,
+			"module_name":  room.ModuleName,
+			"name":         room.Name,
+			"members":      members,
+			"created_at":   room.CreatedAt,
+			"updated_at":   room.UpdatedAt,
+		})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"status": "success",
+		"rooms":  out,
+	})
+}
+
+// requireHost 校验调用者是房主（user_id 与 host_token 都要对上），失败时写 403。
+func requireHost(w http.ResponseWriter, data map[string]any, room *store.Room, userID, message string) bool {
+	if userID == room.HostID && room.HostTokenHash != nil && auth.Sha256Hex(asString(data["host_token"])) == *room.HostTokenHash {
+		return true
+	}
+	writeJSON(w, http.StatusForbidden, map[string]any{"status": "error", "code": "HOST_AUTH_FAILED", "message": message})
+	return false
+}

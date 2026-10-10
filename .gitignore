@@ -1,4 +1,7 @@
-config.local.php
+# Go build output
+/z-coc
+/z-dnd
+*.exe
 *-claimed-*.json
 *.cpa.*.json
 .well-known/
@@ -11,12 +14,12 @@ www/
 
 # Local image-generation intermediates and source masters are not deployment assets.
 tmp/
-assets/art/**/*.png
-assets/art/**/*.tif
+web/assets/art/**/*.png
+web/assets/art/**/*.tif
 
 # Retained design alternatives that are not referenced by the production pages.
-assets/art/generated/archive-index-tab.webp
-assets/art/generated/brass-calibration-rule.webp
-assets/art/generated/mode-multiplayer-occult-link-v1.webp
-assets/art/generated/stitched-archive-patch.webp
-assets/art/user-edited/tavern-candle-archive-edited.webp
+web/assets/art/generated/archive-index-tab.webp
+web/assets/art/generated/brass-calibration-rule.webp
+web/assets/art/generated/mode-multiplayer-occult-link-v1.webp
+web/assets/art/generated/stitched-archive-patch.webp
+web/assets/art/user-edited/tavern-candle-archive-edited.webp

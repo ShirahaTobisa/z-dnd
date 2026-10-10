@@ -1,0 +1,9 @@
+# 统一用 LF：打包部署（git archive）时不转成 CRLF，Go 代码和 shell 脚本在服务器上才正常
+* text=auto eol=lf
+*.bat text eol=crlf
+*.png binary
+*.webp binary
+*.jpg binary
+*.mp3 binary
+*.woff2 binary
+*.jar binary

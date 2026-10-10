@@ -1,0 +1,91 @@
+package main
+
+import (
+	"context"
+	"errors"
+	"log/slog"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"github.com/ShirahaTobisa/z-dnd/internal/config"
+	"github.com/ShirahaTobisa/z-dnd/internal/httpapi"
+	"github.com/ShirahaTobisa/z-dnd/internal/ratelimit"
+	"github.com/ShirahaTobisa/z-dnd/internal/store"
+)
+
+func main() {
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+
+	cfg := config.Load()
+	if err := cfg.Validate(); err != nil {
+		logger.Error("invalid configuration", "error", err)
+		os.Exit(1)
+	}
+
+	ctx := context.Background()
+	st, err := store.NewPool(ctx, cfg)
+	if err != nil {
+		logger.Error("database connection failed", "error", err)
+		os.Exit(1)
+	}
+	defer st.Close()
+
+	store.EnsureSchema(ctx, st, logger)
+
+	if promoted, err := st.PromoteAdminsByEmail(ctx, cfg.AdminEmails); err != nil {
+		logger.Warn("admin promotion failed", "error", err)
+	} else if promoted > 0 {
+		logger.Info("promoted admin accounts", "count", promoted)
+	}
+
+	limiter := ratelimit.New()
+	api := httpapi.New(cfg, st, limiter, logger)
+	defer api.Close()
+
+	cleanupStop := make(chan struct{})
+	go func() {
+		ticker := time.NewTicker(300 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-cleanupStop:
+				return
+			case <-ticker.C:
+				if err := st.CleanupRooms(ctx, cfg.RoomTTLHours); err != nil {
+					logger.Warn("room cleanup failed", "error", err)
+				}
+			}
+		}
+	}()
+	if err := st.CleanupRooms(ctx, cfg.RoomTTLHours); err != nil {
+		logger.Warn("initial room cleanup failed", "error", err)
+	}
+
+	server := &http.Server{
+		Addr:              ":" + cfg.Port,
+		Handler:           api.Handler(),
+		ReadHeaderTimeout: 10 * time.Second,
+	}
+
+	go func() {
+		logger.Info("server listening", "port", cfg.Port)
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logger.Error("server error", "error", err)
+			os.Exit(1)
+		}
+	}()
+
+	signalCh := make(chan os.Signal, 1)
+	signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM)
+	<-signalCh
+
+	close(cleanupStop)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		logger.Warn("graceful shutdown failed", "error", err)
+	}
+}

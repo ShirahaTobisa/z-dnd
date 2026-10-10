@@ -1,23 +1,16 @@
-FROM php:8.3-apache-bookworm
+FROM golang:1.26-alpine AS build
+ARG GOPROXY=https://proxy.golang.org,https://goproxy.cn,direct
+ENV GOPROXY=${GOPROXY}
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/z-dnd ./cmd/server
 
-RUN docker-php-ext-install mysqli \
-    && a2enmod headers rewrite deflate expires \
-    && a2dissite 000-default
-
-COPY docker/apache-z-coc.conf /etc/apache2/sites-available/z-coc.conf
-COPY docker/php-production.ini /usr/local/etc/php/conf.d/z-coc-production.ini
-
-RUN a2ensite z-coc
-
-WORKDIR /var/www/html
-COPY . /var/www/html/
-
-RUN rm -rf /var/www/html/docker /var/www/html/Dockerfile /var/www/html/.dockerignore \
-    && chown -R www-data:www-data /var/www/html
-
+FROM alpine:3.20
+RUN adduser -D -H -u 10001 app
+COPY --from=build /out/z-dnd /z-dnd
+USER app
 EXPOSE 8080
-
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-    CMD php -r "exit(@file_get_contents('http://127.0.0.1:8080/health.php') === false ? 1 : 0);"
-
-CMD ["apache2-foreground"]
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD wget -qO- http://127.0.0.1:8080/health >/dev/null || exit 1
+ENTRYPOINT ["/z-dnd"]

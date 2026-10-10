@@ -1,11 +1,11 @@
-// 把前端依赖复制到 assets/vendor，网页直接引用本地文件，不依赖外部 CDN。
+// 把前端依赖复制到 web/assets/vendor，网页直接引用本地文件，不依赖外部 CDN。
 // 升级 package.json 里的依赖版本后运行：pnpm vendor
 import { copyFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const vendorRoot = path.join(projectRoot, 'assets', 'vendor');
+const vendorRoot = path.join(projectRoot, 'web', 'assets', 'vendor');
 
 const vendorFiles = new Map([
     ['node_modules/vue/dist/vue.global.prod.js', 'vue.global.prod.js'],
