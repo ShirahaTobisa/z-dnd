@@ -1,7 +1,10 @@
-# z-coc-go 部署指南
+# z-dnd 部署指南
 
 > 面向**按步骤操作即可完成部署**的使用者。
 > 默认推荐**方案一**（应用单独一个容器，连接已有的 PostgreSQL 容器）。
+
+> 管理员：`ADMIN_EMAILS` 只在服务启动时把「已注册」的账号提升为管理员。注册不验证邮箱，
+> 所以要先用这个邮箱注册好账号，再写进 `.env` 并重启（`docker compose up -d`）。
 
 ---
 
@@ -10,14 +13,14 @@
 - 已安装 **Docker** 与 **Docker Compose**（`docker compose` 子命令可用）。
 - 镜像由仓库根目录的 [`Dockerfile`](../Dockerfile) **多阶段构建**：
   - 构建阶段 `golang:1.26-alpine` 编译静态二进制；
-  - 运行阶段 `gcr.io/distroless/static-debian12`（无 shell、无包管理器），最终镜像约 **15–25MB**。
+  - 运行阶段 `alpine:3.20`，以非 root 用户运行，镜像自带健康检查（`/health`）。
 - 前端静态资源已由 `go:embed` 打进二进制，运行阶段**无需额外拷贝前端文件**。
 
 ---
 
 ## 方案一（默认，推荐）：应用单独一个容器，连接「已有」PostgreSQL
 
-适用于：服务器上**已有**一个 PostgreSQL 容器（可能在别的 compose 项目里），只想把 z-coc-go
+适用于：服务器上**已有**一个 PostgreSQL 容器（可能在别的 compose 项目里），只想把 z-dnd
 作为一个独立容器加进来。
 
 使用仓库根的 [`docker-compose.yml`](../docker-compose.yml)。
@@ -120,7 +123,7 @@ docker compose -f docker-compose.full.yml up -d --build
 - **回滚**：为镜像打 tag 以便回退。例如构建时保留旧版本：
 
   ```bash
-  docker build -t z-coc-go:2026-10-10 .
+  docker build -t z-dnd:2026-10-10 .
   # 需要回滚时，把 compose 里的 image 指向旧 tag 后重启
   docker compose up -d
   ```
@@ -168,7 +171,7 @@ location /room_ws {
 
 ```bash
 docker exec <db容器名> pg_dump -U <用户名> -d <库名> > backup.sql
-# 例：docker exec z-coc-go-db pg_dump -U zcoc -d z-coc > backup.sql
+# 例：docker exec z-dnd-pg pg_dump -U zdnd -d zdnd > backup.sql
 ```
 
 恢复（示例）：

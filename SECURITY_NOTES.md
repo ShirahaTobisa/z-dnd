@@ -1,11 +1,11 @@
 # 安全部署说明
 
-1. `config.local.php` 只用于传统虚拟主机或本地 PHP 环境，不要上传到公开 GitHub，也不要复制进容器镜像。
-2. Zeabur 部署优先使用同一项目内 MySQL 服务注入的 `MYSQL_HOST`、`MYSQL_PORT`、`MYSQL_USERNAME`、`MYSQL_PASSWORD` 和 `MYSQL_DATABASE`。
-3. 公开仓库只保留 `config.example.php`；其中只能包含占位符和非敏感默认值。
-4. 网页与 PHP API 同域部署时，不设置 `APP_ALLOWED_ORIGINS`。跨域部署时填入逗号分隔的完整 HTTPS Origin，禁止使用 `*`。
-5. `db_api.php`、`room_api.php` 和 `library_api.php` 会自动创建及升级数据表，因此数据库账号首次部署时需要 `CREATE`、`ALTER`、`INDEX` 权限。
-6. 曾经进入聊天记录、公开仓库或公开文件的数据库密码和 API Key 必须在服务商后台轮换。
+1. 数据库密码等配置只放在服务器的 `.env` 里（参考 `.env.example`），`.env` 不进仓库，也不要复制进镜像。
+2. 网页与 API 同域部署时，不设置 `APP_ALLOWED_ORIGINS`。跨域或手机 App 访问时填入逗号分隔的完整 Origin（如 `https://example.com,capacitor://localhost`），禁止使用 `*`。
+3. 服务启动时会自动建表（PostgreSQL），数据库账号首次部署需要建表、建索引权限。
+4. `ADMIN_EMAILS` 只在启动时提升已注册的账号；注册不验证邮箱，先注册再写进 `.env`，否则可能被别人抢注拿到管理员。
+5. 限速按访客 IP 计算。网站放在同机或内网的反向代理（如 Caddy）后面时，从 `X-Forwarded-For` 取真实 IP；不要让外网直接访问应用端口。
+6. 曾经进入聊天记录、公开仓库或公开文件的数据库密码和 API Key 必须轮换。
 7. 前端不内置 AI Key 或生图 Token。用户自行填写的服务地址、Key 和模型信息只保存在其浏览器中。
-8. 正式上线后必须启用 HTTPS、MySQL 定期备份和恢复演练；不要为 MySQL 服务绑定不必要的公网域名。
-9. `/health.php` 只返回通用健康状态，不返回数据库地址、账号、库名或错误详情。
+8. 正式上线后必须启用 HTTPS、定期备份数据库（`pg_dump`）并做恢复演练；不要给数据库绑定公网端口。
+9. `/health` 只返回通用健康状态，不返回数据库地址、账号、库名或错误详情。
