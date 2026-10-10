@@ -1051,7 +1051,8 @@
                     <span class="text-sm font-bold text-mystic-gold font-serif">技能 Skills</span>
                 </div>
                 <div class="flex flex-wrap gap-2 text-[11px] font-serif">
-                    <span v-for="c in skillChoices" :key="c.source" class="px-2 py-0.5 rounded bg-dark-800 border border-dark-700" :class="c.picked > c.count ? 'text-red-400' : 'text-slate-400'">{{ c.source }}：已选 {{ c.picked }} / {{ c.count }}</span>
+                    <span v-for="c in skillAlloc.groups" :key="c.source" class="px-2 py-0.5 rounded bg-dark-800 border border-dark-700" :class="c.picked < c.count ? 'text-amber-300' : 'text-slate-400'">{{ c.source }}：已选 {{ c.picked }} / {{ c.count }}</span>
+                    <span v-if="skillAlloc.extra.length" class="px-2 py-0.5 rounded bg-dark-800 border border-red-900/60 text-red-400" title="这些技能不在任何来源的可选范围内，或者已经选满了">多选了：{{ skillAlloc.extra.map(s => skills[s]?.name || s).join('、') }}</span>
                     <span v-if="expertiseAllowed" class="px-2 py-0.5 rounded bg-dark-800 border border-amber-900/50" :class="hero.expertise.length > expertiseAllowed ? 'text-red-400' : 'text-amber-300'">专精：已选 {{ hero.expertise.length }} / {{ expertiseAllowed }}</span>
                 </div>
             </div>
@@ -2759,9 +2760,7 @@
                 slots: DND.spellSlots(hero), speed: DND.speed(hero),
                 xpLevel: DND.levelFromXp(hero.xp), subclassLevel: DND.subclassLevel(hero),
             }));
-            const skillChoices = computed(() => DND.skillChoices(hero).map(c => ({
-                ...c, picked: hero.skillProfs.filter(s => c.options.includes(s) && !granted.value.includes(s)).length,
-            })));
+            const skillAlloc = computed(() => DND.skillAllocation(hero));
             const weaponRows = computed(() => hero.weapons.map(id => DND.weaponAttack(hero, id)).filter(Boolean));
 
             // —— 装备与背包 ——
@@ -3490,7 +3489,7 @@ return {
     options, isAvatarLoading, handleImageUpload, openAvatarModal, regenerateAvatar, showAvatarModal, tempAvatarPrompt, saveAvatarPromptOnly,
     imageGenArtistPresetOptions, isImageGenArtistCustom, applyImageGenArtistPreset, onAvatarLoad, onAvatarError, settings, showToast,
     radarLabels, radarGrid, radarStatsPoints, showWeaponModal,
-    abilityNames, editionList, alignments, weaponProps, backstoryFields, ed, cls, race, subrace, bg, granted, derived, skillChoices, weaponRows, weaponList, featureList, resourceList,
+    abilityNames, editionList, alignments, weaponProps, backstoryFields, ed, cls, race, subrace, bg, granted, derived, skillAlloc, weaponRows, weaponList, featureList, resourceList,
     choiceList, picks, setChoice, toggleChoice, suggestedLanguages, suggestedTools, expertiseAllowed, armorIssue, defenseText,
     coinTypes, slotNames, rarityNames, rarityColor, encumbranceText, attuneMax, load, attunedCount, equipIssues, openItem, gearName, effectText, setArmor, setShield, addWeapon, unequipWeapon,
     toggleAttune, addCustomItem, sentientOptions, toggleSentient, rollSentient, sentientMod, lib, openItemLibrary, libResults, addLibraryItem,

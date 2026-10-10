@@ -648,6 +648,23 @@
         ].filter(Boolean);
     };
 
+    // 把自选的技能分给各个来源，每个技能只算一次（各来源的可选范围会重叠，比如半精灵游荡者）
+    // 用二分匹配找最合适的分法；返回 { groups: [{ source, count, options, picked }], extra: 哪个来源都放不下的技能 }
+    const skillAllocation = (char) => {
+        const groups = skillChoices(char); const granted = grantedSkills(char);
+        const picks = (char.skillProfs || []).filter(s => !granted.includes(s));
+        const slots = groups.flatMap((g, gi) => Array(g.count).fill(gi));
+        const owner = slots.map(() => -1);
+        const assign = (p, seen) => slots.some((gi, s) => {
+            if (seen.has(s) || !groups[gi].options.includes(picks[p])) return false;
+            seen.add(s);
+            if (owner[s] === -1 || assign(owner[s], seen)) { owner[s] = p; return true; }
+            return false;
+        });
+        const extra = picks.filter((_, p) => !assign(p, new Set()));
+        return { groups: groups.map((g, gi) => ({ ...g, picked: owner.filter((p, s) => p !== -1 && slots[s] === gi).length })), extra };
+    };
+
     const newCharacter = (editionId = '2024') => ({
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         edition: editionId, name: '', gender: '', age: '', alignment: '', avatar: null, avatar_prompt: '',
@@ -694,5 +711,5 @@
         return char;
     };
 
-    root.DND = { ABILITIES, SKILLS, ALL_SKILLS, CLASSES, ARMOR, WEAPONS, CONDITIONS, XP_TABLE, STANDARD_ARRAY, POINT_BUY, editions, edition, classInfo, isLucky, speciesSpells, chose, DAMAGE_TYPES, damageMods, damageModsText, parseDefense, adjustDamage, subclassesOf, casterType, spellAbilityOf, hasStyle, armorTraining, armorIssue, GEAR_WEIGHT, SLOTS, ATTUNE_MAX, itemFromRef, activeItems, itemBonus, syncEquipment, encumbrance, ENCUMBRANCE_TEXT, equipmentIssues, sentientCheckMod, casterSummary, classEntries, classLevel, subclassEntry, isMulticlass, classSummary, hitDicePool, hitDiceText, multiclassIssues, fitMulticlass, MULTICLASS_REQ, slotLevel, slotLabel, weaponData, signed, abilityMod, profBonus, levelFromXp, rollDice, d20Test, saveProficient, saveMod, skillMod, passivePerception, armorClass, maxHp, spellSlots, spellSaveDc, spellAttack, weaponAttack, weaponProficient, initiativeMod, speed, halfProficiency, auraOfProtection, steps, critRange, rageDamage, sneakAttackDice, classFeatures, classResources, asiRecords, asiLevels, characterFeats, hasFeat, hasFightingStyle, cantripsKnown, spellsAllowed, maxSpellLevel, classSpells, alwaysPreparedSpells, spellCastingClass, raceOf, subraceOf, backgroundOf, subclassLevel, pointBuyCost, finalAbilities, grantedSkills, skillChoices, newCharacter, normalizeCharacter };
+    root.DND = { ABILITIES, SKILLS, ALL_SKILLS, CLASSES, ARMOR, WEAPONS, CONDITIONS, XP_TABLE, STANDARD_ARRAY, POINT_BUY, editions, edition, classInfo, isLucky, skillAllocation, speciesSpells, chose, DAMAGE_TYPES, damageMods, damageModsText, parseDefense, adjustDamage, subclassesOf, casterType, spellAbilityOf, hasStyle, armorTraining, armorIssue, GEAR_WEIGHT, SLOTS, ATTUNE_MAX, itemFromRef, activeItems, itemBonus, syncEquipment, encumbrance, ENCUMBRANCE_TEXT, equipmentIssues, sentientCheckMod, casterSummary, classEntries, classLevel, subclassEntry, isMulticlass, classSummary, hitDicePool, hitDiceText, multiclassIssues, fitMulticlass, MULTICLASS_REQ, slotLevel, slotLabel, weaponData, signed, abilityMod, profBonus, levelFromXp, rollDice, d20Test, saveProficient, saveMod, skillMod, passivePerception, armorClass, maxHp, spellSlots, spellSaveDc, spellAttack, weaponAttack, weaponProficient, initiativeMod, speed, halfProficiency, auraOfProtection, steps, critRange, rageDamage, sneakAttackDice, classFeatures, classResources, asiRecords, asiLevels, characterFeats, hasFeat, hasFightingStyle, cantripsKnown, spellsAllowed, maxSpellLevel, classSpells, alwaysPreparedSpells, spellCastingClass, raceOf, subraceOf, backgroundOf, subclassLevel, pointBuyCost, finalAbilities, grantedSkills, skillChoices, newCharacter, normalizeCharacter };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -2175,7 +2175,9 @@
                                     <div v-if="!viewedMap" class="text-sm text-slate-500 py-10 text-center">还没有地图。DM 介绍新地区时会自动建图，也可以在上面新建或导入。</div>
                                     <div v-else class="grid gap-3 md:grid-cols-[1fr_300px]">
                                         <div class="space-y-1">
-                                            <svg ref="mapSvg" viewBox="0 0 600 600" class="w-full aspect-square bg-dark-950 rounded-xl border border-dark-700" :class="canEditWorld ? 'cursor-crosshair' : ''" @click="mapClick">
+                                            <div class="relative">
+                                            <svg ref="mapSvg" viewBox="0 0 600 600" class="w-full aspect-square bg-dark-950 rounded-xl border border-dark-700 touch-none select-none" :class="mapDrag ? 'cursor-grabbing' : 'cursor-grab'" @click="mapClick" @wheel.prevent="mapWheel" @pointerdown="mapPointerDown" @pointermove="mapPointerMove" @pointerup="mapPointerUp" @pointercancel="mapPointerUp">
+                                                <defs><clipPath id="world-map-clip"><rect x="20" y="20" width="560" height="560" /></clipPath></defs>
                                                 <g v-for="t in mapFrame.ticksX" :key="'x' + t">
                                                     <line :x1="mapFrame.sx(t)" y1="20" :x2="mapFrame.sx(t)" y2="580" :stroke="t === 0 ? '#475569' : '#1e293b'" />
                                                     <text :x="mapFrame.sx(t)" y="597" font-size="14" fill="#64748b" text-anchor="middle">{{ t }}</text>
@@ -2185,12 +2187,20 @@
                                                     <text x="17" :y="mapFrame.sy(t) + 5" font-size="14" fill="#64748b" text-anchor="end">{{ t }}</text>
                                                 </g>
                                                 <text x="590" y="16" font-size="15" fill="#64748b" text-anchor="end">北 ↑</text>
-                                                <g v-for="pl in viewedMap.places" :key="pl.name" @click.stop="selectedPlace = pl.name" class="cursor-pointer">
-                                                    <circle :cx="mapFrame.sx(pl.x)" :cy="mapFrame.sy(pl.y)" r="9" :fill="isHere(pl) ? '#d4af37' : hasSubMap(pl) ? '#34d399' : '#94a3b8'" :stroke="selectedPlace === pl.name ? '#ffffff' : '#020617'" stroke-width="2" />
-                                                    <text :x="mapFrame.sx(pl.x) + 13" :y="mapFrame.sy(pl.y) + 6" font-size="19" :fill="isHere(pl) ? '#fde68a' : '#e2e8f0'">{{ pl.name }}</text>
+                                                <g clip-path="url(#world-map-clip)">
+                                                    <circle v-for="l in mapLabels" :key="'c' + l.pl.name" :cx="l.cx" :cy="l.cy" r="9" :fill="isHere(l.pl) ? '#d4af37' : hasSubMap(l.pl) ? '#34d399' : '#94a3b8'" :stroke="selectedPlace === l.pl.name ? '#ffffff' : '#020617'" stroke-width="2" />
+                                                    <text v-for="l in mapLabels.filter(l => !l.hidden)" :key="'t' + l.pl.name" :x="l.lx" :y="l.ly" :text-anchor="l.anchor" font-size="19" :fill="isHere(l.pl) ? '#fde68a' : '#e2e8f0'" stroke="#020617" stroke-width="4" paint-order="stroke">{{ l.pl.name }}</text>
                                                 </g>
                                             </svg>
-                                            <div class="text-[10px] text-slate-500">单位：{{ unitNames[viewedMap.unit] }}；x 向东、y 向北；每格 {{ mapFrame.step }} {{ unitNames[viewedMap.unit] }}。金色是队伍位置，绿色地点有自己的地图。{{ canEditWorld ? '点空白处可以填入新地点坐标。' : '' }}</div>
+                                            <div class="absolute top-2 left-7 flex items-center gap-1 text-xs">
+                                                <button @click="zoomButton(1.5)" class="w-7 h-7 rounded bg-dark-800/90 border border-dark-700 hover:text-slate-100" title="放大">＋</button>
+                                                <button @click="zoomButton(1 / 1.5)" class="w-7 h-7 rounded bg-dark-800/90 border border-dark-700 hover:text-slate-100" title="缩小">－</button>
+                                                <button @click="resetMapView" class="h-7 px-2 rounded bg-dark-800/90 border border-dark-700 hover:text-slate-100" title="显示全部地点">复位</button>
+                                                <span v-if="mapZoom !== 1" class="text-slate-500">{{ Math.round(mapZoom * 100) }}%</span>
+                                                <span v-if="mapLabels.some(l => l.hidden)" class="text-amber-300/80">地点太挤，放大看全部名字</span>
+                                            </div>
+                                            </div>
+                                            <div class="text-[10px] text-slate-500">单位：{{ unitNames[viewedMap.unit] }}；x 向东、y 向北；每格 {{ mapFrame.step }} {{ unitNames[viewedMap.unit] }}。金色是队伍位置，绿色地点有自己的地图。滚轮或双指缩放，按住拖动。{{ canEditWorld ? '点空白处可以填入新地点坐标。' : '' }}</div>
                                         </div>
                                         <div class="space-y-3 text-xs">
                                             <div v-if="selected" class="p-3 rounded-xl border border-dark-700 bg-dark-950 space-y-2">
@@ -7650,25 +7660,80 @@ ${buildInvestigatorProfile(inv)}
                 const hasSubMap = (pl) => !!pl && pl.name !== viewedMap.value?.name && !!DND.world.map(cocState.world, pl.name);
                 const openWorldMap = () => { viewMapName.value = cocState.world.map; selectedPlace.value = ''; showWorldMap.value = true; };
                 // 坐标轴：按地点范围自动缩放，北在上，原点总在图内
+                // 缩放和平移：mapZoom 1 = 显示全部地点；mapCenter 为空时居中。换地图时复位
+                const mapZoom = ref(1); const mapCenter = ref(null); const mapDrag = ref(null);
+                watch(() => viewedMap.value?.name, () => { mapZoom.value = 1; mapCenter.value = null; });
+                const niceStep = (raw) => { const mag = 10 ** Math.floor(Math.log10(raw)); return [1, 2, 5, 10].map(k => k * mag).find(v => v >= raw); };
+                // 坐标轴：北在上，原点总在全图范围内；ux/uy 把图上的点换回地图坐标
                 const mapFrame = Vue.computed(() => {
                     const pts = viewedMap.value?.places || [];
                     const xs = [0, ...pts.map(p => p.x)]; const ys = [0, ...pts.map(p => p.y)];
-                    const span = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys), viewedMap.value?.unit === 'foot' ? 100 : 10) * 1.4;
-                    const raw = span / 8; const mag = 10 ** Math.floor(Math.log10(raw));
-                    const step = [1, 2, 5, 10].map(k => k * mag).find(v => v >= raw);
-                    const cx = (Math.max(...xs) + Math.min(...xs)) / 2 + span * 0.05; const cy = (Math.max(...ys) + Math.min(...ys)) / 2;
-                    const count = Math.ceil(span / step) + 1; const size = count * step;
-                    const x0 = Math.floor((cx - size / 2) / step) * step; const y0 = Math.floor((cy - size / 2) / step) * step;
-                    const ticks = (start) => Array.from({ length: count + 1 }, (_, i) => Math.round((start + i * step) * 1000) / 1000);
-                    return { step, x0, y0, size, ticksX: ticks(x0), ticksY: ticks(y0), sx: (x) => 20 + (x - x0) / size * 560, sy: (y) => 580 - (y - y0) / size * 560 };
+                    const fit = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys), viewedMap.value?.unit === 'foot' ? 100 : 10) * 1.4;
+                    const size = fit / mapZoom.value; const step = niceStep(size / 8);
+                    const center = mapCenter.value || { x: (Math.max(...xs) + Math.min(...xs)) / 2 + fit * 0.05, y: (Math.max(...ys) + Math.min(...ys)) / 2 };
+                    const x0 = center.x - size / 2; const y0 = center.y - size / 2;
+                    const ticks = (start) => { const out = []; for (let t = Math.ceil(start / step) * step; t <= start + size + 1e-9; t += step) out.push(Math.round(t * 1000) / 1000); return out; };
+                    return { step, size, center, ticksX: ticks(x0), ticksY: ticks(y0),
+                        sx: (x) => 20 + (x - x0) / size * 560, sy: (y) => 580 - (y - y0) / size * 560, ux: (px) => x0 + (px - 20) / 560 * size, uy: (py) => y0 + (580 - py) / 560 * size };
                 });
-                // 点地图空白处：把坐标填进「标注地点」
+                // 地点名避开其他地点和名字：依次试右侧、右上、右下、左侧……
+                const mapLabels = Vue.computed(() => {
+                    const f = mapFrame.value; const places = viewedMap.value?.places || [];
+                    const dots = places.map(pl => ({ pl, cx: f.sx(pl.x), cy: f.sy(pl.y) }));
+                    const boxes = dots.map(d => ({ x1: d.cx - 10, x2: d.cx + 10, y1: d.cy - 10, y2: d.cy + 10 }));
+                    const free = (b) => !boxes.some(o => b.x1 < o.x2 && b.x2 > o.x1 && b.y1 < o.y2 && b.y2 > o.y1);
+                    const tries = [[13, 6, 'start'], [13, -14, 'start'], [13, 26, 'start'], [-13, 6, 'end'], [-13, -14, 'end'], [-13, 26, 'end'], [0, -16, 'middle'], [0, 32, 'middle']];
+                    return dots.map(d => {
+                        const w = d.pl.name.length * 19 + 4;
+                        const box = ([dx, dy, a]) => { const x1 = d.cx + dx - (a === 'end' ? w : a === 'middle' ? w / 2 : 0); return { x1, x2: x1 + w, y1: d.cy + dy - 17, y2: d.cy + dy + 4 }; };
+                        // 实在放不下就先不写名字（圆点还在），放大后自然会出现
+                        const pick = tries.find(t => free(box(t)));
+                        if (!pick) return { ...d, hidden: true, box: { x1: 0, x2: 0, y1: 0, y2: 0 } };
+                        boxes.push(box(pick));
+                        return { ...d, lx: d.cx + pick[0], ly: d.cy + pick[1], anchor: pick[2], box: box(pick) };
+                    });
+                });
+                const svgPoint = (e) => { const pt = mapSvg.value.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; return pt.matrixTransform(mapSvg.value.getScreenCTM().inverse()); };
+                // 以图上某点为中心缩放，这个点在屏幕上的位置不变
+                const zoomAt = (factor, p) => {
+                    const f = mapFrame.value; const next = Math.min(50, Math.max(0.5, mapZoom.value * factor)); const k = mapZoom.value / next;
+                    const ux = f.ux(p.x); const uy = f.uy(p.y);
+                    mapCenter.value = { x: ux + (f.center.x - ux) * k, y: uy + (f.center.y - uy) * k }; mapZoom.value = next;
+                };
+                const mapWheel = (e) => zoomAt(e.deltaY < 0 ? 1.2 : 1 / 1.2, svgPoint(e));
+                const zoomButton = (factor) => zoomAt(factor, { x: 300, y: 300 });
+                const resetMapView = () => { mapZoom.value = 1; mapCenter.value = null; };
+                // 拖动平移；两指捏合缩放。拖动过就不算点击
+                const mapPointers = new Map(); let mapMoved = false;
+                const pinch = () => { const [a, b] = [...mapPointers.values()]; return { d: Math.hypot(a.x - b.x, a.y - b.y), mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } }; };
+                const mapPointerDown = (e) => {
+                    mapPointers.set(e.pointerId, svgPoint(e)); e.currentTarget.setPointerCapture?.(e.pointerId);
+                    if (mapPointers.size === 1) { mapMoved = false; mapDrag.value = { start: svgPoint(e), center: { ...mapFrame.value.center } }; }
+                    else if (mapPointers.size === 2) mapDrag.value = { pinch: pinch().d };
+                };
+                const mapPointerMove = (e) => {
+                    if (!mapDrag.value || !mapPointers.has(e.pointerId)) return;
+                    mapPointers.set(e.pointerId, svgPoint(e));
+                    if (mapPointers.size === 2 && mapDrag.value.pinch) {
+                        const { d, mid } = pinch(); zoomAt(d / mapDrag.value.pinch, mid); mapDrag.value.pinch = d; mapMoved = true; return;
+                    }
+                    const p = svgPoint(e); const { start, center } = mapDrag.value; if (!start) return;
+                    const dx = p.x - start.x; const dy = p.y - start.y;
+                    if (Math.abs(dx) + Math.abs(dy) > 6) mapMoved = true;
+                    if (mapMoved) { const k = mapFrame.value.size / 560; mapCenter.value = { x: center.x - dx * k, y: center.y + dy * k }; }
+                };
+                const mapPointerUp = (e) => { mapPointers.delete(e.pointerId); if (!mapPointers.size) mapDrag.value = null; };
+                // 点地点（圆点或名字）选中；单人或房主点空白处把坐标填进「标注地点」
                 const mapClick = (e) => {
-                    if (!canEditWorld.value || !mapSvg.value) return;
-                    const pt = mapSvg.value.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY;
-                    const p = pt.matrixTransform(mapSvg.value.getScreenCTM().inverse()); const f = mapFrame.value; const grain = f.step / 10;
-                    newPlace.x = Math.round((f.x0 + (p.x - 20) / 560 * f.size) / grain) * grain;
-                    newPlace.y = Math.round((f.y0 + (580 - p.y) / 560 * f.size) / grain) * grain;
+                    if (mapMoved) { mapMoved = false; return; }
+                    if (!mapSvg.value) return;
+                    const p = svgPoint(e);
+                    const hit = mapLabels.value.find(l => Math.hypot(l.cx - p.x, l.cy - p.y) < 16 || (p.x > l.box.x1 && p.x < l.box.x2 && p.y > l.box.y1 && p.y < l.box.y2));
+                    if (hit) { selectedPlace.value = hit.pl.name; return; }
+                    if (!canEditWorld.value) return;
+                    const f = mapFrame.value; const grain = f.step / 10;
+                    newPlace.x = Math.round(Math.round(f.ux(p.x) / grain) * grain * 1000) / 1000;
+                    newPlace.y = Math.round(Math.round(f.uy(p.y) / grain) * grain * 1000) / 1000;
                     selectedPlace.value = '';
                 };
                 const travelOptions = Vue.computed(() => Object.keys(DND.PACES).map(pace => {
@@ -8625,7 +8690,7 @@ ${buildInvestigatorProfile(inv)}
                     charReviewState, startCharReview, importReviewModule, importReviewInvestigator,
                     toggleReady, allPlayersReady, handleInvestigatorClick, toggleAiPlayer,
                     openLibrary, openCocCard,
-                    hasCot, getCotContent, removeCot, toggleCot, regenerateLastResponse, lastAssistantIndex, hideSystemCommands, showWorldMap, mapSvg, viewMapName, selectedPlace, travelDifficult, newPlace, newMap, mapKinds, unitNames, canEditWorld, canAct, worldClock, viewedMap, selected, isHere, hasSubMap, openWorldMap, mapFrame, mapClick, travelOptions, travelTo, enterMap, worldEdited, setHere, addMap, removeMap, editPlace, savePlace, removePlace, exportMaps, importMaps, activeHero, viewInvestigatorIndex, shownIndex, viewingOther, fillCommand, heroTitle, heroStats, combatNext, combatEnd, signed: DND.signed, sanitizeBadgeIcon, formatStLog, parseStLogDiff,
+                    hasCot, getCotContent, removeCot, toggleCot, regenerateLastResponse, lastAssistantIndex, hideSystemCommands, showWorldMap, mapSvg, viewMapName, selectedPlace, travelDifficult, newPlace, newMap, mapKinds, unitNames, canEditWorld, canAct, worldClock, viewedMap, selected, isHere, hasSubMap, openWorldMap, mapFrame, mapClick, mapZoom, mapDrag, mapLabels, mapWheel, zoomButton, resetMapView, mapPointerDown, mapPointerMove, mapPointerUp, travelOptions, travelTo, enterMap, worldEdited, setHere, addMap, removeMap, editPlace, savePlace, removePlace, exportMaps, importMaps, activeHero, viewInvestigatorIndex, shownIndex, viewingOther, fillCommand, heroTitle, heroStats, combatNext, combatEnd, signed: DND.signed, sanitizeBadgeIcon, formatStLog, parseStLogDiff,
                     settlementState, confirmEndGame,
                     tavernState, importTavernSave, generateNovel, saveNovel, deleteNovel, viewNovel, exportNovel,
                     downloadReport, canViewReport,
