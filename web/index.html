@@ -38,6 +38,7 @@
     <script src="assets/vendor/mammoth.browser.min.js"></script>
     <script src="assets/js/module-file.js"></script>
     <script src="assets/vendor/FileSaver.min.js"></script>
+    <script src="assets/vendor/localforage.min.js"></script>
     <script src="assets/vendor/html-docx.js"></script>
     <style>
         :root { --app-font-family: 'Noto Serif SC', serif; --z-ui-gothic: 'Grenze Gotisch', 'Noto Serif SC', 'Songti SC', serif; --chat-font-size: 16px; }
@@ -306,6 +307,7 @@
         .markdown-body ul, .markdown-body ol { padding-left: 1.5em; margin-bottom: 0.8em; list-style-type: disc; }
         .markdown-body ol { list-style-type: decimal; }
         .markdown-body li { margin-bottom: 0.3em; }
+        .z-tip-body { font-size: 12px; line-height: 1.6; color: #e0f2fe; } .z-tip-body p, .z-tip-body ul, .z-tip-body ol { margin-bottom: .4em; } .z-tip-body > :last-child { margin-bottom: 0; } .z-tip-body strong { color: #7dd3fc; }
         .markdown-body h1, .markdown-body h2, .markdown-body h3 { color: #c0a062; font-family: 'Noto Serif SC', serif; margin-top: 1em; margin-bottom: 0.5em; font-weight: bold; }
         .markdown-body h1 { font-size: 1.5em; border-bottom: 1px solid #334155; padding-bottom: 0.2em; }
         .markdown-body h2 { font-size: 1.3em; }
@@ -2101,6 +2103,7 @@
                         <div class="mt-4 flex flex-col items-center gap-2 not-italic">
                             <button v-if="resumeSave" @click="loadSave(resumeSave)" class="px-4 py-2 bg-mystic-gold/10 border border-mystic-gold/50 rounded text-mystic-gold hover:bg-mystic-gold hover:text-dark-900 transition-colors text-sm">继续上次的冒险：{{ resumeSave.moduleName || '未命名模组' }}</button>
                             <button @click="currentView = 'coc'" class="px-4 py-2 bg-dark-800 border border-dark-600 rounded hover:border-mystic-gold hover:text-mystic-gold transition-colors text-sm">开始新的冒险</button>
+                            <button @click="currentView = 'manual'" class="text-xs text-sky-300/80 hover:text-sky-200 underline underline-offset-4">第一次玩？先看新手入门</button>
                         </div>
                     </div>
                 </div>
@@ -2110,9 +2113,9 @@
                             <div class="absolute inset-0 bg-gradient-to-r from-mystic-gold/5 via-transparent to-transparent pointer-events-none"></div>
                             <div class="flex items-center gap-4 overflow-hidden relative z-10">
                                 <button @click="showMobileMenu = !showMobileMenu" aria-label="切换导航菜单" :aria-expanded="showMobileMenu" class="md:hidden text-slate-400 flex-shrink-0 hover:text-mystic-gold transition-colors"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path></svg></button>
-                                <div class="flex flex-col">
+                                <div class="flex flex-col min-w-0">
                                     <div class="text-[10px] text-mystic-gold/60 uppercase tracking-[0.2em] font-bold">当前模组</div>
-                                    <div class="font-bold text-mystic-gold truncate max-w-[200px] md:max-w-[400px] font-serif tracking-wide text-lg text-shadow-gold">{{ cocState.module?.name || '未命名模组' }}</div>
+                                    <div class="font-bold text-mystic-gold truncate max-w-[38vw] md:max-w-[400px] font-serif tracking-wide text-lg text-shadow-gold">{{ cocState.module?.name || '未命名模组' }}</div>
                                 </div>
                                 <!-- Player Preview (Top Bar) -->
                                 <div v-if="cocState.mode === 'multi' && multiplayerState.members.length > 0" class="hidden md:flex items-center -space-x-2 ml-6 border-l border-dark-700 pl-6 py-1">
@@ -2139,11 +2142,11 @@
                                     <svg class="w-3 h-3 text-slate-600 group-hover:text-mystic-gold transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
                                 </div>
                                 <button @click="showMobileRightSidebar = !showMobileRightSidebar" aria-label="切换冒险者面板" :aria-expanded="showMobileRightSidebar" class="md:hidden p-2 text-slate-400 hover:text-mystic-gold transition-colors rounded-lg border border-transparent hover:border-dark-700 hover:bg-dark-800"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg></button>
-                                <button v-if="cocState.mode === 'single' || (cocState.mode === 'multi' && multiplayerState.isHost)" @click="saveGame" class="group flex items-center gap-2 px-3 py-1.5 rounded border border-indigo-900/30 bg-indigo-900/10 hover:bg-indigo-900/20 hover:border-indigo-500/50 transition-all mr-2">
+                                <button v-if="cocState.mode === 'single' || (cocState.mode === 'multi' && multiplayerState.isHost)" @click="saveGame" class="group flex items-center gap-2 whitespace-nowrap shrink-0 px-3 py-1.5 rounded border border-indigo-900/30 bg-indigo-900/10 hover:bg-indigo-900/20 hover:border-indigo-500/50 transition-all mr-2">
                                     <span class="text-[10px] text-indigo-400 group-hover:text-indigo-300 uppercase font-bold tracking-widest">保存</span>
                                     <svg class="w-3 h-3 text-indigo-500/70 group-hover:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
                                 </button>
-                                <button @click="exitCocGame" class="group flex items-center gap-2 px-3 py-1.5 rounded border border-red-900/30 bg-red-900/10 hover:bg-red-900/20 hover:border-red-500/50 transition-all">
+                                <button @click="exitCocGame" class="group flex items-center gap-2 whitespace-nowrap shrink-0 px-3 py-1.5 rounded border border-red-900/30 bg-red-900/10 hover:bg-red-900/20 hover:border-red-500/50 transition-all">
                                     <span class="text-[10px] text-red-400 group-hover:text-red-300 uppercase font-bold tracking-widest">退出</span>
                                     <svg class="w-3 h-3 text-red-500/70 group-hover:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
                                 </button>
@@ -2157,6 +2160,7 @@
                                 <span class="text-slate-400 truncate">{{ cocState.world.map || '还没有地图' }}{{ cocState.world.here ? ' · ' + cocState.world.here : '' }}</span>
                                 <span class="text-slate-500 whitespace-nowrap">地图 ›</span>
                             </button>
+                            <button v-if="cocState.mode === 'single' || multiplayerState.isHost" @click="setTableMode('beginnerMode', !cocState.beginnerMode)" class="ml-auto whitespace-nowrap px-2 py-0.5 rounded border" :class="cocState.beginnerMode ? 'border-sky-700/60 text-sky-300' : 'border-dark-700 text-slate-500 hover:text-slate-300'" title="开启后 DM 每次回复都会附上新手提示">📘 新手提示{{ cocState.beginnerMode ? '开' : '关' }}</button>
                         </div>
 
                         <!-- 地图面板 -->
@@ -2353,6 +2357,7 @@
                                                             <div v-if="msg.diceResult.extra" class="mt-1 space-y-0.5 text-xs text-slate-300 leading-snug break-words">
                                                                 <div v-for="(part, pIdx) in msg.diceResult.extra.split(' · ')" :key="pIdx">{{ part }}</div>
                                                             </div>
+                                                            <div v-if="cocState.beginnerMode && explainRoll(msg.diceResult)" class="mt-1.5 text-[11px] text-sky-300/90 leading-snug">📘 {{ explainRoll(msg.diceResult) }}</div>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -2386,6 +2391,10 @@
                                                     <div v-show="msg.showCot" class="cot-content markdown-body" v-html="renderMarkdown(getCotContent(msg.content))"></div>
                                                 </div>
                                                 <div class="markdown-body relative z-10 font-serif leading-loose" v-html="renderMarkdown(hideSystemCommands(removeCot(msg.content)))"></div>
+                                                <div v-if="getTip(msg.content)" class="mt-3 rounded-lg border border-sky-700/40 bg-sky-950/30 px-3 py-2 text-xs leading-relaxed text-sky-100/90 relative z-10">
+                                                    <div class="font-bold text-sky-300 mb-1">📘 新手提示</div>
+                                                    <div class="markdown-body z-tip-body" v-html="renderMarkdown(getTip(msg.content))"></div>
+                                                </div>
                                                 <div v-if="rollRequests(msg.content).length" class="mt-3 flex flex-wrap gap-2 relative z-10">
                                                     <button v-for="(r, rIdx) in rollRequests(msg.content)" :key="rIdx" @click="fillRollRequest(r)" :disabled="index !== lastAssistantIndex || !isMyRequest(r)" class="px-3 py-1 rounded-full border text-xs transition-colors disabled:cursor-default" :class="index === lastAssistantIndex && isMyRequest(r) ? 'border-mystic-gold/60 text-mystic-gold hover:bg-mystic-gold hover:text-dark-900' : 'border-dark-700 text-slate-500'" :title="index === lastAssistantIndex && isMyRequest(r) ? '点一下填入检定指令，可以再补一句行动描述' : ''">🎲 {{ r.name }}：{{ r.item }}{{ r.mode ? ` ${r.mode}` : '' }}{{ r.dc ? ` DC ${r.dc}` : '' }}</button>
                                                 </div>
@@ -2674,7 +2683,7 @@
                             </div>
 
                             <div class="max-w-4xl mx-auto flex gap-3">
-                                <textarea v-model="cocInput" ref="cocInputRef" @input="handleInput" @keydown.enter.exact="onEnterSend" @keydown.esc="showMentionList = false" :placeholder="multiplayerState.isSpectator && cocState.mode === 'multi' ? '旁观中，不能发言' : isRoundLocked ? '本轮已行动，等待队友...' : '你的行动...'" :disabled="isRoundLocked" class="flex-1 bg-dark-800 rounded-lg px-4 py-3 resize-none border border-dark-700 focus:ring-1 focus:ring-mystic-gold focus:border-mystic-gold focus:bg-dark-900 text-slate-200 placeholder-slate-600 transition-all h-[56px] custom-scrollbar disabled:opacity-50 disabled:cursor-not-allowed"></textarea>
+                                <textarea v-model="cocInput" ref="cocInputRef" @input="handleInput" @keydown.enter.exact="onEnterSend" @keydown.esc="showMentionList = false" :placeholder="multiplayerState.isSpectator && cocState.mode === 'multi' ? '旁观中，不能发言' : isRoundLocked ? '本轮已行动，等待队友...' : cocState.beginnerMode ? '直接用中文写你想做什么，比如：我走过去问老板娘发生了什么' : '你的行动...'" :disabled="isRoundLocked" class="flex-1 bg-dark-800 rounded-lg px-4 py-3 resize-none border border-dark-700 focus:ring-1 focus:ring-mystic-gold focus:border-mystic-gold focus:bg-dark-900 text-slate-200 placeholder-slate-600 transition-all h-[56px] custom-scrollbar disabled:opacity-50 disabled:cursor-not-allowed"></textarea>
                                 <button v-if="cocState.mode === 'multi' && multiplayerState.isHost && multiplayerState.roundActionIds.length && !isGenerating" @click="forceEndRound" class="self-center px-2 py-1 rounded border border-amber-700/50 text-[11px] text-amber-300 hover:bg-amber-900/30 whitespace-nowrap" title="不等还没行动的玩家，直接让 DM 回复">结束本轮</button>
                                 <button v-if="isGenerating && (cocState.mode === 'single' || multiplayerState.isHost)" @click="stopGenerating" class="self-center px-2 py-1 rounded border border-red-800/60 text-[11px] text-red-300 hover:bg-red-900/30 whitespace-nowrap" title="DM 回复太久或跑偏时停下，之后可以点「重新生成」">停止</button>
                                 <button @click="sendCocMessage" aria-label="发送消息" :disabled="!cocInput.trim() || isGenerating || isRoundLocked" class="w-[56px] h-[56px] bg-dark-800 hover:bg-mystic-gold hover:text-dark-950 text-mystic-gold border border-mystic-gold/50 rounded-lg flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-lg group"><svg class="w-6 h-6 transform rotate-90 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg></button>
@@ -2825,6 +2834,7 @@
                                     <span class="text-xs text-slate-600 mt-2 font-mono">(.txt, .md, .docx, .pdf, .json, 图片)</span>
                                     <input type="file" multiple accept=".json,.txt,.md,.docx,.doc,.pdf,image/*" @change="importCocModule" class="hidden">
                                 </label>
+                                <button @click="loadTutorialModule" class="w-full py-3 rounded-lg border border-sky-700/50 bg-sky-950/20 text-sky-200 hover:bg-sky-900/30 transition-colors text-sm">📘 第一次玩？用「新手教学冒险」（一小时左右，自动打开新手模式）</button>
                                 <div class="relative flex items-center py-2"><div class="flex-grow border-t border-dark-700"></div><span class="flex-shrink-0 mx-4 text-slate-600 text-xs font-serif tracking-widest uppercase">或</span><div class="flex-grow border-t border-dark-700"></div></div>
                                 <div class="relative group">
                                     <textarea v-model="cocState.tempModuleText" placeholder="在此粘贴模组内容..." class="w-full h-40 p-6 rounded-lg bg-dark-900/50 border border-dark-700 text-sm text-slate-300 focus:border-mystic-gold/50 focus:bg-dark-900 focus:ring-1 focus:ring-mystic-gold/50 outline-none resize-none font-serif leading-relaxed transition-all placeholder-slate-700"></textarea>
@@ -2851,27 +2861,29 @@
                         </div>
                     </div>
                     
-                    <!-- COJ Mode Toggle -->
-                    <div v-if="cocState.mode === 'single' || multiplayerState.inRoom" class="z-coj-panel glass-panel p-5 rounded-lg flex items-center justify-between border-mystic-gold/20 transition-all" :class="{'bg-mystic-gold/5 border-mystic-gold/40 shadow-glow-gold/10': cocState.isCoj}">
+                    <!-- 整局开关：戏剧叙事、新手模式 -->
+                    <template v-if="cocState.mode === 'single' || multiplayerState.inRoom">
+                    <div v-for="m in TABLE_MODES" :key="m.key" class="z-coj-panel glass-panel p-5 rounded-lg flex items-center justify-between border-mystic-gold/20 transition-all" :class="{'bg-mystic-gold/5 border-mystic-gold/40 shadow-glow-gold/10': cocState[m.key]}">
                         <div class="z-coj-main flex items-center gap-4">
-                            <div class="z-coj-icon w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-500" :class="cocState.isCoj ? 'bg-mystic-gold text-dark-900 border-mystic-gold shadow-glow-gold' : 'bg-dark-900/50 text-slate-500 border-dark-700'">
-                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path></svg>
+                            <div class="z-coj-icon w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-500" :class="cocState[m.key] ? 'bg-mystic-gold text-dark-900 border-mystic-gold shadow-glow-gold' : 'bg-dark-900/50 text-slate-500 border-dark-700'">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="m.icon"></path></svg>
                             </div>
                             <div class="z-coj-copy">
-                                <h4 class="font-bold font-serif text-lg transition-colors" :class="cocState.isCoj ? 'text-mystic-gold' : 'text-slate-300'">戏剧叙事模式</h4>
+                                <h4 class="font-bold font-serif text-lg transition-colors" :class="cocState[m.key] ? 'text-mystic-gold' : 'text-slate-300'">{{ m.title }}</h4>
                                 <div class="z-coj-note flex items-center gap-2 mt-1">
                                     <span class="z-coj-badge text-[11px] text-dark-900 font-bold bg-mystic-gold px-2 py-0.5 rounded shadow-sm">说明</span>
-                                    <span class="text-[11px] text-mystic-gold font-bold">DM 会加重情感描写和角色的高光时刻，适合剧情向的冒险</span>
+                                    <span class="text-[11px] text-mystic-gold font-bold">{{ m.desc }}</span>
                                 </div>
                             </div>
                         </div>
                         <div class="z-coj-control flex items-center gap-4">
-                            <span class="text-xs font-bold uppercase tracking-widest transition-colors font-mono" :class="cocState.isCoj ? 'text-mystic-gold' : 'text-slate-500'">{{ cocState.isCoj ? 'ACTIVE' : 'OFF' }}</span>
-                            <div class="tooltip tooltip-left" :data-tip="cocState.mode === 'multi' && !multiplayerState.isHost ? '仅房主可切换' : (cocState.gameState !== 'preparing' ? '仅能在准备阶段切换' : '点击切换叙事风格')">
-                                <input type="checkbox" v-model="cocState.isCoj" @change="toggleCojMode" :disabled="(cocState.mode === 'multi' && (!multiplayerState.isHost || cocState.gameState !== 'preparing'))" class="toggle toggle-warning toggle-lg" />
+                            <span class="text-xs font-bold uppercase tracking-widest transition-colors font-mono" :class="cocState[m.key] ? 'text-mystic-gold' : 'text-slate-500'">{{ cocState[m.key] ? 'ACTIVE' : 'OFF' }}</span>
+                            <div class="tooltip tooltip-left" :data-tip="cocState.mode === 'multi' && !multiplayerState.isHost ? '仅房主可切换' : '点击切换'">
+                                <input type="checkbox" :checked="cocState[m.key]" @change="setTableMode(m.key, $event.target.checked)" :disabled="cocState.mode === 'multi' && !multiplayerState.isHost" class="toggle toggle-warning toggle-lg" />
                             </div>
                         </div>
                     </div>
+                    </template>
 
                     <!-- Investigators -->
                     <div class="glass-panel p-6 rounded-lg relative overflow-hidden">
@@ -2884,10 +2896,19 @@
                                     <span v-else class="text-slate-500">当前轮次：等待 {{ multiplayerState.members[multiplayerState.turnIndex]?.name || 'Unknown' }} 选择...</span>
                                 </div>
                             </div>
-                            <label v-if="cocState.mode === 'single' || (cocState.mode === 'multi' && multiplayerState.isHost)" class="text-xs px-4 py-2 bg-dark-800 hover:bg-mystic-green hover:text-dark-900 border border-dark-600 hover:border-mystic-green rounded cursor-pointer transition-all text-slate-300 font-bold uppercase tracking-wide shadow-lg">导入 (.json/.png)<input type="file" accept=".json,.png" @change="importInvestigator" class="hidden"></label>
+                            <div v-if="cocState.mode === 'single' || (cocState.mode === 'multi' && multiplayerState.isHost)" class="flex flex-wrap gap-2">
+                                <button @click="pickFromWorkshop" class="text-xs px-4 py-2 bg-mystic-green/10 hover:bg-mystic-green hover:text-dark-900 border border-mystic-green/50 rounded transition-all text-mystic-green font-bold tracking-wide shadow-lg">从冒险者档案选</button>
+                                <label class="text-xs px-4 py-2 bg-dark-800 hover:bg-mystic-green hover:text-dark-900 border border-dark-600 hover:border-mystic-green rounded cursor-pointer transition-all text-slate-300 font-bold uppercase tracking-wide shadow-lg">导入 (.json/.png)<input type="file" accept=".json,.png" @change="importInvestigator" class="hidden"></label>
+                            </div>
+                        </div>
+                        <div v-if="workshopChars" class="mb-4 p-3 rounded-lg border border-mystic-green/30 bg-dark-900/60 relative z-10">
+                            <div class="flex justify-between items-center mb-2 text-xs text-slate-400"><span>点一个角色加入名册（冒险者档案里改过的角色，要重新加一次才会更新）</span><button @click="workshopChars = null" class="text-slate-500 hover:text-slate-200 px-1">✕</button></div>
+                            <div class="flex flex-wrap gap-2">
+                                <button v-for="(c, cIdx) in workshopChars" :key="cIdx" @click="pickWorkshopChar(c)" class="px-3 py-1.5 rounded border border-dark-700 hover:border-mystic-green text-sm" :class="c.classId ? 'text-slate-200' : 'text-slate-500'">{{ c.name || '未命名' }} <span class="text-xs text-slate-500">{{ c.classId ? `${CLASSES[c.classId]?.name || ''} ${c.level || 1} 级` : '没建完' }}</span></button>
+                            </div>
                         </div>
                         
-                        <div v-if="cocState.investigators.length === 0" class="text-center py-12 text-slate-600 border border-dark-800 border-dashed rounded bg-dark-900/30 font-serif italic">暂无冒险者记录... 也许他们都已迷失在时空裂隙中。</div>
+                        <div v-if="cocState.investigators.length === 0" class="text-center py-12 text-slate-600 border border-dark-800 border-dashed rounded bg-dark-900/30 font-serif italic">还没有冒险者。先去左侧「冒险者档案」建一个角色，再点上面的「从冒险者档案选」。</div>
                         <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-4 relative z-10">
                             <div v-for="(inv, index) in cocState.investigators" :key="index" class="relative p-4 rounded border transition-all cursor-pointer flex gap-4 group overflow-hidden" :class="[ cocState.activeInvestigatorIndex === index ? 'border-mystic-green bg-mystic-green/10 shadow-glow-green' : 'border-dark-700 bg-dark-800/40 hover:border-slate-500 hover:bg-dark-800', multiplayerState.assignments[index] && multiplayerState.assignments[index] !== (multiplayerState.myId || user.uuid) ? 'opacity-50' : '' ]" @click="handleInvestigatorClick(index)">
                                 <div class="absolute inset-0 bg-gradient-to-r from-mystic-green/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
@@ -4074,6 +4095,35 @@
                         </div>
                     </header>
 
+                    <!-- Section: 新手入门 -->
+                    <section class="relative group">
+                        <div class="absolute -left-4 top-0 bottom-0 w-1 bg-gradient-to-b from-sky-500/60 to-transparent rounded-full"></div>
+                        <div class="glass-panel p-8 md:p-12 rounded-3xl border border-sky-900/20 transition-all hover:border-sky-800/30">
+                            <h3 class="text-2xl font-bold text-sky-300 font-serif mb-8 flex items-center gap-4">
+                                <span class="bg-sky-900/20 p-3 rounded-2xl text-sky-300 text-2xl leading-none">📘</span>
+                                第零章：新手入门（第一次玩看这里）
+                            </h3>
+                            <div class="space-y-8 text-slate-400 text-sm font-serif leading-relaxed">
+                                <div v-for="block in BEGINNER_GUIDE" :key="block.title" class="space-y-3">
+                                    <p class="text-slate-200 font-bold text-base">{{ block.title }}</p>
+                                    <p v-for="(t, i) in block.paras || []" :key="'p' + i">{{ t }}</p>
+                                    <ul v-if="block.steps" class="space-y-3">
+                                        <li v-for="(t, i) in block.steps" :key="'s' + i" class="flex gap-4">
+                                            <span class="w-6 h-6 rounded-full bg-dark-800 border border-dark-700 flex items-center justify-center text-sky-300 shrink-0 font-bold">{{ i + 1 }}</span>
+                                            <p>{{ t }}</p>
+                                        </li>
+                                    </ul>
+                                    <ul v-if="block.items" class="space-y-2 list-disc pl-5">
+                                        <li v-for="(t, i) in block.items" :key="'i' + i">{{ t }}</li>
+                                    </ul>
+                                    <div v-if="block.terms" class="grid gap-x-6 gap-y-2 md:grid-cols-2">
+                                        <p v-for="[k, v] in block.terms" :key="k"><strong class="text-slate-200">{{ k }}</strong>：{{ v }}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
                     <!-- Section: Cloud Sync -->
                     <section class="relative group">
                         <div class="absolute -left-4 top-0 bottom-0 w-1 bg-gradient-to-b from-mystic-gold/60 to-transparent rounded-full shadow-[0_0_10px_rgba(212,175,55,0.3)]"></div>
@@ -4100,7 +4150,7 @@
                                         </li>
                                         <li class="flex gap-4">
                                             <span class="w-6 h-6 rounded-full bg-dark-800 border border-dark-700 flex items-center justify-center text-mystic-gold shrink-0 font-bold">3</span>
-                                            <p>完成注册并登录后，系统会自动拉取云端档案，并在数据变化后同步冒险者、跑团存档、异闻创作与必要设置。API Key 仍只保存在当前浏览器。</p>
+                                            <p>完成注册并登录后，系统会自动拉取云端档案，并在数据变化后同步冒险者、跑团存档、冒险小说与必要设置。API Key 仍只保存在当前浏览器。</p>
                                         </li>
                                     </ul>
                                 </div>
@@ -5628,7 +5678,7 @@
                         inspiration: parseInt(c.inspiration) > 0,
                     };
                 });
-                const cocState = reactive({ combat: DND.combat.create(), world: DND.world.create(), mode: null, isCoj: false, module: null, tempModuleText: '', investigators: [], activeInvestigatorIndex: -1, gameState: 'idle', log: [], systemPrompt: '', pendingRolls: [], isGameEnded: false });
+                const cocState = reactive({ combat: DND.combat.create(), world: DND.world.create(), mode: null, isCoj: false, beginnerMode: false, module: null, tempModuleText: '', investigators: [], activeInvestigatorIndex: -1, gameState: 'idle', log: [], systemPrompt: '', pendingRolls: [], isGameEnded: false });
                 const lastAssistantIndex = Vue.computed(() => { let idx = -1; for (let i = 0; i < cocState.log.length; i++) { if (cocState.log[i].role === 'assistant') idx = i; } return idx; });
 
                 const clearUserAssignments = (userId) => { Object.keys(multiplayerState.assignments).forEach(key => { if (multiplayerState.assignments[key] === userId) delete multiplayerState.assignments[key]; }); };
@@ -5641,9 +5691,10 @@
                     }
                     return String(val);
                 };
+                const getTip = (text) => [...ensureString(text).replace(/<cot>[\s\S]*?(?:<\/cot>|$)/g, '').matchAll(/<tip>([\s\S]*?)(?:<\/tip>|$)/g)].map(m => m[1].trim()).filter(Boolean).join('\n');
                 const hasCot = (text) => { const s = ensureString(text); return s && (s.includes('<cot>') || s.includes('<cot')); };
                 const getCotContent = (text) => { const s = ensureString(text); if (!s) return ''; const match = s.match(/<cot>([\s\S]*?)(?:<\/cot>|<cot>|$)/); return match ? match[1] : (s.includes('<cot>') ? s.split('<cot>')[1] || '' : ''); };
-                const removeCot = (text) => { const s = ensureString(text); if (!s) return ''; let clean = s.replace(/<cot>[\s\S]*?(?:<\/cot>|<cot>)/g, '').trim(); if (clean.includes('<cot>')) clean = clean.split('<cot>')[0].trim(); return clean; };
+                const removeCot = (text) => { const s = ensureString(text); if (!s) return ''; let clean = s.replace(/<cot>[\s\S]*?(?:<\/cot>|<cot>)/g, '').replace(/<tip>[\s\S]*?(?:<\/tip>|$)/g, '').trim(); if (clean.includes('<cot>')) clean = clean.split('<cot>')[0].trim(); return clean; };
                 const toggleCot = async (index) => { if (cocState.mode === 'multi' && !multiplayerState.isHost && !multiplayerState.cotAuthorizedUsers.includes(multiplayerState.myId || user.uuid)) { if (await showConfirm('您没有权限查看思维链 (CoT)。是否向房主申请权限？', '申请权限')) requestCotAccess(); return; } const msg = cocState.log[index]; if (msg) msg.showCot = !msg.showCot; };
                 const requestCotAccess = () => { if (!multiplayerState.inRoom || multiplayerState.isSpectator) return; broadcastMessage({ type: 'request_cot_access', userId: multiplayerState.myId || user.uuid, userName: user.name }); showToast('已发送权限申请', 'info'); };
                 const saveApiPreset = () => {
@@ -6700,17 +6751,20 @@ ${buildInvestigatorProfile(inv)}
                     }
                     cocState.mode = mode; currentView.value = 'preparing'; cocState.gameState = 'preparing';
                 };
-                const toggleCojMode = () => {
-                   if (cocState.mode === 'multi') {
-                       if (cocState.gameState !== 'preparing') {
-                           cocState.isCoj = !cocState.isCoj; // Revert change
-                           return showToast('多人模式中，仅能在准备阶段切换戏剧叙事模式', 'warning');
-                       }
-                       if (multiplayerState.isHost) {
-                           broadcastMessage({ type: 'coj_toggle', isCoj: cocState.isCoj });
-                       }
-                   }
-                   showToast(`戏剧叙事模式已${cocState.isCoj ? '开启' : '关闭'}`, 'info');
+                // 冒险者手册「新手入门」章节的内容
+                const BEGINNER_GUIDE = [{"title": "什么是跑团", "paras": ["你扮演一个冒险者，AI 当地下城主（DM）：描述世界、扮演所有 NPC、裁定规则。你说想做什么，DM 告诉你发生了什么；结果说不准的时候，掷骰子决定。", "不用先背规则书，加值、命中、扣血这些系统都会帮你算。"]}, {"title": "第一次玩，照这 5 步", "steps": ["填 AI 接口：进「设置」→「API 连接与服务」，填 OpenAI 兼容的 API 地址和 Key，点「获取模型列表」选一个模型。DM 说的每句话都靠它，不填就开不了局；不知道填什么就问群管理。", "建角色：左侧「冒险者档案」。最省事的办法是在页面底部输入框用一句话描述你想玩的人，比如「一个爱喝酒、力气很大的矮人战士」，点发送，AI 会把整张卡填好；再点「起始装备」，有「补全未选」就也点一下。等级保持 1 级。", "选冒险：左侧「开始冒险」→「单人模式」→ 点「第一次玩？用新手教学冒险」，会自动打开新手模式。", "带上角色：在「冒险者名册」点「从冒险者档案选」，再点你刚建的角色。", "点「开始跑团」，然后直接用中文写你想做什么。"]}, {"title": "怎么行动", "items": ["想做什么就写什么：「我走过去问老板娘发生了什么」「我小心地推开门」。想说话就直接写台词。", "DM 需要你掷骰时，消息下面会出现「🎲 名字：察觉 DC 12」这样的按钮，点一下再发送就行，还可以在后面补一句你怎么做。", "想主动检定或攻击：点右侧角色卡上的技能、武器或法术，会自动填好指令。", "新手模式下，DM 每次回复下面有蓝色的「📘 新手提示」，讲刚才用到的规则和接下来能做什么；时间条右边的按钮可以随时开关。"]}, {"title": "骰子怎么看", "items": ["大部分判定都是掷一颗 20 面骰（d20），加上你的加值，再和难度比：检定比 DC（难度），攻击比对方的 AC（护甲等级），达到就成功。", "优势是掷两次取高的，劣势是掷两次取低的。", "攻击掷出 20 是重击，伤害骰翻倍；掷出 1 必定落空。", "结果卡上写着掷出几点、加了多少、成功没有；新手模式下还会说明这次掷骰的规则。"]}, {"title": "战斗怎么打", "items": ["战斗开始后顶部会出现战斗条，按先攻（谁反应快）排好顺序，金色框是现在轮到的人。", "轮到你时：可以移动，再做一个动作，比如攻击、施法、冲刺、躲藏、帮助队友。", "攻击：先点战斗条上的敌人选目标，再点角色卡上的武器，发送。系统自动判断命中并扣血。", "生命降到 0 会倒地，之后每回合点角色卡上的「掷」做死亡豁免：攒满 3 次成功就稳定下来，3 次失败就死亡。"]}, {"title": "休息和成长", "items": ["短休（休息一小时）：可以花生命骰回血，部分职业能力也会恢复。", "长休（睡一晚）：生命和法术位全部回满。", "打败敌人、完成冒险会得到经验，够了就能升级：去「冒险者档案」升级，再重新加入名册。"]}, {"title": "常用词", "terms": [["HP（生命值）", "掉到 0 就倒地。"], ["AC（护甲等级）", "越高越难被打中。"], ["DC（难度等级）", "检定要达到的数字。"], ["调整值", "属性带来的加减，比如敏捷 14 是 +2。"], ["熟练加值", "擅长的技能、武器额外加的数，1～4 级是 +2。"], ["豁免检定", "躲开或扛住危险（陷阱、法术、毒）时掷的骰。"], ["先攻", "决定战斗顺序的掷骰。"], ["法术位", "施法用的次数，长休恢复；戏法不占法术位。"], ["生命骰", "短休时用来回血的骰子，大小跟职业有关。"]]}, {"title": "和朋友一起玩", "items": ["一个人当房主：「开始冒险」→「多人联机」建房间，把房间号发给朋友；也可以把房间设为公开，朋友在「联机大厅」里找。", "房主选好模组、给每个人分配角色，大家点准备后开局。只有房主需要填 AI 接口（其他人用 AI 建角色时也要填）。"]}];
+                // 整局开关：单人随时可切；联机由房主切换并同步给所有人
+                const TABLE_MODES = [
+                    { key: 'isCoj', title: '戏剧叙事模式', desc: 'DM 会加重情感描写和角色的高光时刻，适合剧情向的冒险', icon: 'M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z' },
+                    { key: 'beginnerMode', title: '新手模式', desc: 'DM 每次回复后附一段新手提示，讲清刚才的规则和接下来能做什么；掷骰结果也会说明怎么算', icon: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253' },
+                ];
+                const setTableMode = (key, value) => {
+                    if (cocState.mode === 'multi') {
+                        if (!multiplayerState.isHost) return;
+                        broadcastMessage({ type: 'table_mode', key, value });
+                    }
+                    cocState[key] = value;
+                    showToast(`${TABLE_MODES.find(m => m.key === key).title}已${value ? '开启' : '关闭'}`, 'info');
                 };
                 const exitCocMode = () => { if (cocState.mode === 'multi') exitCocGame(); else { cocState.mode = null; cocState.gameState = 'idle'; currentView.value = 'coc'; } };
                 const exitCocGame = async () => { 
@@ -6735,7 +6789,7 @@ ${buildInvestigatorProfile(inv)}
                         showToast('当前没有进行中的游戏', 'warning');
                         return;
                     }
-                    const save = { id: Date.now(), timestamp: Date.now(), mode: cocState.mode, isCoj: cocState.isCoj, combat: cocState.combat, world: cocState.world, moduleName: cocState.module?.name, moduleContent: cocState.module?.content, investigators: cocState.investigators, log: cocState.log, systemPrompt: cocState.systemPrompt, pendingRolls: cocState.pendingRolls, multiplayer: cocState.mode === 'multi' ? { assignments: multiplayerState.assignments, assignmentDetails: Object.entries(multiplayerState.assignments).reduce((acc, [idx, uid]) => { const member = multiplayerState.members.find(m => m.id === uid); if (member) acc[idx] = { id: uid, name: member.name }; return acc; }, {}), turnIndex: multiplayerState.turnIndex, roundActionIds: multiplayerState.roundActionIds } : { assignments: multiplayerState.assignments, roundActionIds: multiplayerState.roundActionIds }, lastMessage: cocState.log.length > 0 ? cocState.log[cocState.log.length - 1].content : '' };
+                    const save = { id: Date.now(), timestamp: Date.now(), mode: cocState.mode, isCoj: cocState.isCoj, beginnerMode: cocState.beginnerMode, combat: cocState.combat, world: cocState.world, moduleName: cocState.module?.name, moduleContent: cocState.module?.content, investigators: cocState.investigators, log: cocState.log, systemPrompt: cocState.systemPrompt, pendingRolls: cocState.pendingRolls, multiplayer: cocState.mode === 'multi' ? { assignments: multiplayerState.assignments, assignmentDetails: Object.entries(multiplayerState.assignments).reduce((acc, [idx, uid]) => { const member = multiplayerState.members.find(m => m.id === uid); if (member) acc[idx] = { id: uid, name: member.name }; return acc; }, {}), turnIndex: multiplayerState.turnIndex, roundActionIds: multiplayerState.roundActionIds } : { assignments: multiplayerState.assignments, roundActionIds: multiplayerState.roundActionIds }, lastMessage: cocState.log.length > 0 ? cocState.log[cocState.log.length - 1].content : '' };
                     
                     try {
                         // 将 Vue 响应式对象转换为纯 JSON 对象，避免 IndexedDB 克隆错误
@@ -6753,7 +6807,7 @@ ${buildInvestigatorProfile(inv)}
                 const autoSaveGame = async () => {
                     if (!cocState.mode) return;
                     const autoSaveId = 'auto_save_slot';
-                    const save = { id: autoSaveId, timestamp: Date.now(), mode: cocState.mode, isCoj: cocState.isCoj, combat: cocState.combat, world: cocState.world, moduleName: cocState.module?.name, moduleContent: cocState.module?.content, investigators: cocState.investigators, log: cocState.log, systemPrompt: cocState.systemPrompt, pendingRolls: cocState.pendingRolls, multiplayer: cocState.mode === 'multi' ? { assignments: multiplayerState.assignments, assignmentDetails: Object.entries(multiplayerState.assignments).reduce((acc, [idx, uid]) => { const member = multiplayerState.members.find(m => m.id === uid); if (member) acc[idx] = { id: uid, name: member.name }; return acc; }, {}), turnIndex: multiplayerState.turnIndex, roundActionIds: multiplayerState.roundActionIds } : { assignments: multiplayerState.assignments, roundActionIds: multiplayerState.roundActionIds }, lastMessage: cocState.log.length > 0 ? cocState.log[cocState.log.length - 1].content : '', isAutoSave: true };
+                    const save = { id: autoSaveId, timestamp: Date.now(), mode: cocState.mode, isCoj: cocState.isCoj, beginnerMode: cocState.beginnerMode, combat: cocState.combat, world: cocState.world, moduleName: cocState.module?.name, moduleContent: cocState.module?.content, investigators: cocState.investigators, log: cocState.log, systemPrompt: cocState.systemPrompt, pendingRolls: cocState.pendingRolls, multiplayer: cocState.mode === 'multi' ? { assignments: multiplayerState.assignments, assignmentDetails: Object.entries(multiplayerState.assignments).reduce((acc, [idx, uid]) => { const member = multiplayerState.members.find(m => m.id === uid); if (member) acc[idx] = { id: uid, name: member.name }; return acc; }, {}), turnIndex: multiplayerState.turnIndex, roundActionIds: multiplayerState.roundActionIds } : { assignments: multiplayerState.assignments, roundActionIds: multiplayerState.roundActionIds }, lastMessage: cocState.log.length > 0 ? cocState.log[cocState.log.length - 1].content : '', isAutoSave: true };
                     
                     try {
                         const pureSave = JSON.parse(JSON.stringify(save));
@@ -6912,6 +6966,7 @@ ${buildInvestigatorProfile(inv)}
                         cocState.mode = 'single';
                         cocState.module = { name: saveCopy.moduleName, content: saveCopy.moduleContent || '' };
                         cocState.isCoj = saveCopy.isCoj || false;
+                        cocState.beginnerMode = !!saveCopy.beginnerMode;
                         cocState.investigators = saveCopy.investigators;
                         cocState.log = saveCopy.log;
                         cocState.systemPrompt = saveCopy.systemPrompt;
@@ -7098,6 +7153,16 @@ ${buildInvestigatorProfile(inv)}
                     }
                     showToast('图片资料已追加', 'success');
                 };
+                const loadTutorialModule = async () => {
+                    try {
+                        const res = await fetch('./assets/data/tutorial-module.md', { cache: 'no-cache' });
+                        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                        cocState.module = { name: '新手教学：醉橡木酒馆的地窖', content: await res.text() };
+                        if (cocState.mode === 'multi' && multiplayerState.isHost) broadcastMessage({ type: 'sync_module', moduleName: cocState.module.name });
+                        if (!cocState.beginnerMode) setTableMode('beginnerMode', true);
+                        showToast('已载入新手教学冒险，建一个 1 级角色就能开始', 'success');
+                    } catch (e) { showToast(`教学冒险载入失败：${e.message}`, 'error'); }
+                };
                 const saveManualModule = () => { if (!cocState.tempModuleText) return; cocState.module = { name: '手动模组', content: cocState.tempModuleText }; showToast('模组保存成功', 'success'); if (cocState.mode === 'multi' && multiplayerState.isHost) broadcastMessage({ type: 'sync_module', moduleName: cocState.module.name }); };
                 const importInvestigator = async (e) => { 
                     const file = e.target.files[0]; if (!file) return;
@@ -7114,18 +7179,37 @@ ${buildInvestigatorProfile(inv)}
                             if (!data) throw new Error('未在 PNG 中找到嵌入的角色数据'); 
                             data.avatar = await compressImage(URL.createObjectURL(file), 300, 0.8); 
                         } 
-                        if (!data) throw new Error('不支持的文件格式'); 
-                        data = DND.normalizeCharacter(data); 
-                        cocState.investigators.push(data); 
-                        if (cocState.mode === 'multi' && multiplayerState.isHost) broadcastMessage({ type: 'sync_investigators', investigators: cocState.investigators }); 
-                        if (cocState.activeInvestigatorIndex === -1) cocState.activeInvestigatorIndex = cocState.investigators.length - 1; 
-                        saveData(); 
-                        showToast('冒险者导入成功: ' + data.name, 'success'); 
-                    } catch(err) { 
-                        showToast('导入失败: ' + err.message, 'error'); 
-                    } 
-                    e.target.value = ''; 
+                        if (!data) throw new Error('不支持的文件格式');
+                        await addInvestigator(data);
+                    } catch(err) {
+                        showToast('导入失败: ' + err.message, 'error');
+                    }
+                    e.target.value = '';
                 };
+                // 导入文件和从冒险者档案挑选共用：整理角色数据、压缩头像、加入名册
+                const addInvestigator = async (raw) => {
+                    const data = DND.normalizeCharacter(JSON.parse(JSON.stringify(raw)));
+                    if (!data.classId) return showToast(`「${data.name || '未命名'}」还没选职业，先去冒险者档案把角色建完`, 'warning');
+                    if (data.avatar?.startsWith('data:image')) data.avatar = await compressImage(data.avatar, 300, 0.7);
+                    else if (data.avatar?.startsWith('blob:')) delete data.avatar;
+                    cocState.investigators.push(data);
+                    if (cocState.mode === 'multi' && multiplayerState.isHost) broadcastMessage({ type: 'sync_investigators', investigators: cocState.investigators });
+                    if (cocState.activeInvestigatorIndex === -1) cocState.activeInvestigatorIndex = cocState.investigators.length - 1;
+                    saveData();
+                    showToast('冒险者已加入名册: ' + data.name, 'success');
+                    return true;
+                };
+                // 冒险者档案（车卡页）的角色存在同一个网站的浏览器存储里，直接读出来挑，不用先导出再导入
+                const workshopChars = ref(null);
+                const pickFromWorkshop = async () => {
+                    let raw = null;
+                    try { raw = await localforage.createInstance({ name: 'AICharGen_DND', storeName: 'characters_dnd' }).getItem('ai_chargen_characters_dnd'); } catch (_) {}
+                    raw = raw || localStorage.getItem('ai_chargen_characters_dnd');
+                    const list = (typeof raw === 'string' ? JSON.parse(raw) : raw) || [];
+                    if (!list.length) return showToast('冒险者档案里还没有角色，先去建一个', 'warning');
+                    workshopChars.value = list.map(c => c.hero || c);
+                };
+                const pickWorkshopChar = async (c) => { if (await addInvestigator(c)) workshopChars.value = null; };
                 const deleteInvestigator = async (index) => { if(await showConfirm('删除此冒险者？', '删除角色')) { cocState.investigators.splice(index, 1); if(cocState.activeInvestigatorIndex >= index) cocState.activeInvestigatorIndex = -1; if (cocState.mode === 'multi' && multiplayerState.isHost) { broadcastMessage({ type: 'sync_investigators', investigators: cocState.investigators }); multiplayerState.assignments = {}; broadcastMessage({ type: 'sync_assignments', assignments: {} }); } saveData(); } };
                 const toggleReady = () => {
                     if (multiplayerState.isSpectator) return showToast('旁观中不需要准备', 'warning');
@@ -7150,7 +7234,15 @@ ${buildInvestigatorProfile(inv)}
                     return list.filter(Boolean).join('');
                 };
                 // 把系统提示里的队伍资料换成最新的
-                const livePrompt = () => (cocState.systemPrompt || 'You are a Dungeon Master.').replace(/(<investigator_profiles>)[\s\S]*?(<\/investigator_profiles>)/, (m, a, b) => `${a}\n${buildPartyProfiles()}\n    ${b}`);
+                const BEGINNER_PROMPT = `
+<beginner_mode>
+玩家是第一次玩 DnD 的新手。每次回复先照常写叙事，最后另起一段，用 <tip></tip> 包住给新手的说明，3～5 行，口语化，用到术语时顺便用半句话解释：
+1. 刚才规则上发生了什么：为什么要掷骰（或为什么不用掷）、掷的是什么、结果为什么成功或失败；没用到规则就一句话点出这一幕的要点。
+2. 现在可以做什么：给 2～3 个具体的行动建议，提醒玩家直接用中文描述想做的事就行；要掷骰时告诉玩家点消息下面的检定按钮。提到技能、属性时用角色卡上的叫法。
+3. 战斗中再说明：现在轮到谁、这一回合能做什么（移动加一个动作，有的职业还有附赠动作）、怎么攻击（点战斗条上的敌人选目标，再点角色卡上的武器）。
+<tip> 里不要剧透模组秘密，不要替玩家做决定；<tip> 外面的叙事保持沉浸，不要出戏讲规则。
+</beginner_mode>`;
+                const livePrompt = () => (cocState.systemPrompt || 'You are a Dungeon Master.').replace(/(<investigator_profiles>)[\s\S]*?(<\/investigator_profiles>)/, (m, a, b) => `${a}\n${buildPartyProfiles()}\n    ${b}`) + (cocState.beginnerMode ? BEGINNER_PROMPT : '');
 
                 const confirmEndGame = () => {
                     if (cocState.mode === 'multi' && !multiplayerState.isHost) return showToast('仅房主可以确认结团', 'warning');
@@ -7379,6 +7471,7 @@ ${chunkLogs}
                 
                 const startCocGame = () => {
                     if (!cocState.module || cocState.investigators.length === 0) return showToast('请先导入模组和冒险者', 'warning');
+                    if (!settings.customApiUrl) { currentView.value = 'settings'; return showToast('先在设置的「API 连接与服务」里填好 AI 接口地址和 Key，DM 才能开口', 'warning'); }
                     if (cocState.mode === 'multi') {
                         if (playingMembers().length < 2) return showToast('多人模式至少需要 2 名真人玩家（旁观者不算）。如果只有您一人，请切换至单人模式', 'warning');
                         if (!playingMembers().every(m => m.isReady || m.isHost)) return showToast('等待其他玩家准备就绪', 'warning');
@@ -8111,7 +8204,7 @@ ${buildInvestigatorProfile(inv)}
                 const ROOM_HOST_ONLY_TYPES = new Set([
                     'sync_state', 'sync_log_append', 'update_last_message', 'update_last_message_full',
                     'sync_module', 'sync_investigators', 'sync_assignments', 'game_start', 'game_ended',
-                    'room_closed', 'grant_cot_access', 'coj_toggle', 'generating_start', 'generating_end',
+                    'room_closed', 'grant_cot_access', 'table_mode', 'generating_start', 'generating_end',
                     'regenerate_start', 'distribute_reports'
                 ]);
                 const getRoomSessionId = () => String(multiplayerState.myId || user.uuid || '').trim();
@@ -8443,6 +8536,7 @@ ${buildInvestigatorProfile(inv)}
                         gameState: cocState.gameState,
                         mode: cocState.mode,
                         isCoj: cocState.isCoj,
+                        beginnerMode: cocState.beginnerMode,
                         combat: cocState.combat,
                         world: cocState.world,
                         module: getRoomModuleSummary(),
@@ -8513,6 +8607,7 @@ ${buildInvestigatorProfile(inv)}
                         case 'sync_state':
                             if (!multiplayerState.isHost) {
                                 if (payload.isCoj !== undefined) cocState.isCoj = payload.isCoj;
+                                if (payload.beginnerMode !== undefined) cocState.beginnerMode = payload.beginnerMode;
                                 if (payload.combat) cocState.combat = payload.combat;
                                 if (payload.world) cocState.world = payload.world;
                                 if (payload.gameState) {
@@ -8671,10 +8766,11 @@ ${buildInvestigatorProfile(inv)}
                                  multiplayerState.cotAuthorizedUsers = payload.authorizedUsers;
                              }
                              break;
-                        case 'coj_toggle':
-                            cocState.isCoj = payload.isCoj;
-                            showToast(`戏剧叙事模式已${cocState.isCoj ? '开启' : '关闭'}`, 'info');
+                        case 'table_mode': {
+                            const m = TABLE_MODES.find(x => x.key === payload.key);
+                            if (m) { cocState[m.key] = !!payload.value; showToast(`${m.title}已${payload.value ? '开启' : '关闭'}`, 'info'); }
                             break;
+                        }
                         case 'generating_start':
                             if (!multiplayerState.isHost) isGenerating.value = true;
                             break;
@@ -9140,14 +9236,14 @@ ${buildInvestigatorProfile(inv)}
                     showMentionList, mentionCandidates, handleInput, selectMention, savedGames, savesFilter, groupedSaves, openFolders, toggleFolder, moveSaveToFolder, renameFolder, 
                     isSavesEditing, toggleSavesEditMode, moveFolder, deleteFolder, editFolderName, promptMoveToFolder, folderManagementState, closeFolderModal, confirmFolderAction, 
                     deleteFolderState, openDeleteFolderModal, closeDeleteFolderModal, confirmDissolveFolder, confirmDeleteAllInFolder, isRoundLocked, hasAiTeammates,
-                    selectCocMode, toggleCojMode, exitCocMode, exitCocGame, startCocGame, sendCocMessage, saveGame, deleteSave, loadSave, exportSave, importSave,
+                    selectCocMode, exitCocMode, exitCocGame, startCocGame, sendCocMessage, saveGame, deleteSave, loadSave, exportSave, importSave,
                     importCocModule, importSupplementaryImages, saveManualModule, importInvestigator, deleteInvestigator,
                     initBackend, createRoom, joinRoom, leaveRoom, setSpectator, kickPlayer, unkickMember, addFriend, acceptFriend, inviteFriend,
                     handleUserAvatarUpload, saveData, renderMarkdown, copyToClipboard,
                     charReviewState, startCharReview, importReviewModule, importReviewInvestigator,
                     toggleReady, allPlayersReady, handleInvestigatorClick, toggleAiPlayer,
                     openLibrary, openCocCard,
-                    hasCot, getCotContent, removeCot, toggleCot, rollRequests, isMyRequest, fillRollRequest, regenerateLastResponse, lastAssistantIndex, hideSystemCommands, showWorldMap, mapSvg, viewMapName, selectedPlace, travelDifficult, newPlace, newMap, mapKinds, unitNames, canEditWorld, canAct, worldClock, viewedMap, selected, isHere, hasSubMap, openWorldMap, mapFrame, mapClick, mapZoom, mapDrag, mapLabels, mapWheel, zoomButton, resetMapView, mapPointerDown, mapPointerMove, mapPointerUp, travelOptions, travelTo, enterMap, worldEdited, setHere, addMap, removeMap, editPlace, savePlace, removePlace, exportMaps, importMaps, activeHero, viewInvestigatorIndex, shownIndex, viewingOther, fillCommand, targetEnemy, onEnterSend, stopGenerating, resumeSave, heroTitle, heroStats, combatNext, combatEnd, signed: DND.signed, sanitizeBadgeIcon, formatStLog, parseStLogDiff,
+                    hasCot, getCotContent, removeCot, getTip, BEGINNER_GUIDE, CLASSES: DND.CLASSES, workshopChars, pickFromWorkshop, pickWorkshopChar, explainRoll: DND.explainRoll, TABLE_MODES, setTableMode, loadTutorialModule, toggleCot, rollRequests, isMyRequest, fillRollRequest, regenerateLastResponse, lastAssistantIndex, hideSystemCommands, showWorldMap, mapSvg, viewMapName, selectedPlace, travelDifficult, newPlace, newMap, mapKinds, unitNames, canEditWorld, canAct, worldClock, viewedMap, selected, isHere, hasSubMap, openWorldMap, mapFrame, mapClick, mapZoom, mapDrag, mapLabels, mapWheel, zoomButton, resetMapView, mapPointerDown, mapPointerMove, mapPointerUp, travelOptions, travelTo, enterMap, worldEdited, setHere, addMap, removeMap, editPlace, savePlace, removePlace, exportMaps, importMaps, activeHero, viewInvestigatorIndex, shownIndex, viewingOther, fillCommand, targetEnemy, onEnterSend, stopGenerating, resumeSave, heroTitle, heroStats, combatNext, combatEnd, signed: DND.signed, sanitizeBadgeIcon, formatStLog, parseStLogDiff,
                     settlementState, confirmEndGame,
                     tavernState, importTavernSave, generateNovel, saveNovel, deleteNovel, viewNovel, exportNovel,
                     downloadReport, canViewReport,

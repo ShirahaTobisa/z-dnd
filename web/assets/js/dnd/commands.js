@@ -4,7 +4,9 @@
 (function (root) {
     const D = root.DND;
     const ABILITY_BY_NAME = Object.fromEntries(Object.entries(D.ABILITIES).flatMap(([k, v]) => [[k, k], [k.toLowerCase(), k], [v, k]]));
-    const SKILL_BY_NAME = Object.fromEntries(Object.entries(D.SKILLS).flatMap(([id, s]) => [[id, id], [s.name, id]]));
+    // 技能的常见别的译名（DM 和玩家常这么写），也认
+    const SKILL_ALIASES = { 说服: 'persuasion', 洞察: 'insight', 察言观色: 'insight', 医疗: 'medicine', 医术: 'medicine', 生存: 'survival', 侦查: 'perception', 侦察: 'perception', 潜行: 'stealth', 隐藏: 'stealth', 杂技: 'acrobatics', 特技: 'acrobatics', 欺骗: 'deception', 恐吓: 'intimidation', 奥术: 'arcana', 驯养动物: 'animalHandling', 动物驯养: 'animalHandling', 手上功夫: 'sleightOfHand', 手法: 'sleightOfHand' };
+    const SKILL_BY_NAME = { ...SKILL_ALIASES, ...Object.fromEntries(Object.entries(D.SKILLS).flatMap(([id, s]) => [[id, id], [s.name, id]])) };
 
     // 徒手攻击人人都能用，不必列在武器栏里
     const findWeapon = (char, name) => (['徒手', '徒手攻击', 'unarmed'].includes(name) ? 'unarmed'
@@ -89,7 +91,7 @@
         if (!info) return { label: `${target} 检定`, roll: '-', level: '未找到该项', success: null };
 
         const mods = rollModifiers(char, info);
-        if (mods.autoFail) return { label: info.label, roll: '-', target: dc, level: `自动失败（${mods.autoFail}）`, success: false, extra: '' };
+        if (mods.autoFail) return { kind: info.kind, ability: info.ability, label: info.label, roll: '-', target: dc, level: `自动失败（${mods.autoFail}）`, success: false, extra: '' };
         if (/优势|\badv\b/i.test(rest)) mods.adv.push('指定');
         if (/劣势|\bdis\b/i.test(rest)) mods.dis.push('指定');
         const mod = info.mod + mods.penalty;
@@ -159,7 +161,7 @@
             const sneak = D.sneakAttackDice(char);
             if (sneak && w.finesseOrRanged) extra += ` · 满足条件可加偷袭 ${level === '重击' ? sneak * 2 : sneak}d6`;
         }
-        return { label: info.label, roll: t.total, target: dc, level, success: level ? success : null, extra, change, ...(attack ? { attack } : {}) };
+        return { kind: info.kind, ability: info.ability, label: info.label, roll: t.total, target: dc, level, success: level ? success : null, extra, change, ...(attack ? { attack } : {}) };
     };
 
     // .r 表达式
@@ -169,7 +171,7 @@
         const r = D.rollDice(m[1]);
         if (!r) return null;
         const detail = r.parts.filter(p => p.rolls).map(p => `[${p.rolls.join(',')}]`).join(' ');
-        return { label: `投骰 ${r.expr}`, roll: r.total, success: null, extra: detail };
+        return { kind: 'dice', label: `投骰 ${r.expr}`, roll: r.total, success: null, extra: detail };
     };
 
     // .st 可修改的项目：key 为角色字段，name 为显示名
@@ -566,7 +568,7 @@
         }
         const header = `${spell.level ? `${slotLevel || spell.level}环` : '戏法'} · ${spell.time} · ${spell.range}`;
         changes.unshift({ char, log: `${char.name} 施放${spell.name}：${notes.join('，') || '无消耗'}`, rollback });
-        return { label: `施放 ${spell.name}`, roll: main, level: '', success: null, extra: [header, ...details].join(' · '), changes };
+        return { kind: 'spell', label: `施放 ${spell.name}`, roll: main, level: '', success: null, extra: [header, ...details].join(' · '), changes };
     };
 
     // —— 战斗 ——
@@ -982,5 +984,21 @@
         return { name: target.name, ac: target.ac, hit, dealt: adj.dealt, log: `${hit ? (attack.crit ? '💥 重击' : '💥 命中') : '💨 未命中'} ${target.name}（AC ${target.ac}）${adj.dealt ? `，造成 ${adj.dealt} 点${attack.type}${hit ? '' : '（擦伤）'}${adj.note ? `（${adj.note}）` : ''}，剩余 ${left}/${target.maxHp}${left === 0 ? '，倒下了' : ''}` : ''}` };
     };
 
-    Object.assign(D, { resolveAttack, world, runWorldCommands, travelDuration: duration, MAP_KINDS, UNIT_NAMES, PACES, PACE_NOTES, COMMAND_GUIDE, guideLists, commandGuideText, rollCheck, rollExpr, castSpell, itemConflict, inventoryText, spellList, applyStat, undoStat, useResource, fontOfMagic, spendHitDice, rest, combat, runCombatCommands, profile });
+    // 新手模式：一两句话说明这次掷骰的规则，结果卡上显示
+    const RULE_TEXT = {
+        skill: (r) => `技能检定 = d20 + ${D.ABILITIES[r.ability]}调整值，熟练这个技能再加熟练加值；总数达到难度（DC）就成功。`,
+        ability: (r) => `属性检定 = d20 + ${D.ABILITIES[r.ability]}调整值；总数达到难度（DC）就成功。`,
+        save: (r) => `豁免检定用来躲开或扛住危险（陷阱、法术、毒）：d20 + ${D.ABILITIES[r.ability]}调整值，职业擅长的豁免再加熟练加值；达到 DC 就扛住了。`,
+        init: () => '先攻决定战斗里的行动顺序：d20 + 敏捷调整值，数字大的先行动。',
+        attack: () => '攻击检定 = d20 + 攻击加值，达到目标的护甲等级（AC）就命中，命中才算伤害；掷出 20 是重击，伤害骰翻倍，掷出 1 必定落空。',
+        death: () => '死亡豁免：生命为 0 时每回合掷一次 d20，10 以上记成功、以下记失败；先攒满 3 次成功就稳定，3 次失败就死亡；掷出 20 直接恢复 1 点生命。',
+        spell: () => '施法会消耗一个对应环阶的法术位（戏法不用），长休后恢复；要命中的法术比目标 AC，要对方豁免的法术比你的法术 DC。',
+        dice: () => '按写的骰子掷：2d6 就是两颗六面骰相加，后面的 +3 是固定加值。',
+    };
+    const explainRoll = (r) => {
+        const text = RULE_TEXT[r?.kind]?.(r) || '';
+        return text && /优势|劣势/.test(r.extra || '') ? `${text}优势是掷两次 d20 取高的，劣势取低的。` : text;
+    };
+
+    Object.assign(D, { explainRoll, resolveAttack, world, runWorldCommands, travelDuration: duration, MAP_KINDS, UNIT_NAMES, PACES, PACE_NOTES, COMMAND_GUIDE, guideLists, commandGuideText, rollCheck, rollExpr, castSpell, itemConflict, inventoryText, spellList, applyStat, undoStat, useResource, fontOfMagic, spendHitDice, rest, combat, runCombatCommands, profile });
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -42,7 +42,7 @@ var hostOnlyMessageTypes = map[string]bool{
 	"game_ended":               true,
 	"room_closed":              true,
 	"grant_cot_access":         true,
-	"coj_toggle":               true,
+	"table_mode":               true,
 	"generating_start":         true,
 	"generating_end":           true,
 	"regenerate_start":         true,
