@@ -714,7 +714,7 @@
                     <template v-else>
                         <div class="text-xs text-slate-500 mb-3">共 {{ external.total }} 个 DND 模组</div>
                         <div class="library-module-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            <div v-for="m in external.list" :key="m.keyId" class="library-module-card bg-dark-900 border border-dark-700 hover:border-amber-500/50 rounded-lg overflow-hidden flex flex-col transition-colors">
+                            <div v-for="m in external.list" :key="m.keyId" class="library-module-card relative bg-dark-900 border border-dark-700 hover:border-amber-500/50 rounded-lg overflow-hidden flex flex-col transition-colors">
                                 <div class="p-5 flex-1">
                                     <div class="flex items-center gap-2 mb-1 text-[10px]">
                                         <span class="px-1.5 py-0.5 rounded bg-amber-900/30 text-amber-400 border border-amber-500/30 font-bold">{{ m.original ? '原创' : '搬运' }}</span>
