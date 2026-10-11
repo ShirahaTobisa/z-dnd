@@ -1,6 +1,6 @@
 # z-dnd 美术素材
 
-场景大图是 DnD 奇幻题材，2026-10-11 用 NovelAI 生成；布纹、黄铜零件、星图、标本页沿用原 z-coc 素材包（GPT 图像生成），它们没有题材色彩。各图的提示词见 `PROMPTS.md`。
+DnD 奇幻题材的图 2026-10-11 生成：场景大图用 NovelAI；d20 徽章、透明圆环、草药图鉴、龙骨图鉴、四人小队这几张 NovelAI 画不准，改用 GPT 图像生成。布纹、黄铜零件、星图沿用原 z-coc 素材包，它们没有题材色彩。提示词都在 `PROMPTS.md`。
 
 ## 使用原则
 
@@ -18,14 +18,14 @@
 | `generated/dnd-tavern-night.webp` | 冒险小说 | 打烊后的奇幻酒馆 |
 | `generated/dnd-guild-library.webp` | 图书馆阅览室 | 圆顶法师图书馆 |
 | `generated/dnd-forbidden-vault.webp` | 图书馆禁书区 | 地下禁书库、铁栅门和锁链 |
-| `generated/dnd-party-campfire.webp` | 多人联机卡片 | 星空下围着篝火的冒险者 |
+| `generated/dnd-party-campfire.webp` | 多人联机卡片 | 篝火边的四人冒险小队（GPT） |
 | `generated/dnd-launch-dragon.webp` | 开场动画 | 满月下盘踞高塔的龙 |
-| `generated/dnd-bestiary-dragon.webp` | 冒险者手册、空状态水印 | 龙骨解剖素描 |
-| `generated/dnd-brand-medallion.webp` | 侧栏品牌徽章 | 龙纹黄铜圆章 |
+| `generated/dnd-bestiary-dragon.webp` | 冒险者手册、空状态水印 | 龙骨解剖版画（GPT） |
+| `generated/dnd-brand-d20.webp` | 侧栏品牌徽章 | 黄铜圆框里的 d20（GPT） |
+| `generated/dnd-medallion-ring.webp` | 车卡页勋章、404 页印记 | 黄铜符文圆环，中间空，透明背景（GPT） |
+| `generated/dnd-herbarium-plate.webp` | 设置页、空状态卡片水印 | 奇幻草药图鉴页（GPT） |
 | `generated/dark-archive-cloth-texture.webp` | 全局底纹、卡片、侧栏 | 低对比布纹 |
 | `generated/observatory-chart-1890s.webp` | 侧栏、设置、卡片水印 | 天文观测草图 |
-| `generated/marine-algae-herbarium.webp` | 空状态、卡片装饰 | 标本页 |
 | `generated/archive-corner-brass.webp` | 卡片左上角件 | 黄铜角件，透明背景 |
 | `generated/museum-label-holder.webp` | 横幅编号、标签 | 黄铜标签框，透明背景 |
 | `generated/evidence-binding-strip.webp` | 卡片底边 | 封蜡装订带，透明背景 |
-| `generated/instrument-status-medallion.webp` | 状态图标、徽章 | 黄铜表圈，透明背景 |

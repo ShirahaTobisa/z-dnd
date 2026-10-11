@@ -4,7 +4,7 @@
 
 用 NovelAI V5（`nai-diffusion-5-full`，采样器 `k_dpmpp_2m_sde`，28 步，2K 尺寸，提示词引导值 5.5，缩放引导值 0）生成，网页用的是转成 webp 的版本。补图时沿用同一组画师串，画风才统一。
 
-- 画师串：`artist:wlop, artist:ask_(askzy), artist:kawacy, painterly, best quality, absurdres, very aesthetic, masterpiece, no text`（`dnd-bestiary-dragon` 只用 `artist:wlop`，好出单色素描）
+- 画师串：`artist:wlop, artist:ask_(askzy), artist:kawacy, painterly, best quality, absurdres, very aesthetic, masterpiece, no text`
 - 负面提示词：`lowres, worst quality, low quality, jpeg artifacts, blurry, text, watermark, signature, username, logo, artist name, frame, border, chibi, oversaturated`
 
 ### dnd-town-street.webp（横图）
@@ -55,14 +55,6 @@ no humans, scenery, indoors, fantasy library, wizard library, tall bookshelves, 
 no humans, scenery, indoors, underground vault, dungeon, stone walls, iron bars, iron gate, chained book, chains, ancient tomes on stone shelves, glowing runes, faint purple magic glow, single torch, cobweb, dust, dark, ominous, dark atmosphere, cinematic lighting, wide shot
 ```
 
-### dnd-party-campfire.webp（横图）
-
-用在：多人联机卡片
-
-```text
-multiple boys, multiple girls, adventurers, fantasy, from behind, sitting around campfire, night, forest clearing, cloak, armor, staff, bow (weapon), sword, starry sky, distant mountains, campfire glow, warm light, silhouette, wide shot, scenery, cinematic lighting, dark atmosphere
-```
-
 ### dnd-launch-dragon.webp（竖图）
 
 用在：开场动画
@@ -71,20 +63,38 @@ multiple boys, multiple girls, adventurers, fantasy, from behind, sitting around
 no humans, dragon, western dragon, coiled around ruined tower, wings spread, full moon, night sky, clouds, castle ruins, mountains, moonlight, epic, fantasy, dark atmosphere, cinematic lighting, from below, vertical composition
 ```
 
-### dnd-bestiary-dragon.webp（竖图）
+## DnD 版小件和图鉴（GPT 图像生成，2026-10-11）
 
-用在：手册、空状态水印
+NovelAI 画不准几何体、出不了透明底，这几张改用 GPT 出。
+
+### dnd-brand-d20.webp（品牌徽章：黄铜 d20）
 
 ```text
-no humans, traditional media, ink sketch, monochrome, sepia, western dragon, anatomy study, side view, wings, skeleton sketch, old paper, parchment, aged paper, scientific illustration, naturalist sketch, hatching, white space, no text
+A single twenty-sided die (d20, regular icosahedron with 20 equilateral triangular faces, geometrically accurate) made of aged dark brass with subtle engraved filigree on each face, the top face showing a small engraved dragon-claw sigil instead of a number. The die sits centered inside a round antique brass medallion frame with a thin beaded rim. Painterly dark-fantasy illustration, oil-paint texture, warm candlelight rim light from the upper left, deep near-black navy background with soft vignette. Centered, front-facing, symmetrical, the whole medallion fits inside the frame with a small margin so it can be cropped to a circle. Must read clearly at very small sizes. No text, no letters, no numbers, no watermark, no signature.
 ```
 
-### dnd-brand-medallion.webp（方图）
-
-用在：侧栏品牌徽章（裁成 384×384）
+### dnd-medallion-ring.webp（黄铜表圈：透明底）
 
 ```text
-no humans, still life, round brass medallion, coin, dragon relief, embossed dragon, coiled dragon, circular emblem, ornate border, metal, antique gold, centered, front view, symmetrical, dark background, simple background, rim light, close-up, no text, no letters
+An isolated circular ornamental ring made of blackened antique brass, like the bezel of a fantasy adventurer's compass: a thick round band engraved with small arcane runes and tiny d20 motifs, four small gem studs at north, east, south and west, slight wear and patina. The center of the ring is completely empty and transparent. Front view, perfectly centered, ring fills about 90% of the canvas. Soft warm highlight on the upper-left edge, dark shading on the lower right. Transparent background (or flat pure magenta #FF00FF if transparency is unavailable). Painterly realistic metal texture, no text, no letters, no numbers, no shadow on the background, no watermark.
+```
+
+### dnd-herbarium-plate.webp（奇幻草药图鉴页）
+
+```text
+A page from a fantasy herbalist's field journal: hand-engraved botanical illustrations of three imaginary magical plants (a curling moonleaf vine with crescent-shaped leaves, a small mushroom cluster with spotted caps, and a thistle-like flower with star-shaped petals), each drawn with fine ink cross-hatching and very light watercolor washes in muted sage green and faded amber. Printed on genuinely aged warm parchment with deckled edges, light foxing spots and a faint fold crease. Portrait composition, plants arranged loosely around the page with generous empty margins, like a real 18th-century natural-history plate. Flat archival scan lighting. No title, no labels, no captions, no letters, no numbers, no readable text, no border frame, no watermark.
+```
+
+### dnd-bestiary-dragon.webp（龙骨图鉴）
+
+```text
+A naturalist's anatomical study plate of a western dragon, drawn as a museum-quality copperplate engraving: the dragon's skeleton shown in side view with a horned reptilian skull, long serpentine neck vertebrae, ribcage, four clawed legs and the bone structure of one bat-like wing extended upward, plus two small secondary sketches of a single claw and a wing joint in the lower corner. Fine ink cross-hatching in faded sepia-black on aged warm gray parchment with slight ink spread, foxing spots and soft scan shadows. Portrait composition, specimen centered with quiet paper margins. Scientific and believable, not monstrous. No title, no labels, no letters, no numbers, no readable text, no decorative border, no watermark.
+```
+
+### dnd-party-campfire.webp（四人冒险小队）
+
+```text
+Four fantasy adventurers resting around a small campfire in a forest clearing at night, seen from slightly behind and to the side so their faces are mostly hidden: an armored fighter with a sword leaning on a log, a hooded ranger holding a longbow, a robed wizard with a tall staff, and a cleric with a round shield. Starry night sky with distant snowy mountains above the treeline. Painterly dark-fantasy oil painting, visible brush strokes, warm orange firelight on the figures against cool blue-gray night shadows. Wide landscape composition with the group in the lower third and plenty of dark sky above for text overlays. No text, no logo, no watermark, no signature.
 ```
 
 ## 沿用的克苏鲁版通用素材（GPT 图像生成）
@@ -117,20 +127,6 @@ Lighting/mood: flat archival scan, scholarly, secretive and quietly ominous
 Color palette: near-black navy paper, faded bone-white graphite, restrained oxidized teal and tiny antique brass pencil accents
 Constraints: no readable words, letters, numbers or labels; no zodiac symbols, pentagrams, occult clichés, fantasy magic glow, logo, signature, border, or watermark
 Avoid: vector-perfect geometry, modern infographic style, luminous galaxy photography, decorative tattoo design, obvious AI artifacts
-```
-
-### 9. 海藻腊叶标本
-
-```text
-Use case: scientific-educational
-Asset type: decorative natural-history plate for library cards, archive empty states and side-panel accents in a dark Cthulhu tabletop web app
-Primary request: an authentic late-19th-century pressed marine algae herbarium sheet with three distinct specimens of dark branching seaweed, a few salt crystals and a tiny dried shell fragment, arranged by a real museum curator
-Style/medium: photorealistic flatbed scan of genuine pressed specimens mounted on aged cool-gray rag paper; delicate organic edges, brittle fibers, faded pigment, subtle mounting-thread shadows and uneven paper wear
-Composition/framing: portrait plate, specimens distributed vertically with generous margins and natural asymmetry; visually interesting silhouette at small size
-Lighting/mood: flat archival scan, scientifically sober, coastal, melancholy and faintly uncanny
-Color palette: charcoal brown, desaturated bottle green, oxidized teal, cool old paper and restrained sepia
-Constraints: all label areas blank; no readable text, letters, numbers, handwriting, stamps, logos, signatures, decorative frame or watermark; no tentacle monster or fantasy anatomy
-Avoid: botanical illustration look, modern stock photography, bright green plants, perfect symmetry, glossy wet surfaces, obvious AI artifacts
 ```
 
 ### 11. 黑化黄铜档案角件
@@ -176,20 +172,5 @@ Color palette: charcoal linen, blackened brass, muted brown-red wax, a trace of 
 Scene/backdrop: perfectly flat solid #ff00ff chroma-key background for local background removal
 Constraints: background must be one uniform #ff00ff color with no shadows, gradients, texture, reflections, floor plane or lighting variation; crisp separated edges; do not use magenta in the object; no readable text, letters, numbers, symbols, heraldry, tentacles, skulls, logo, signature or watermark
 Avoid: decorative ribbon bow, fantasy scrollwork, steampunk machinery, bright red, glossy CGI, excessive complexity, obvious AI artifacts
-```
-
-### 15. 科学仪器状态表圈
-
-```text
-Use case: stylized-concept
-Asset type: reusable status medallion and section-heading accent for a dark archival website
-Primary request: one small circular 1890s scientific instrument bezel made from blackened brass, with a recessed center of dark blue-black enamel, a thin oxidized teal calibration ring and four tiny flush screws
-Style/medium: photorealistic museum-object scan, restrained precision instrument hardware with real patina, scratches and slightly imperfect machining
-Composition/framing: one isolated circular token, front-on orthographic view, centered with generous padding, strong simple silhouette
-Lighting/mood: flat archival documentation light, no cast shadow
-Color palette: charcoal brass, muted antique gold, near-black navy enamel and restrained oxidized teal
-Scene/backdrop: perfectly flat solid #ff00ff chroma-key background for local removal
-Constraints: the center is blank; background is one uniform #ff00ff with no gradient, shadow, texture, reflection or floor plane; do not use magenta in the object; no glyph, eye, star, rune, readable text, letters, numbers, logo, signature or watermark
-Avoid: coin portrait, occult seal, compass rose, steampunk gear, glossy CGI, bright gold, obvious AI artifacts
 ```
 
