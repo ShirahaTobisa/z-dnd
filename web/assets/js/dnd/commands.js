@@ -778,6 +778,8 @@
                 else { const r = combat.end(state, chars); logs.push(r.log); changes.push(...r.changes); }
             } else if (m[3]) {
                 const spec = Object.fromEntries([...m[5].matchAll(/(hp|ac|init|xp)=([+-]?\d+)/gi)].map(x => [x[1].toLowerCase(), x[2]]));
+                // DM 重复声明已在场的敌人时不再加一只同名的（同名会让目标和扣血对不上）
+                if ([...state.order, ...(state.pending || [])].some(e => !e.pc && e.name === m[4])) { logs.push(`👹 ${m[4]} 已经在战斗中`); continue; }
                 // 怪物数据跟着参战角色的规则版本走
                 const e = combat.add(state, { name: m[4], ...spec }, chars[0]?.char.edition);
                 const cr = e.monster ? `，CR ${D.monsterBook(e.edition)[e.monster].cr}` : '';
@@ -980,5 +982,5 @@
         return { name: target.name, ac: target.ac, hit, dealt: adj.dealt, log: `${hit ? (attack.crit ? '💥 重击' : '💥 命中') : '💨 未命中'} ${target.name}（AC ${target.ac}）${adj.dealt ? `，造成 ${adj.dealt} 点${attack.type}${hit ? '' : '（擦伤）'}${adj.note ? `（${adj.note}）` : ''}，剩余 ${left}/${target.maxHp}${left === 0 ? '，倒下了' : ''}` : ''}` };
     };
 
-    Object.assign(D, { resolveAttack, world, runWorldCommands, travelDuration: duration, MAP_KINDS, UNIT_NAMES, PACES, COMMAND_GUIDE, guideLists, commandGuideText, rollCheck, rollExpr, castSpell, itemConflict, inventoryText, spellList, applyStat, undoStat, useResource, fontOfMagic, spendHitDice, rest, combat, runCombatCommands, profile });
+    Object.assign(D, { resolveAttack, world, runWorldCommands, travelDuration: duration, MAP_KINDS, UNIT_NAMES, PACES, PACE_NOTES, COMMAND_GUIDE, guideLists, commandGuideText, rollCheck, rollExpr, castSpell, itemConflict, inventoryText, spellList, applyStat, undoStat, useResource, fontOfMagic, spendHitDice, rest, combat, runCombatCommands, profile });
 })(typeof window !== 'undefined' ? window : globalThis);

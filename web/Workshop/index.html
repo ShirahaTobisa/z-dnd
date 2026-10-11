@@ -448,7 +448,7 @@
             animation: dossierScan 9s ease-in-out infinite;
         }
         .workshop-art-banner::after {
-            content: "ARKHAM FIELD OFFICE  /  INVESTIGATOR DOSSIER";
+            content: "ADVENTURERS GUILD  /  CHARACTER DOSSIER";
             position: absolute;
             right: 22px;
             bottom: 18px;
@@ -805,9 +805,9 @@
                                 </svg>
                             </div>
                             <div class="flex gap-2 w-full">
-                                <button @click="$refs.reportInput.click()" class="btn btn-sm btn-outline border-mystic-green/50 text-mystic-green hover:bg-mystic-green hover:text-white flex-1 font-serif" title="导入冒险结算，更新经验、物品和经历">更新</button>
-                                <button @click="exportJSON" class="btn btn-sm btn-outline border-dark-600 text-slate-400 hover:border-mystic-gold hover:bg-mystic-gold hover:text-dark-900 flex-1 font-serif">JSON</button>
-                                <button @click="exportPNG" class="btn btn-sm bg-mystic-gold text-dark-900 border-none hover:bg-yellow-600 shadow-lg shadow-mystic-gold/20 flex-1 font-serif">PNG</button>
+                                <button @click="$refs.reportInput.click()" class="btn btn-sm btn-outline border-mystic-green/50 text-mystic-green hover:bg-mystic-green hover:text-white flex-1 font-serif" title="导入冒险结算，更新经验、物品和经历">导入结算</button>
+                                <button @click="exportJSON" class="btn btn-sm btn-outline border-dark-600 !text-slate-300 hover:border-mystic-gold hover:bg-mystic-gold hover:!text-dark-900 flex-1 font-serif" title="导出角色数据文件">导出 JSON</button>
+                                <button @click="exportPNG" class="btn btn-sm bg-mystic-gold text-dark-900 border-none hover:bg-yellow-600 shadow-lg shadow-mystic-gold/20 flex-1 font-serif" title="导出带角色数据的图片，可以直接导入主站">导出 PNG</button>
                             </div>
                         </div>
                     </div>
@@ -1088,7 +1088,7 @@
                             </tr>
                         </tbody>
                     </table>
-                    <button @click="showWeaponModal = true" class="btn btn-xs btn-outline border-dashed border-dark-600 text-slate-500 hover:border-mystic-gold hover:text-mystic-gold w-full font-serif">+ 添加武器</button>
+                    <button @click="showWeaponModal = true" class="btn btn-xs btn-outline border-dashed border-dark-600 !text-slate-400 hover:border-mystic-gold hover:!text-mystic-gold w-full font-serif">+ 添加武器</button>
                     <div class="flex flex-wrap items-center gap-2 mt-2">
                         <span class="ws-label mb-0">装备与背包 Equipment</span>
                         <button v-if="startingGear" @click="takeStartingGear" :disabled="hero.inventory.includes(startingGear.items)" class="btn btn-xs btn-ghost border border-mystic-gold/40 text-mystic-gold font-serif" :title="startingGear.items">领取起始装备</button>
@@ -1736,7 +1736,7 @@
 
             <div class="modal-action">
                 <button class="btn btn-ghost text-slate-400 hover:text-slate-200" @click="showAvatarModal = false">取消</button>
-                <button class="btn btn-outline border-dark-600 text-slate-400 hover:bg-dark-800 hover:text-slate-200" @click="saveAvatarPromptOnly">仅保存</button>
+                <button class="btn btn-outline border-dark-600 !text-slate-300 hover:bg-dark-800 hover:!text-slate-200" @click="saveAvatarPromptOnly">仅保存</button>
                 <button class="btn bg-mystic-gold text-dark-900 border-none hover:bg-yellow-600" @click="regenerateAvatar">生成</button>
             </div>
         </div>
