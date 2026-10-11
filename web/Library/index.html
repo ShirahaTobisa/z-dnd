@@ -678,7 +678,7 @@
                     <div class="text-slate-500 text-sm font-serif italic hidden md:block">
                         <template v-if="libraryState.currentSection === 'reading'">“知识是危险的，但无知更加致命。”</template>
                         <template v-else-if="libraryState.currentSection === 'restricted'">“有些秘密注定不该被揭开...”</template>
-                        <template v-else>模组来自魔都 TRPG 中文模组站，下载后用「贡献藏书」导入即可开团</template>
+                        <template v-else>模组来自魔都 TRPG 中文模组站，下载后用「贡献藏书」导入即可开团；本站按 5E 规则结算，2014 和 2024 版模组都能直接用</template>
                     </div>
                     
                     <div class="flex gap-3 w-full md:w-auto">
@@ -709,15 +709,20 @@
                 </div>
                 <!-- 外部模组（魔都模组站） -->
                 <template v-if="libraryState.currentSection === 'external'">
+                    <!-- 按规则版本筛选（魔都模组站的 moduleVersion） -->
+                    <div class="flex flex-wrap items-center gap-2 mb-4 text-xs">
+                        <button v-for="[v, label] in EXT_VERSIONS" :key="v" @click="external.version = v; fetchExternalModules()" class="px-3 py-1 rounded-full border transition-colors" :class="external.version === v ? 'border-amber-500/60 bg-amber-900/20 text-amber-300' : 'border-dark-700 text-slate-400 hover:text-slate-200'">{{ label }}</button>
+                        <span v-if="!libraryState.loading" class="ml-auto text-slate-500">共 {{ external.total }} 个</span>
+                    </div>
                     <div v-if="libraryState.loading" class="text-center py-20 text-amber-400 animate-pulse">正在翻找模组...</div>
                     <div v-else-if="!external.list.length" class="text-center py-20 border border-dashed border-dark-700 rounded bg-dark-900/30 text-slate-500 font-serif italic">没有找到相关模组</div>
                     <template v-else>
-                        <div class="text-xs text-slate-500 mb-3">共 {{ external.total }} 个 DND 模组</div>
                         <div class="library-module-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             <div v-for="m in external.list" :key="m.keyId" class="library-module-card relative bg-dark-900 border border-dark-700 hover:border-amber-500/50 rounded-lg overflow-hidden flex flex-col transition-colors">
                                 <div class="p-5 flex-1">
                                     <div class="flex items-center gap-2 mb-1 text-[10px]">
                                         <span class="px-1.5 py-0.5 rounded bg-amber-900/30 text-amber-400 border border-amber-500/30 font-bold">{{ m.original ? '原创' : '搬运' }}</span>
+                                        <span v-if="m.version" class="px-1.5 py-0.5 rounded border border-sky-700/40 text-sky-300">{{ EXT_VERSION_LABEL[m.version] || m.version }}</span>
                                         <span class="text-slate-600">{{ m.releaseDate }}</span>
                                     </div>
                                     <h3 class="text-lg font-bold text-slate-200 font-serif line-clamp-1" :title="m.title">{{ m.title }}</h3>
@@ -1257,17 +1262,19 @@
                     { name: '魔都模组站', url: `${CNMODS}/web/`, desc: '中文 TRPG 模组站，可免费下载' },
                     { name: '纯美苹果园', url: 'https://www.goddessfantasy.net/', desc: '中文跑团论坛，有 DND 资料与模组译文，需要注册登录' },
                 ];
-                const external = reactive({ list: [], page: 0, totalPages: 0, total: 0, loadingMore: false });
+                const external = reactive({ list: [], page: 0, totalPages: 0, total: 0, loadingMore: false, version: '' });
+                const EXT_VERSIONS = [['', '全部版本'], ['D&D5E', '5E 2014 版'], ['DND5R', '5E 2024 版'], ['D&D3R', '3.5 版'], ['D&D3E', '3 版'], ['D&D4E', '4 版']];
+                const EXT_VERSION_LABEL = Object.fromEntries(EXT_VERSIONS.filter(([v]) => v));
                 const htmlToText = (html) => new DOMParser().parseFromString(String(html || ''), 'text/html').body.textContent.replace(/\s+/g, ' ').trim();
                 const fetchExternalModules = async (more = false) => {
                     if (more) external.loadingMore = true; else libraryState.loading = true;
                     try {
                         const page = more ? external.page + 1 : 1;
-                        const qs = new URLSearchParams({ page, pageSize: 12, moduleType: 'DND', title: libraryState.searchQuery.trim() });
+                        const qs = new URLSearchParams({ page, pageSize: 12, moduleType: 'DND', title: libraryState.searchQuery.trim(), moduleVersion: external.version });
                         const res = await fetch(`${CNMODS}/prod-api/index/moduleListPage.do?${qs}`);
                         const data = (await res.json())?.data || {};
                         const items = (data.list || []).map(m => ({
-                            keyId: m.keyId, title: m.title, article: m.article, freeLevel: m.freeLevel, original: m.original, releaseDate: m.releaseDate,
+                            keyId: m.keyId, title: m.title, version: m.moduleVersion, article: m.article, freeLevel: m.freeLevel, original: m.original, releaseDate: m.releaseDate,
                             minAmount: m.minAmount, maxAmount: m.maxAmount, minDuration: m.minDuration, maxDuration: m.maxDuration,
                             summary: htmlToText(m.opinion), page: `${CNMODS}/web/moduleDetail?keyId=${encodeURIComponent(m.keyId)}`,
                             url: /^https?:\/\//i.test(m.url || '') ? m.url : '',
@@ -1623,7 +1630,7 @@
 
                 return {
                     user, libraryState, toasts,
-                    fetchLibraryModules, forumSites, external, fetchExternalModules, uploadToLibrary, handleLibraryFileUpload, handleAlchemyFileUpload, useLibraryModule,
+                    fetchLibraryModules, forumSites, external, EXT_VERSIONS, EXT_VERSION_LABEL, fetchExternalModules, uploadToLibrary, handleLibraryFileUpload, handleAlchemyFileUpload, useLibraryModule,
                     adaptNovelToModule, exportModuleToWord, copyToClipboard, generateModuleSummary,
                     uploadAlchemyResult, exportAlchemyResult, deleteModule, confirmDelete, cancelDelete,
                     showDeleteModal, moduleToDelete
