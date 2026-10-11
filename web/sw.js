@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'z-coc-shell-v27';
+const CACHE_VERSION = 'z-coc-shell-v28';
 const APP_SHELL = [
     './',
     './index.html',
@@ -19,7 +19,7 @@ const APP_SHELL = [
     './assets/js/dnd/commands.js',
     './assets/js/module-file.js',
     './assets/js/stale-guard.js',
-    './assets/art/generated/launch-ritual-moon-archive-v1.webp'
+    './assets/art/generated/dnd-launch-dragon.webp'
 ];
 
 self.addEventListener('install', (event) => {

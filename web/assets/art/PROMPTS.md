@@ -1,76 +1,97 @@
-# GPT 图像生成最终提示词
+# 美术提示词
 
-以下每一项均作为独立图像生成任务执行。
+## DnD 版场景图（NovelAI，2026-10-11）
 
-## 1. 新英格兰街景
+用 NovelAI V5（`nai-diffusion-5-full`，采样器 `k_dpmpp_2m_sde`，28 步，2K 尺寸，提示词引导值 5.5，缩放引导值 0）生成，网页用的是转成 webp 的版本。补图时沿用同一组画师串，画风才统一。
 
-```text
-Use case: historical-scene
-Asset type: wide website chapter/background image for a dark Cthulhu tabletop roleplaying assistant
-Primary request: an authentic-looking documentary photograph of a quiet coastal New England street in 1926 at blue hour, damp cobblestones after rain, weathered clapboard houses, a distant church tower, sparse period-correct street lamps, low sea fog collecting at the far end of the street
-Style/medium: photorealistic early silver-gelatin archival photograph, physically scanned from an aged original; realistic lens softness, subtle film grain, imperfect exposure, mild edge fading and natural paper wear
-Composition/framing: wide cinematic landscape, eye-level, deep street perspective, no dominant person, enough darker negative space for UI overlays
-Lighting/mood: dim overcast dusk, restrained cold blue-black shadows with a trace of oxidized teal, ominous but believable and quiet
-Constraints: historically accurate 1920s architecture and objects; no modern vehicles, signs, wires, clothing or technology; no monsters, tentacles, glowing magic, fantasy concept-art look, text, logo, signature, border, or watermark
-Avoid: glossy digital rendering, HDR, excessive fog, symmetrical composition, obvious AI artifacts, oversharpening
-```
+- 画师串：`artist:wlop, artist:ask_(askzy), artist:kawacy, painterly, best quality, absurdres, very aesthetic, masterpiece, no text`（`dnd-bestiary-dragon` 只用 `artist:wlop`，好出单色素描）
+- 负面提示词：`lowres, worst quality, low quality, jpeg artifacts, blurry, text, watermark, signature, username, logo, artist name, frame, border, chibi, oversaturated`
 
-## 2. 夜间图书馆
+### dnd-town-street.webp（横图）
+
+用在：当前冒险、开始冒险、单人模式卡片、404 页
 
 ```text
-Use case: historical-scene
-Asset type: wide hero/background image for the Miskatonic University library page of a dark Cthulhu tabletop web app
-Primary request: an authentic early-20th-century American university reading room at night, long oak tables, tall dark bookcases, brass reading lamps, worn leather chairs, a high shadowed ceiling, a few scattered closed books, the room empty and recently abandoned
-Style/medium: photorealistic archival interior photograph from circa 1915–1925, silver-gelatin print scanned from a physical original; subtle lens softness, restrained grain, believable wood and brass textures, mild uneven exposure
-Composition/framing: wide landscape establishing view with strong architectural depth, central aisle, darker outer edges and usable negative space for interface overlays
-Lighting/mood: low warm pools of tungsten light surrounded by deep blue-black shadow; scholarly, solemn, quietly unsettling, not theatrical
-Color palette: nearly monochrome charcoal and umber with very restrained oxidized teal and antique brass highlights
-Constraints: period-accurate furnishings; no people, no readable book titles, no modern fixtures, no supernatural creature, no glowing symbols, no fantasy concept-art look, no text, logo, signature, frame, or watermark
-Avoid: perfect symmetry, glossy 3D rendering, excessive haze, heavy HDR, oversharpening, obvious AI artifacts
+no humans, scenery, fantasy, medieval fantasy town, narrow cobblestone street, half-timbered house, stone buildings, hanging lantern, warm window light, dusk, blue hour, light rain, wet ground, reflection, mist, distant castle on hill, dark sky, moody, cinematic lighting, wide shot, depth of field, dark atmosphere
 ```
 
-## 3. 调查员档案静物
+### dnd-adventurer-desk.webp（横图）
+
+用在：存档、车卡页背景、公告横幅
 
 ```text
-Use case: photorealistic-natural
-Asset type: wide decorative background for an investigator character workshop in a dark Cthulhu tabletop web app
-Primary request: a believable top-down archival investigator dossier arranged on a worn dark walnut desk: an unmarked manila case folder, one blank vintage portrait photograph with no visible face, a fingerprint card with no readable personal data, a brass compass, fountain pen, small magnifying glass, a folded 1920s street map fragment, two paper clips, and a wax-sealed envelope
-Style/medium: museum-quality still-life photography of real physical objects, not illustration; authentic paper fibers, tarnished brass, fingerprints on glass, small imperfections and uneven placement
-Composition/framing: landscape overhead composition, objects weighted around the outer thirds, calm empty area through the center-right for UI controls, natural asymmetry and plausible overlap
-Lighting/mood: single soft desk-lamp source from upper left, deep charcoal shadows, restrained antique gold and oxidized teal accents, mysterious and investigative rather than theatrical
-Constraints: period-correct materials; all papers blank or containing only indistinct illegible marks; no readable words, names or numbers; no weapons, blood, tentacles, monsters, magic glow, modern plastic, logo, signature, frame, or watermark
-Avoid: flat-lay stock-photo perfection, excessive props, artificial vignette, CGI sheen, over-sharpening, obvious AI artifacts
+no humans, still life, from above, old wooden table, unrolled parchment map, blank map, d20, dice, dagger, leather pouch, gold coin, potion bottle, red liquid, quill, inkwell, candle, leather-bound book, rope, compass, warm candlelight, dark background, shadows, fantasy, adventurer equipment, empty space in center, dark atmosphere, no text
 ```
 
-## 4. 打烊后的酒馆
+### dnd-raven-messenger.webp（横图）
+
+用在：同伴、公告
 
 ```text
-Use case: historical-scene
-Asset type: wide background image for the 'Anecdote Log' tavern and story archive page of a dark Cthulhu tabletop web app
-Primary request: an authentic photograph of a small New England hotel bar around 1924 after closing time, dark oak counter, worn stools, cloudy mirror, shelves of unlabeled glass bottles, old wall clock, coat hooks, one half-open door leading into a black corridor, no people
-Style/medium: photorealistic documentary interior photograph scanned from an aged silver-gelatin print; believable glass, wood wear, dust, slight camera shake and uneven exposure
-Composition/framing: wide landscape, eye-level from a corner booth, foreground partially obscured by a dark table edge, open central and upper areas suitable for UI overlay
-Lighting/mood: one weak amber ceiling lamp and faint cold moonlight through a side window; intimate, abandoned, quietly threatening, grounded realism
-Color palette: mostly charcoal, deep brown, muted antique amber, extremely restrained green-gray
-Constraints: 1920s period accuracy; bottles must have no legible labels; no people, gore, monsters, tentacles, supernatural glow, modern objects, readable text, logo, signature, frame, or watermark
-Avoid: cinematic fantasy concept art, perfect cleanliness, neon colors, excessive haze, HDR, staged stock-photo look, obvious AI artifacts
+no humans, raven, perched on windowsill, stone window, night, moonlight, sealed letter, wax seal, scroll, candle on table, fantasy, medieval, castle tower window, starry sky, distant mountains, cozy, dark atmosphere, cinematic lighting, wide shot, no text
 ```
 
-## 5. 头足类档案图谱
+### dnd-tavern-night.webp（横图）
+
+用在：冒险小说
 
 ```text
-Use case: scientific-educational
-Asset type: decorative archival scientific plate for handbook, settings watermark, restricted library cards, and empty states in a dark Cthulhu tabletop web app
-Primary request: a convincing late-19th-century natural-history copperplate engraving of a deep-sea cephalopod specimen, scientifically plausible anatomy, shown in a restrained three-quarter side view with two small secondary studies of an eye and a sucker ring
-Style/medium: hand-engraved natural-history museum plate printed in faded black ink on genuinely aged warm gray paper; irregular cross-hatching, slight ink spread, deckled paper fibers, tiny foxing spots and mild scan shadows
-Composition/framing: portrait-oriented plate with the specimen centered and ample quiet paper margin, balanced like a real zoological atlas page
-Lighting/mood: flat archival scan, mysterious because of the unfamiliar anatomy but not monstrous or fantastical
-Color palette: carbon black, warm gray, faint oxidized green and very restrained antique sepia
-Constraints: no title, caption, labels, letters, numbers or readable text; no magical symbols, gore, horror creature exaggeration, glowing eyes, logo, signature, decorative border, or watermark
-Avoid: modern digital illustration, tattoo style, symmetrical ornamental design, fantasy tentacle monster, perfect vector lines, obvious AI artifacts
+no humans, scenery, indoors, fantasy tavern, after closing, empty tavern, wooden tables, wooden chairs, wooden beams, stone fireplace, dying embers, ember glow, tankard, wine bottle, candle, hanging lantern, barrels, bar counter, warm light, dark shadows, night, cozy, dark atmosphere, cinematic lighting, wide shot
 ```
 
-## 6. 暗色档案布纹
+### dnd-guild-library.webp（横图）
+
+用在：图书馆阅览室
+
+```text
+no humans, scenery, indoors, fantasy library, wizard library, tall bookshelves, many books, spiral staircase, wooden balcony, arched windows, moonlight, floating candles, reading desk, open book, globe, warm candlelight, dust particles, night, dark atmosphere, cinematic lighting, wide shot, depth of field
+```
+
+### dnd-forbidden-vault.webp（横图）
+
+用在：图书馆禁书区
+
+```text
+no humans, scenery, indoors, underground vault, dungeon, stone walls, iron bars, iron gate, chained book, chains, ancient tomes on stone shelves, glowing runes, faint purple magic glow, single torch, cobweb, dust, dark, ominous, dark atmosphere, cinematic lighting, wide shot
+```
+
+### dnd-party-campfire.webp（横图）
+
+用在：多人联机卡片
+
+```text
+multiple boys, multiple girls, adventurers, fantasy, from behind, sitting around campfire, night, forest clearing, cloak, armor, staff, bow (weapon), sword, starry sky, distant mountains, campfire glow, warm light, silhouette, wide shot, scenery, cinematic lighting, dark atmosphere
+```
+
+### dnd-launch-dragon.webp（竖图）
+
+用在：开场动画
+
+```text
+no humans, dragon, western dragon, coiled around ruined tower, wings spread, full moon, night sky, clouds, castle ruins, mountains, moonlight, epic, fantasy, dark atmosphere, cinematic lighting, from below, vertical composition
+```
+
+### dnd-bestiary-dragon.webp（竖图）
+
+用在：手册、空状态水印
+
+```text
+no humans, traditional media, ink sketch, monochrome, sepia, western dragon, anatomy study, side view, wings, skeleton sketch, old paper, parchment, aged paper, scientific illustration, naturalist sketch, hatching, white space, no text
+```
+
+### dnd-brand-medallion.webp（方图）
+
+用在：侧栏品牌徽章（裁成 384×384）
+
+```text
+no humans, still life, round brass medallion, coin, dragon relief, embossed dragon, coiled dragon, circular emblem, ornate border, metal, antique gold, centered, front view, symmetrical, dark background, simple background, rim light, close-up, no text, no letters
+```
+
+## 沿用的克苏鲁版通用素材（GPT 图像生成）
+
+布纹、黄铜零件、星图和标本页没有题材色彩，DnD 版继续使用。
+
+### 6. 暗色档案布纹
 
 ```text
 Use case: stylized-concept
@@ -84,21 +105,7 @@ Constraints: truly tileable edges; no symbols, stains shaped like faces, tentacl
 Avoid: obvious repeating clusters, dramatic highlights, grunge brush pack appearance, CGI noise, fabric folds, glossy material
 ```
 
-## 7. 1923 年无线电台
-
-```text
-Use case: historical-scene
-Asset type: wide decorative background for the radio and online communication page of a dark Cthulhu tabletop web app
-Primary request: an authentic 1923 vacuum-tube tabletop radio receiver on a worn dark oak workbench, bakelite tuning knobs, exposed glass valves, woven speaker grille, cloth-covered wire, one pair of period headphones resting nearby, a small unlabeled notebook closed beside it
-Style/medium: photorealistic museum-object photography with the texture and tonal response of an early silver-gelatin archival photograph scanned from a physical print; real dust, tarnished metal, subtle fingerprints and imperfect alignment
-Composition/framing: wide landscape, radio placed in the left-middle third, shallow but believable depth, generous dark negative space on the right for interface controls
-Lighting/mood: one weak amber desk lamp from upper left and deep blue-black ambient shadow; quiet, technical, clandestine and ominous without overt supernatural effects
-Color palette: charcoal, near-black navy, worn brown wood, restrained antique brass and a trace of oxidized teal
-Constraints: historically plausible 1920s equipment and materials; no readable labels, station names, numbers or text; no people, monsters, tentacles, magic glow, modern electronics, logo, signature, border, or watermark
-Avoid: steampunk fantasy, glossy CGI, neon lighting, cinematic smoke, excessive props, staged stock-photo perfection, HDR, oversharpening, obvious AI artifacts
-```
-
-## 8. 1890 年代天文观测草图
+### 8. 1890 年代天文观测草图
 
 ```text
 Use case: scientific-educational
@@ -112,7 +119,7 @@ Constraints: no readable words, letters, numbers or labels; no zodiac symbols, p
 Avoid: vector-perfect geometry, modern infographic style, luminous galaxy photography, decorative tattoo design, obvious AI artifacts
 ```
 
-## 9. 海藻腊叶标本
+### 9. 海藻腊叶标本
 
 ```text
 Use case: scientific-educational
@@ -126,21 +133,7 @@ Constraints: all label areas blank; no readable text, letters, numbers, handwrit
 Avoid: botanical illustration look, modern stock photography, bright green plants, perfect symmetry, glossy wet surfaces, obvious AI artifacts
 ```
 
-## 10. 调查证物横向静物
-
-```text
-Use case: photorealistic-natural
-Asset type: narrow horizontal decorative vignette for section dividers, card headers and empty-state footers in a dark Cthulhu tabletop web app
-Primary request: a believable 1920s investigation evidence tray on a scratched blackened oak surface: one tarnished brass key, a broken compass, two spent matches, a small sealed amber-glass specimen vial, a folded blank paper fragment, dark sealing wax crumbs and three damp coastal stones
-Style/medium: photorealistic museum still-life photography of real physical objects, subtle early-film tonal response, natural dust, fingerprints, oxidation and imperfect placement
-Composition/framing: very wide low horizontal arrangement, objects clustered loosely across the middle band, deep clean shadow at both ends so it can fade into website panels; no single centered hero object
-Lighting/mood: low raking desk-lamp light from upper left, deep navy-black shadows, clandestine and tactile, understated dread
-Color palette: charcoal, worn walnut, antique brass, amber glass, cool slate and a very restrained oxidized teal reflection
-Constraints: folded paper must be blank; vial has no label; no readable text, letters or numbers; no blood, weapons, monsters, tentacles, glowing symbols, modern plastic, logo, signature, border, or watermark
-Avoid: neat product flat-lay, steampunk fantasy, excessive props, glossy CGI, dramatic smoke, neon color, obvious AI artifacts
-```
-
-## 11. 黑化黄铜档案角件
+### 11. 黑化黄铜档案角件
 
 ```text
 Use case: stylized-concept
@@ -155,7 +148,7 @@ Constraints: background must be one uniform #ff00ff color with no shadows, gradi
 Avoid: fantasy filigree, ornate baroque decoration, steampunk gears, glossy CGI, thick picture frame, obvious AI artifacts
 ```
 
-## 12. 博物馆抽屉标签框
+### 12. 博物馆抽屉标签框
 
 ```text
 Use case: stylized-concept
@@ -170,7 +163,7 @@ Constraints: background must be one uniform #ff00ff color with no shadows, gradi
 Avoid: ornate Victorian filigree, steampunk gears, fantasy rune plaque, glossy CGI, bright gold, obvious AI artifacts
 ```
 
-## 13. 封蜡档案装订带
+### 13. 封蜡档案装订带
 
 ```text
 Use case: stylized-concept
@@ -185,22 +178,7 @@ Constraints: background must be one uniform #ff00ff color with no shadows, gradi
 Avoid: decorative ribbon bow, fantasy scrollwork, steampunk machinery, bright red, glossy CGI, excessive complexity, obvious AI artifacts
 ```
 
-## 14. 书布档案索引标签
-
-```text
-Use case: stylized-concept
-Asset type: reusable selected-navigation background and archive index tab for a dark Cthulhu tabletop website
-Primary request: one authentic 1920s library card-catalog index tab made from folded charcoal book cloth over stiff board, with a slim tarnished brass edge, two tiny flat rivets and a completely blank inset face
-Style/medium: photorealistic flatbed scan of a real historical index tab, tactile woven fibers, softened corners, tiny scratches and restrained oxidation
-Composition/framing: single isolated horizontal rounded tab, very wide and low, front-on orthographic view, centered with generous padding and a clean silhouette
-Lighting/mood: flat archival documentation light with no cast shadow
-Color palette: near-black navy cloth, charcoal, blackened brass, muted antique gold and a trace of oxidized teal
-Scene/backdrop: perfectly flat solid #ff00ff chroma-key background for local removal
-Constraints: background is one uniform #ff00ff with no gradient, shadow, texture, reflection or floor plane; do not use magenta in the object; no readable text, letters, numbers, symbols, logo, signature or watermark
-Avoid: modern plastic tab, glossy button, ornate filigree, fantasy rune, steampunk gears, bright gold, obvious AI artifacts
-```
-
-## 15. 科学仪器状态表圈
+### 15. 科学仪器状态表圈
 
 ```text
 Use case: stylized-concept
@@ -215,47 +193,3 @@ Constraints: the center is blank; background is one uniform #ff00ff with no grad
 Avoid: coin portrait, occult seal, compass rose, steampunk gear, glossy CGI, bright gold, obvious AI artifacts
 ```
 
-## 16. 无编号黄铜刻度条
-
-```text
-Use case: stylized-concept
-Asset type: reusable progress-line, card edge and section-rule ornament for a dark archival website
-Primary request: one long narrow late-19th-century scientific instrument scale made from blackened brass, with fine engraved calibration ticks of varied lengths, two end screws and subtle oxidized teal residue
-Style/medium: photorealistic flatbed scan of real measuring instrument hardware, precise but visibly hand-finished, scratched and aged
-Composition/framing: a single isolated extremely wide and very low horizontal strip, front-on orthographic view, centered with generous padding and straight clean silhouette
-Lighting/mood: flat archival documentation light, no cast shadow
-Color palette: charcoal metal, blackened brass, muted antique gold and restrained oxidized teal
-Scene/backdrop: perfectly flat solid #ff00ff chroma-key background for local removal
-Constraints: no numbers, letters or labels; background is one uniform #ff00ff with no gradient, shadow, texture, reflection or floor plane; do not use magenta in the object; no symbols, logo, signature or watermark
-Avoid: modern ruler, glossy chrome, steampunk gears, ornate filigree, bright gold, crooked perspective, obvious AI artifacts
-```
-
-## 17. 缝线档案纸片
-
-```text
-Use case: stylized-concept
-Asset type: reusable small annotation patch, tooltip backing and empty-state caption plate for a dark archival website
-Primary request: one blank rectangular fragment of cool-gray aged rag paper stitched onto a slightly larger piece of frayed near-black book cloth with four short uneven beige thread stitches, one at each corner
-Style/medium: photorealistic flatbed scan of real archival repair materials, visible paper fibers, subtle foxing, woven cloth and handmade stitching
-Composition/framing: one isolated compact horizontal patch, front-on orthographic view, centered with generous padding, simple readable silhouette
-Lighting/mood: flat archival documentation light with no cast shadow
-Color palette: cool old paper, near-black navy cloth, charcoal, faded bone thread and a tiny trace of oxidized teal
-Scene/backdrop: perfectly flat solid #ff00ff chroma-key background for local removal
-Constraints: paper face completely blank; background is one uniform #ff00ff with no gradient, shadow, texture, reflection or floor plane; do not use magenta in the object; no readable text, stamps, symbols, blood, logo, signature or watermark
-Avoid: scrapbook craft aesthetic, decorative lace, torn parchment scroll, fantasy map, bright white paper, obvious AI artifacts
-```
-
-## 18. 用户横版烛光书房调色
-
-```text
-Use case: style-transfer
-Asset type: wide responsive hero background for the “异闻酒馆 / 轶闻 Log” section of a dark Cthulhu tabletop website
-Input images: Image 1 is the edit target
-Primary request: color-grade and atmospherically finish the supplied illustration so it feels like a preserved occult library plate viewed by candlelight, suitable behind translucent website UI
-Composition/framing: preserve the original 16:9 composition, character, pose, books, candles, skulls and every major object; retain usable darker negative space around the left and right edges for responsive cropping
-Lighting/mood: deepen shadows, controlled candle glow, ominous but refined; subtle cold teal ambient light in the far shadows with restrained ember-red highlights near the flames
-Color palette: blue-black ink, charcoal, aged burgundy, oxidized teal, muted brass, warm ivory; reduce pink saturation and avoid vivid orange
-Materials/textures: subtle archival paper grain and restrained photographic vignette, with natural tonal variation rather than a flat filter
-Constraints: change only color treatment, atmospheric depth and edge falloff; keep the original subject identity, anatomy, pose, framing and scene geometry unchanged; preserve any existing artist credit or signature exactly where present; no new text, logo, border or watermark
-Avoid: crushed black detail, neon red, heavy bloom, fake fog covering the character, modern cinematic teal-orange cliché, extra objects, altered face or hands
-```

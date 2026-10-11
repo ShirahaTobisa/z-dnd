@@ -18,8 +18,8 @@ import (
 )
 
 const (
-	launchArtPath = "assets/art/generated/launch-ritual-moon-archive-v1.webp"
-	launchPreload = "</assets/art/generated/launch-ritual-moon-archive-v1.webp>; rel=preload; as=image; type=image/webp; fetchpriority=high"
+	launchArtPath = "assets/art/generated/dnd-launch-dragon.webp"
+	launchPreload = "</assets/art/generated/dnd-launch-dragon.webp>; rel=preload; as=image; type=image/webp; fetchpriority=high"
 )
 
 // staticAliases maps request paths that cannot be embedded under their original
