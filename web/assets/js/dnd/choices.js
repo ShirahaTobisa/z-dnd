@@ -104,9 +104,10 @@
           options: () => Object.entries(D.FEATS).filter(([, f]) => f.cat === 'origin').map(([id, f]) => ({ id, name: f.name, desc: f.desc })) },
         { id: 'skilledSkills', label: '多才多艺（三项技能）', source: '专长', many: true, count: () => 3, when: (c) => D.hasFeat(c, 'skilled'), skills: true,
           options: () => skillOptions(), hint: '也可以换成工具熟练，写在下面的工具栏里' },
-        { id: 'magicInitiateList', label: '魔法入门：法术表', source: '专长', when: (c) => D.hasFeat(c, 'magicInitiate'), options: () => MAGIC_INITIATE_LISTS },
-        { id: 'magicInitiateSpells', label: '魔法入门：两个戏法和一个 1 环法术', source: '专长', many: true, count: () => 3, when: (c) => D.hasFeat(c, 'magicInitiate') && c.choices?.magicInitiateList,
-          options: (c) => Object.values(D.spellBook(c.edition)).filter(s => s.level <= 1 && s.classes.includes(c.choices.magicInitiateList)).map(s => ({ id: s.id, name: `${s.level ? '1环' : '戏法'} ${s.name}` })) },
+        // 背景送的魔法入门（2024 版侍僧、向导、贤者）法术表是固定的，不用选
+        { id: 'magicInitiateList', label: '魔法入门：法术表', source: '专长', when: (c) => D.hasFeat(c, 'magicInitiate') && !D.backgroundOf(c)?.magicInitiate, options: () => MAGIC_INITIATE_LISTS },
+        { id: 'magicInitiateSpells', label: '魔法入门：两个戏法和一个 1 环法术', source: '专长', many: true, count: () => 3, when: (c) => D.hasFeat(c, 'magicInitiate') && magicInitiateList(c),
+          options: (c) => Object.values(D.spellBook(c.edition)).filter(s => s.level <= 1 && s.classes.includes(magicInitiateList(c))).map(s => ({ id: s.id, name: `${s.level ? '1环' : '戏法'} ${s.name}` })) },
     ];
     const choiceDefs = (char) => DEFS.filter(d => (!d.editions || d.editions.includes(char.edition)) && (d.when ? d.when(char) : d.count(char) > 0))
         .map(d => ({ ...d, count: d.many ? d.count(char) : 1, options: d.options(char) }));
@@ -118,12 +119,42 @@
         const land = LAND[char.edition]?.[char.choices?.landType]; const level = lv(char, 'druid');
         return land ? Object.entries(land[1]).filter(([l]) => +l <= level).flatMap(([, ids]) => ids) : [];
     };
+    const magicInitiateList = (char) => D.backgroundOf(char)?.magicInitiate || char.choices?.magicInitiateList || '';
     const magicInitiateSpells = (char) => (D.hasFeat(char, 'magicInitiate') ? picked(char, 'magicInitiateSpells') : []);
 
     // 专精（双倍熟练）可选数量：游荡者、吟游诗人，2024 版游侠、法师
     const expertiseAllowed = (char) => steps([[1, 2], [6, 4]], lv(char, 'rogue'))
         + (char.edition === '2024' ? steps([[2, 2], [9, 4]], lv(char, 'bard')) + steps([[2, 1], [9, 3]], lv(char, 'ranger')) + (lv(char, 'wizard') >= 2 ? 1 : 0)
             : steps([[3, 2], [10, 4]], lv(char, 'bard')));
+
+    // 补全没选完的项目（AI 生成角色后自动用，玩家也可以点按钮用）：
+    // 技能按调整值从高到低挑，武器专精先挑身上带的武器；需要玩家自己拿主意的单选项（秩序、恩赐等）不动。返回补上的内容
+    const autoFillChoices = (char) => {
+        const filled = [];
+        const bestSkills = (options, n) => options.filter(id => !(char.skillProfs || []).includes(id) && !D.grantedSkills(char).includes(id))
+            .sort((a, b) => D.skillMod(char, b) - D.skillMod(char, a)).slice(0, n);
+        // 职业、种族、背景、兼职的技能熟练
+        for (let guard = 0; guard < 20; guard++) {
+            const g = D.skillAllocation(char).groups.find(x => x.picked < x.count);
+            const pick = g && bestSkills(g.options, 1)[0];
+            if (!pick) break;
+            char.skillProfs = [...(char.skillProfs || []), pick];
+            filled.push(`${g.source}技能：${D.SKILLS[pick].name}`);
+        }
+        // 多选项目里的技能和武器专精
+        choiceDefs(char).filter(d => d.many && (d.skills || d.id === 'weaponMastery')).forEach(d => {
+            const have = picked(char, d.id).filter(v => d.options.some(o => o.id === v));
+            const need = d.count - have.length; if (need <= 0) return;
+            const ids = d.options.map(o => o.id).filter(id => !have.includes(id));
+            const avg = (id) => { const m = String(D.WEAPONS[id]?.damage || '').match(/(\d+)d(\d+)/); return m ? m[1] * (+m[2] + 1) / 2 : 0; };
+            const carried = ids.filter(id => (char.weapons || []).includes(id)).sort((a, b) => avg(b) - avg(a));
+            const add = d.skills ? bestSkills(ids, need) : [...carried, ...ids.filter(id => !carried.includes(id))].slice(0, need);
+            if (!add.length) return;
+            char.choices = { ...(char.choices || {}), [d.id]: [...have, ...add] };
+            filled.push(`${d.label}：${add.map(id => d.options.find(o => o.id === id)?.name || id).join('、')}`);
+        });
+        return filled;
+    };
 
     // 语言、工具的默认建议（玩家可以自己改）
     const LANG_2014 = { dwarf: '矮人语', elf: '精灵语', halfling: '半身人语', dragonborn: '龙语', gnome: '侏儒语', halfElf: '精灵语', halfOrc: '兽人语', tiefling: '炼狱语' };
@@ -143,5 +174,5 @@
     };
     const suggestedTools = (char) => [BG_TOOLS[char.edition]?.[char.background], CLASS_TOOLS[char.classId]].filter(Boolean).join('、');
 
-    Object.assign(D, { CHOICE_OPTIONS: OPTIONS, LAND_TYPES: LAND, choiceDefs, choicePicks: picked, choiceSkills, landSpells, magicInitiateSpells, expertiseAllowed, suggestedLanguages, suggestedTools });
+    Object.assign(D, { CHOICE_OPTIONS: OPTIONS, LAND_TYPES: LAND, choiceDefs, choicePicks: picked, choiceSkills, autoFillChoices, landSpells, magicInitiateList, magicInitiateSpells, expertiseAllowed, suggestedLanguages, suggestedTools });
 })(typeof window !== 'undefined' ? window : globalThis);

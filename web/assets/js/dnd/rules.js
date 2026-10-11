@@ -449,7 +449,11 @@
     // 奥法骑士、奥术诡术师：用智力施展法师法术，法术位按职业等级的三分之一
     const THIRD_CASTERS = { '奥法骑士': 'fighter', '奥术诡术师': 'rogue' };
     const casterType = (e) => CLASSES[e.classId]?.caster || (THIRD_CASTERS[e.subclass] === e.classId ? 'third' : null);
-    const spellAbilityOf = (char, classId) => CLASSES[classId]?.spellAbility || (classEntries(char).some(e => e.classId === classId && casterType(e) === 'third') ? 'INT' : null);
+    const spellAbilityOf = (char, classId) => CLASSES[classId]?.spellAbility || (classEntries(char).some(e => e.classId === classId && casterType(e) === 'third') ? 'INT' : null)
+        || (classId === 'species' ? speciesSpellAbility(char) : null);
+    // 种族法术的施法属性：2014 版按种族固定；2024 版由玩家选，默认取智力、感知、魅力中最高的
+    const speciesSpellAbility = (char) => subraceOf(char)?.spellAbility || raceOf(char)?.spellAbility
+        || ['INT', 'WIS', 'CHA'].reduce((best, ab) => ((char.abilities?.[ab] || 0) > (char.abilities?.[best] || 0) ? ab : best), 'CHA');
     const spellListOf = (e) => (casterType(e) === 'third' ? 'wizard' : e.classId);
     const THIRD_KNOWN = [[3, 3], [4, 4], [7, 5], [8, 6], [10, 7], [11, 8], [13, 9], [14, 10], [16, 11], [19, 12], [20, 13]];
     const CANTRIPS_KNOWN = {
@@ -496,10 +500,25 @@
     // 子职业送的始终准备法术（不占准备数量）
     // 种族、子种族送的法术（按角色等级解锁）
     const speciesSpells = (char) => [raceOf(char), subraceOf(char)].flatMap(r => Object.entries(r?.spells || {}).filter(([l]) => +l <= clampLevel(char.level)).flatMap(([, ids]) => ids));
-    const alwaysPreparedSpells = (char) => [...new Set([...speciesSpells(char), ...classEntries(char).flatMap(e => subclassSpellIds(char, e, 'alwaysPrepared')), ...(root.DND.landSpells?.(char) || []), ...(root.DND.magicInitiateSpells?.(char) || [])])].filter(id => root.DND.spellBook?.(char.edition)[id]);
+    // 职业能力送的始终准备法术（2024 版游侠宿敌的猎人印记等）
+    const classAlwaysPrepared = (char) => classEntries(char).flatMap(e => Object.entries(edition(char.edition).classAlwaysPrepared?.[e.classId] || {}).filter(([lv]) => +lv <= e.level).flatMap(([, ids]) => ids));
+    const alwaysPreparedSpells = (char) => [...new Set([...speciesSpells(char), ...classAlwaysPrepared(char), ...classEntries(char).flatMap(e => subclassSpellIds(char, e, 'alwaysPrepared')), ...(root.DND.landSpells?.(char) || []), ...(root.DND.magicInitiateSpells?.(char) || [])])].filter(id => root.DND.spellBook?.(char.edition)[id]);
     // 施放某个法术用的职业：法术表、子职业送的或扩展表里有它的职业，都没有就取第一个施法职业
-    const spellCastingClass = (char, spell) => ((root.DND.magicInitiateSpells?.(char) || []).includes(spell.id) && !classEntries(char).some(e => spell.classes.includes(spellListOf(e))) ? char.choices.magicInitiateList : null) || (classEntries(char).find(e => spell.classes.includes(spellListOf(e)) || subclassSpellIds(char, e, 'alwaysPrepared').includes(spell.id) || subclassSpellIds(char, e, 'expandedSpells').includes(spell.id))
-        || classEntries(char).find(e => spellAbilityOf(char, e.classId)))?.classId;
+    const spellCastingClass = (char, spell) => ((root.DND.magicInitiateSpells?.(char) || []).includes(spell.id) && !classEntries(char).some(e => spell.classes.includes(spellListOf(e))) ? root.DND.magicInitiateList(char) : null)
+        || classEntries(char).find(e => spell.classes.includes(spellListOf(e)) || subclassSpellIds(char, e, 'alwaysPrepared').includes(spell.id) || subclassSpellIds(char, e, 'expandedSpells').includes(spell.id))?.classId
+        || (speciesSpells(char).includes(spell.id) ? 'species' : null)
+        || classEntries(char).find(e => spellAbilityOf(char, e.classId))?.classId;
+    // 每长休可以不耗法术位施放一次的法术：种族法术、魔法入门的 1 环法术、2024 版圣武士至圣斩和寻获坐骑（游侠宿敌在职业资源里，带 spell 字段）
+    const freeCasts = (char) => {
+        const book = root.DND.spellBook?.(char.edition) || {};
+        const list = [...speciesSpells(char), ...(root.DND.magicInitiateSpells?.(char) || [])].filter(id => book[id]?.level > 0).map(spell => ({ spell, max: 1 }));
+        if (char.edition === '2024') {
+            const paladin = classLevel(char, 'paladin');
+            if (paladin >= 2) list.push({ spell: 'divineSmite', max: 1 });
+            if (paladin >= 5) list.push({ spell: 'findSteed', max: 1 });
+        }
+        return list.map(f => ({ id: `free:${f.spell}`, name: `免费${book[f.spell]?.name || f.spell}`, max: f.max, recharge: 'long', spell: f.spell }));
+    };
 
     // 职业资源：[{ id, name, max, used, left, recharge, shortRegain }]，max 为 99 表示不限次数
     // 兼职时各职业资源分别按职业等级算；同名资源（如牧师和圣武士的引导神力）不叠加次数，取多的那个
@@ -513,7 +532,7 @@
             if (max > (out[d.id]?.max || 0)) out[d.id] = { ...d, name, max, recharge, roll: d.roll?.(level, char) || '' };
         };
         classEntries(char).forEach(e => (edition(char.edition).resources?.[e.classId] || []).filter(d => !d.subclass || d.subclass === e.subclass).forEach(d => add(d, e.level)));
-        [raceOf(char), subraceOf(char)].flatMap(r => r?.resources || []).concat(characterFeats(char).map(id => root.DND.FEATS?.[id]?.resource).filter(Boolean))
+        [raceOf(char), subraceOf(char)].flatMap(r => r?.resources || []).concat(characterFeats(char).map(id => root.DND.FEATS?.[id]?.resource).filter(Boolean), freeCasts(char))
             .forEach(d => add(d, clampLevel(char.level)));
         return Object.values(out).map(r => { const used = Math.min(r.max, parseInt(char.resourcesUsed?.[r.id]) || 0); return { ...r, used, left: r.max - used }; });
     };
@@ -578,7 +597,7 @@
         const styleHit = ranged && hasStyle(char, 'archery') ? 2 : 0;
         const dmgMod = mod + (!ranged && !w.props.includes('twoHanded') && hasStyle(char, 'dueling') ? 2 : 0);
         const totalDmg = dmgMod + magicDmg;
-        return { id: weaponId, name: magic?.name || w.name, magicExtra: magic?.effects?.extra || '', toHit: mod + styleHit + magicHit + (proficient ? profBonus(char.level) : 0), proficient, damage: `${w.damage}${totalDmg ? signed(totalDmg) : ''}`, greatWeapon: hasStyle(char, 'greatWeapon') && (w.props.includes('twoHanded') || !!w.versatile) && !ranged, type: w.type, range: w.range || '', melee: !w.props.includes('ranged'), usesStr: mod === str && !w.props.includes('ranged'), finesseOrRanged: w.props.includes('finesse') || w.props.includes('ranged'), mastery: chose(char, 'weaponMastery', weaponId) ? edition(char.edition).weaponMastery?.[weaponId] || null : null };
+        return { id: weaponId, name: magic?.name || w.name, magical: !!magic, magicExtra: magic?.effects?.extra || '', toHit: mod + styleHit + magicHit + (proficient ? profBonus(char.level) : 0), proficient, damage: `${w.damage}${totalDmg ? signed(totalDmg) : ''}`, greatWeapon: hasStyle(char, 'greatWeapon') && (w.props.includes('twoHanded') || !!w.versatile) && !ranged, type: w.type, range: w.range || '', melee: !w.props.includes('ranged'), usesStr: mod === str && !w.props.includes('ranged'), finesseOrRanged: w.props.includes('finesse') || w.props.includes('ranged'), mastery: chose(char, 'weaponMastery', weaponId) ? edition(char.edition).weaponMastery?.[weaponId] || null : null };
     };
 
     const initiativeMod = (char) => abilityMod(char.abilities?.DEX) + (hasFeat(char, 'alert') ? (char.edition === '2024' ? profBonus(char.level) : 5) : halfProficiency(char, 'DEX', 'ability'));
@@ -711,5 +730,5 @@
         return char;
     };
 
-    root.DND = { ABILITIES, SKILLS, ALL_SKILLS, CLASSES, ARMOR, WEAPONS, CONDITIONS, XP_TABLE, STANDARD_ARRAY, POINT_BUY, editions, edition, classInfo, isLucky, skillAllocation, speciesSpells, chose, DAMAGE_TYPES, damageMods, damageModsText, parseDefense, adjustDamage, subclassesOf, casterType, spellAbilityOf, hasStyle, armorTraining, armorIssue, GEAR_WEIGHT, SLOTS, ATTUNE_MAX, itemFromRef, activeItems, itemBonus, syncEquipment, encumbrance, ENCUMBRANCE_TEXT, equipmentIssues, sentientCheckMod, casterSummary, classEntries, classLevel, subclassEntry, isMulticlass, classSummary, hitDicePool, hitDiceText, multiclassIssues, fitMulticlass, MULTICLASS_REQ, slotLevel, slotLabel, weaponData, signed, abilityMod, profBonus, levelFromXp, rollDice, d20Test, saveProficient, saveMod, skillMod, passivePerception, armorClass, maxHp, spellSlots, spellSaveDc, spellAttack, weaponAttack, weaponProficient, initiativeMod, speed, halfProficiency, auraOfProtection, steps, critRange, rageDamage, sneakAttackDice, classFeatures, classResources, asiRecords, asiLevels, characterFeats, hasFeat, hasFightingStyle, cantripsKnown, spellsAllowed, maxSpellLevel, classSpells, alwaysPreparedSpells, spellCastingClass, raceOf, subraceOf, backgroundOf, subclassLevel, pointBuyCost, finalAbilities, grantedSkills, skillChoices, newCharacter, normalizeCharacter };
+    root.DND = { ABILITIES, SKILLS, ALL_SKILLS, CLASSES, ARMOR, WEAPONS, CONDITIONS, XP_TABLE, STANDARD_ARRAY, POINT_BUY, editions, edition, classInfo, isLucky, skillAllocation, classAlwaysPrepared, freeCasts, speciesSpells, chose, DAMAGE_TYPES, damageMods, damageModsText, parseDefense, adjustDamage, subclassesOf, casterType, spellAbilityOf, hasStyle, armorTraining, armorIssue, GEAR_WEIGHT, SLOTS, ATTUNE_MAX, itemFromRef, activeItems, itemBonus, syncEquipment, encumbrance, ENCUMBRANCE_TEXT, equipmentIssues, sentientCheckMod, casterSummary, classEntries, classLevel, subclassEntry, isMulticlass, classSummary, hitDicePool, hitDiceText, multiclassIssues, fitMulticlass, MULTICLASS_REQ, slotLevel, slotLabel, weaponData, signed, abilityMod, profBonus, levelFromXp, rollDice, d20Test, saveProficient, saveMod, skillMod, passivePerception, armorClass, maxHp, spellSlots, spellSaveDc, spellAttack, weaponAttack, weaponProficient, initiativeMod, speed, halfProficiency, auraOfProtection, steps, critRange, rageDamage, sneakAttackDice, classFeatures, classResources, asiRecords, asiLevels, characterFeats, hasFeat, hasFightingStyle, cantripsKnown, spellsAllowed, maxSpellLevel, classSpells, alwaysPreparedSpells, spellCastingClass, raceOf, subraceOf, backgroundOf, subclassLevel, pointBuyCost, finalAbilities, grantedSkills, skillChoices, newCharacter, normalizeCharacter };
 })(typeof window !== 'undefined' ? window : globalThis);

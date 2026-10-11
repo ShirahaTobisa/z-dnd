@@ -496,6 +496,13 @@ blackTentacles|艾伐黑触手|4|咒法|A|90尺|1分|c|W|s:STR:3d6:钝击|触手
     const SPELLS = parse(RAW);
     const SPELLS_2024 = { ...SPELLS, ...parse(RAW_2024) };
     REMOVED_2024.forEach(id => delete SPELLS_2024[id]);
+    // 「猎人印记」「Hunter's Mark」「huntersMark」都能找到同一个法术
+    const normEn = (s) => String(s).toLowerCase().replace(/[^a-z]/g, '');
+    root.DND.findSpellByName = (book, name) => {
+        const n = String(name || '').trim(); const en = n.match(/[（(]([A-Za-z][^）)]*)[）)]/)?.[1] || (/^[A-Za-z' -]+$/.test(n) ? n : '');
+        const zh = n.replace(/[（(][^）)]*[）)]/, '').trim();
+        return Object.values(book).find(s => s.name === zh || s.id === n || s.name.split('/').includes(zh)) || (en && Object.values(book).find(s => normEn(s.id) === normEn(en))) || null;
+    };
     root.DND.SPELLS = SPELLS;
     root.DND.spellBook = (edition) => (edition === '2024' ? SPELLS_2024 : SPELLS);
 })(typeof window !== 'undefined' ? window : globalThis);

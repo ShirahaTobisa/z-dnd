@@ -1053,6 +1053,7 @@
                 </div>
                 <div class="flex flex-wrap gap-2 text-[11px] font-serif">
                     <span v-for="c in skillAlloc.groups" :key="c.source" class="px-2 py-0.5 rounded bg-dark-800 border border-dark-700" :class="c.picked < c.count ? 'text-amber-300' : 'text-slate-400'">{{ c.source }}：已选 {{ c.picked }} / {{ c.count }}</span>
+                    <button v-if="hasUnfilled" @click="fillChoices" class="px-2 py-0.5 rounded border border-mystic-gold/50 text-mystic-gold hover:bg-mystic-gold/10" title="技能按调整值从高到低补，武器专精先选身上的武器">补全未选</button>
                     <span v-if="skillAlloc.extra.length" class="px-2 py-0.5 rounded bg-dark-800 border border-red-900/60 text-red-400" title="这些技能不在任何来源的可选范围内，或者已经选满了">多选了：{{ skillAlloc.extra.map(s => skills[s]?.name || s).join('、') }}</span>
                     <span v-if="expertiseAllowed" class="px-2 py-0.5 rounded bg-dark-800 border border-amber-900/50" :class="hero.expertise.length > expertiseAllowed ? 'text-red-400' : 'text-amber-300'">专精：已选 {{ hero.expertise.length }} / {{ expertiseAllowed }}</span>
                 </div>
@@ -2657,10 +2658,10 @@
                 return url;
             };
 
-            const generateAvatarUrl = (tag) => {
+            const generateAvatarUrl = (tag, quiet = false) => {
                 const endpoint = (settings.imageGenApiUrl || '').trim();
                 if (!endpoint) {
-                    showToast('请先填写生图 API 地址', 'warning');
+                    if (!quiet) showToast('请先填写生图 API 地址', 'warning');
                     return '';
                 }
 
@@ -2762,6 +2763,9 @@
                 xpLevel: DND.levelFromXp(hero.xp), subclassLevel: DND.subclassLevel(hero),
             }));
             const skillAlloc = computed(() => DND.skillAllocation(hero));
+            const hasUnfilled = computed(() => skillAlloc.value.groups.some(g => g.picked < g.count)
+                || DND.choiceDefs(hero).some(d => d.many && (d.skills || d.id === 'weaponMastery') && DND.choicePicks(hero, d.id).length < d.count));
+            const fillChoices = () => { const filled = DND.autoFillChoices(hero); showToast(filled.length ? `已补上：${filled.join('；')}` : '没有能自动补的项目', 'info'); };
             const weaponRows = computed(() => hero.weapons.map(id => DND.weaponAttack(hero, id)).filter(Boolean));
 
             // —— 装备与背包 ——
@@ -2997,9 +3001,10 @@
                 const fitted = DND.fitMulticlass(hero);
                 if (JSON.stringify(fitted) !== JSON.stringify(hero.multiclass)) hero.multiclass = fitted;
                 hero.multiclass.forEach(m => { if (m.subclass && (m.level < DND.subclassLevel(hero, m.classId) || !subclassOptions(m.classId).some(s => s.name === m.subclass))) m.subclass = ''; });
-                // 只保留当前职业（含子职业扩展表）能选的法术
+                // 只保留当前职业（含子职业扩展表）能选的法术；始终准备的法术不占名额，从已选里去掉
                 const allowed = new Set(DND.classSpells(hero).map(sp => sp.id));
-                if (hero.spellIds.some(id => !allowed.has(id))) hero.spellIds = hero.spellIds.filter(id => allowed.has(id));
+                const always = new Set(DND.alwaysPreparedSpells(hero));
+                if (hero.spellIds.some(id => !allowed.has(id) || always.has(id))) hero.spellIds = hero.spellIds.filter(id => allowed.has(id) && !always.has(id));
                 if (hero.race && !edition.races[hero.race]) hero.race = '';
                 if (hero.background && !edition.backgrounds[hero.background]) hero.background = '';
                 const r = race.value;
@@ -3053,7 +3058,7 @@
 所有 id 字段必须从下列清单中选：
 - race（${edition.raceLabel}）：${idList(edition.races)}${subraces ? `\n- subrace：${subraces}（只有带子种族的种族才填）` : ''}
 - classId：${idList(DND.CLASSES)}
-- subclass（达到子职业等级才填，否则留空）：${Object.keys(DND.CLASSES).map(id => `${id}=${DND.subclassesOf(hero, id).map(s => s.name).join('/')}`).join('; ')}
+- subclass（达到子职业等级才填，否则留空；必须照抄下面的中文名，不要写英文）：${Object.keys(DND.CLASSES).map(id => `${id}=${DND.subclassesOf(hero, id).map(s => s.name).join('/')}`).join('; ')}
 - background：${idList(edition.backgrounds)}
 - skillProfs：${idList(DND.SKILLS)}
 - weapons：${idList(DND.WEAPONS)}
@@ -3062,7 +3067,7 @@
 1. baseAbilities 用标准数组 15、14、13、12、10、8，按职业需要分配到 STR DEX CON INT WIS CHA，genMethod 填 "standard"。
 2. ${edition.abilityBonusFrom === 'background' ? 'bonusPicks 是背景给的属性加值：只能加在该背景列出的三项属性上，+2/+1 或 +1/+1/+1。' : 'bonusPicks 只给需要自选加值的种族（如半精灵）填写，其他种族填 {}。'}
 3. skillProfs 只填职业可选的技能（数量按职业规定），种族和背景自带的技能程序会自动补上。
-4. 武器、护甲要符合职业熟练；有战斗风格的职业在 fightingStyle 填 ${Object.entries(DND.FIGHTING_STYLES).map(([id, f]) => `${id}=${f.name}`).join(', ')} 之一；features 写其他特性备注；施法职业在 spellNames 里用中文法术名列出戏法和已准备法术（数量按职业规定，非施法职业留空数组）。
+4. 武器、护甲要符合职业熟练；有战斗风格的职业在 fightingStyle 填 ${Object.entries(DND.FIGHTING_STYLES).map(([id, f]) => `${id}=${f.name}`).join(', ')} 之一；features 写其他特性备注；施法职业在 spellNames 里列出戏法和已准备法术，每项写成「中文名（英文名）」，如「猎人印记（Hunter's Mark）」（数量按职业规定，非施法职业留空数组）。
 5. avatar_prompt 是 NovelAI 格式的英文外貌提示词。
 6. 用户要求兼职时，classId 填起始职业，multiclass 填兼职职业，如 [{"classId":"wizard","level":2,"subclass":""}]；level 是总等级，兼职等级从中扣除。不要求兼职就填 []。
 JSON 结构：
@@ -3091,7 +3096,9 @@ JSON 结构：
                     catch { throw new Error('AI 返回的内容不是有效的角色数据，请重试或换个描述'); }
 
                     const current = JSON.parse(JSON.stringify(hero));
-                    if (Array.isArray(result.spellNames)) result.spellIds = result.spellNames.map(n => Object.values(DND.spellBook(result.edition || hero.edition)).find(sp => sp.name === n)?.id).filter(Boolean);
+                    const bookMap = DND.spellBook(result.edition || hero.edition);
+                    const unknownSpells = (result.spellNames || []).filter(n => !DND.findSpellByName(bookMap, n));
+                    if (Array.isArray(result.spellNames)) result.spellIds = result.spellNames.map(n => DND.findSpellByName(bookMap, n)?.id).filter(Boolean);
                     Object.assign(hero, DND.normalizeCharacter({
                         ...current, ...result,
                         id: current.id, edition: current.edition, avatar: current.avatar, history: current.history, badges: current.badges,
@@ -3102,8 +3109,17 @@ JSON 结构：
                     }));
                     if (['weapons', 'armor', 'shield'].some(k => k in result)) hero.items = [...hero.items, ...current.items.filter(i => !DND.WEAPONS[i.ref] && !DND.ARMOR[i.ref] && i.ref !== 'shield')];
 
+                    // 等子职业等选项按规则校验完，再补全没选的项目、提示没对上的内容
+                    await Vue.nextTick();
+                    const filled = DND.autoFillChoices(hero);
+                    const notes = [
+                        result.subclass && !hero.subclass && `子职业「${result.subclass}」没对上，请手动选`,
+                        unknownSpells.length && `这些法术库里没有：${unknownSpells.join('、')}`,
+                        filled.length && `已自动补上：${filled.join('；')}`,
+                    ].filter(Boolean);
+                    if (notes.length) showToast(notes.join('。'), unknownSpells.length || (result.subclass && !hero.subclass) ? 'warning' : 'info');
                     if (result.avatar_prompt) {
-                        const avatarUrl = generateAvatarUrl(hero.avatar_prompt);
+                        const avatarUrl = generateAvatarUrl(hero.avatar_prompt, true);
                         if (avatarUrl) hero.avatar = avatarUrl;
                     }
                     generationStatus.value = '生成成功！';
@@ -3490,7 +3506,7 @@ return {
     options, isAvatarLoading, handleImageUpload, openAvatarModal, regenerateAvatar, showAvatarModal, tempAvatarPrompt, saveAvatarPromptOnly,
     imageGenArtistPresetOptions, isImageGenArtistCustom, applyImageGenArtistPreset, onAvatarLoad, onAvatarError, settings, showToast,
     radarLabels, radarGrid, radarStatsPoints, showWeaponModal,
-    abilityNames, editionList, alignments, weaponProps, backstoryFields, ed, cls, race, subrace, bg, granted, derived, skillAlloc, weaponRows, weaponList, featureList, resourceList,
+    abilityNames, editionList, alignments, weaponProps, backstoryFields, ed, cls, race, subrace, bg, granted, derived, skillAlloc, hasUnfilled, fillChoices, weaponRows, weaponList, featureList, resourceList,
     choiceList, picks, setChoice, toggleChoice, suggestedLanguages, suggestedTools, expertiseAllowed, armorIssue, defenseText,
     coinTypes, slotNames, rarityNames, rarityColor, encumbranceText, attuneMax, load, attunedCount, equipIssues, openItem, gearName, effectText, setArmor, setShield, addWeapon, unequipWeapon,
     toggleAttune, addCustomItem, sentientOptions, toggleSentient, rollSentient, sentientMod, lib, openItemLibrary, libResults, addLibraryItem,

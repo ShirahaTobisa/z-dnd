@@ -40,9 +40,9 @@
                 } },
             elf: { name: '精灵', size: '中型', speed: 30, darkvision: 60, bonuses: { DEX: 2 }, skills: ['perception'], traits: ['敏锐感官', '精类血统', '出神'],
                 subraces: {
-                    high: { name: '高等精灵', bonuses: { INT: 1 }, traits: ['精灵武器训练', '戏法', '额外语言'], weapons: ['长剑', '短剑', '短弓', '长弓'] },
+                    high: { name: '高等精灵', spellAbility: 'INT', bonuses: { INT: 1 }, traits: ['精灵武器训练', '戏法', '额外语言'], weapons: ['长剑', '短剑', '短弓', '长弓'] },
                     wood: { name: '木精灵', srd: false, bonuses: { WIS: 1 }, speed: 35, traits: ['精灵武器训练', '轻捷步伐（速度 35 尺）', '荒野遁形'], weapons: ['长剑', '短剑', '短弓', '长弓'] },
-                    drow: { name: '卓尔精灵', srd: false, bonuses: { CHA: 1 }, darkvision: 120, spells: { 1: ['dancingLights'], 3: ['faerieFire'], 5: ['darkness'] }, traits: ['高等黑暗视觉', '日照敏感', '卓尔魔法', '卓尔武器训练'], weapons: ['刺剑', '短剑', '手弩'] },
+                    drow: { name: '卓尔精灵', srd: false, spellAbility: 'CHA', bonuses: { CHA: 1 }, darkvision: 120, spells: { 1: ['dancingLights'], 3: ['faerieFire'], 5: ['darkness'] }, traits: ['高等黑暗视觉', '日照敏感', '卓尔魔法', '卓尔武器训练'], weapons: ['刺剑', '短剑', '手弩'] },
                 } },
             halfling: { name: '半身人', size: '小型', speed: 25, bonuses: { DEX: 2 }, traits: ['幸运', '勇敢', '半身人灵巧'],
                 subraces: {
@@ -66,11 +66,11 @@
             gnome: { name: '侏儒', size: '小型', speed: 25, darkvision: 60, bonuses: { INT: 2 }, traits: ['侏儒狡黠'],
                 subraces: {
                     rock: { name: '岩侏儒', bonuses: { CON: 1 }, traits: ['工匠知识', '工匠'] },
-                    forest: { name: '林侏儒', srd: false, bonuses: { DEX: 1 }, spells: { 1: ['minorIllusion'] }, traits: ['天生幻术师', '与小动物交谈'] },
+                    forest: { name: '林侏儒', srd: false, spellAbility: 'INT', bonuses: { DEX: 1 }, spells: { 1: ['minorIllusion'] }, traits: ['天生幻术师', '与小动物交谈'] },
                 } },
             halfElf: { name: '半精灵', size: '中型', speed: 30, darkvision: 60, bonuses: { CHA: 2 }, bonusChoice: { count: 2, amount: 1, exclude: ['CHA'] }, skillChoice: 2, traits: ['精类血统', '多才多艺'] },
             halfOrc: { name: '半兽人', size: '中型', speed: 30, darkvision: 60, bonuses: { STR: 2, CON: 1 }, skills: ['intimidation'], resources: [{ id: 'relentless', name: '坚韧不屈', max: 1, recharge: 'long' }], traits: ['坚韧不屈', '凶蛮攻击'] },
-            tiefling: { name: '提夫林', size: '中型', speed: 30, darkvision: 60, bonuses: { CHA: 2, INT: 1 }, resist: '火焰', traits: ['地狱抗性', '炼狱传承'], spells: { 1: ['thaumaturgy'], 3: ['hellishRebuke'], 5: ['darkness'] } },
+            tiefling: { name: '提夫林', size: '中型', speed: 30, darkvision: 60, spellAbility: 'CHA', bonuses: { CHA: 2, INT: 1 }, resist: '火焰', traits: ['地狱抗性', '炼狱传承'], spells: { 1: ['thaumaturgy'], 3: ['hellishRebuke'], 5: ['darkness'] } },
         },
         // custom：自定义背景，玩家自选技能
         // srd: false 的背景只收录技能等规则数值

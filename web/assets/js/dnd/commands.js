@@ -97,7 +97,7 @@
         // 游荡者 11 级可靠才能：熟练的技能检定 d20 低于 10 按 10 算
         const reliable = info.kind === 'skill' && D.classLevel(char, 'rogue') >= 11 && char.skillProfs?.includes(info.skill) && t.roll < 10;
         if (reliable) { t.total += 10 - t.roll; t.success = dc == null ? null : t.total >= dc; }
-        let level = ''; let success = t.success; let change = null;
+        let level = ''; let success = t.success; let change = null; let attack = null;
 
         if (info.kind === 'attack') {
             const crit = t.roll >= D.critRange(char);
@@ -128,9 +128,28 @@
             const brutal = crit && w.melee && char.edition === '2014' ? D.steps([[9, 1], [13, 2], [17, 3]])(D.classLevel(char, 'barbarian')) + (char.race === 'halfOrc' ? 1 : 0) : 0;
             const die = String(w.damage).match(/d(\d+)/)?.[1];
             const dmgExpr = `${crit ? critDamage(w.damage) : w.damage}${brutal && die ? `+${brutal}d${die}` : ''}${rage ? `+${rage}` : ''}`.replace(/(\d*d\d+)/g, `$1${gwf}`);
-            extra += ` · 伤害 ${D.rollDice(dmgExpr).total} ${w.type}${rage ? `（含狂暴 +${rage}）` : ''}${brutal ? `（含重击额外 ${brutal} 骰）` : ''}${gwf ? '（巨武器战斗）' : ''}`;
+            const dmgTotal = D.rollDice(dmgExpr).total;
+            extra += ` · 伤害 ${dmgTotal} ${w.type}${rage ? `（含狂暴 +${rage}）` : ''}${brutal ? `（含重击额外 ${brutal} 骰）` : ''}${gwf ? '（巨武器战斗）' : ''}`;
+            // 每次命中都有的额外伤害，会一起自动结算
+            const always = [];
             // 圣武士 11 级：近战武器命中另加 1d8 光耀（2014 精通至圣斩 / 2024 光耀打击）
-            if (w.melee && !thrown && D.classLevel(char, 'paladin') >= 11) extra += ` · 命中另加 ${D.rollDice(crit ? '2d8' : '1d8').total} 光耀`;
+            if (w.melee && !thrown && D.classLevel(char, 'paladin') >= 11) always.push({ amount: D.rollDice(crit ? '2d8' : '1d8').total, type: '光耀' });
+            // 专注中的增伤法术：神恩每次命中都加；猎人印记、脆弱诅咒只对被标记的目标
+            const conc = Object.values(D.spellBook(char.edition)).find(s => s.name === char.concentration);
+            if (conc?.id === 'divineFavor') always.push({ amount: D.rollDice(crit ? '2d4' : '1d4').total, type: '光耀', from: '神恩' });
+            const mark = { huntersMark: [char.edition === '2024' && D.classLevel(char, 'ranger') >= 20 ? '1d10' : '1d6', char.edition === '2024' ? '力场' : w.type], hex: ['1d6', '黯蚀'] }[conc?.id];
+            if (mark) extra += ` · 若目标被${conc.name}标记，另加 ${D.rollDice(crit ? critDamage(mark[0]) : mark[0]).total} ${mark[1]}`;
+            always.forEach(x => { extra += ` · ${x.from ? `${x.from}` : '命中'}另加 ${x.amount} ${x.type}`; });
+            // 2024 武器专精：只写效果，由 DM 按结果叙事
+            const abMod = D.abilityMod(char.abilities?.[w.usesStr ? 'STR' : 'DEX']);
+            const MASTERY = {
+                缓速: '命中并造成伤害后目标速度 -10 尺', 迅击: '轻型副手武器的额外攻击可并入攻击动作', 烦扰: '命中后你下次攻击该目标有优势',
+                削弱: '命中后目标的下一次攻击有劣势', 掀翻: `命中后目标体质豁免 DC ${8 + abMod + D.profBonus(char.level)}，失败倒地`,
+                劈砍: '命中后可对 5 尺内另一个敌人再攻击一次（伤害不加属性）', 擦伤: `未命中也造成 ${Math.max(0, abMod)} 点${w.type}伤害`, 推离: '命中后可把大型或更小的目标推开 10 尺',
+            };
+            if (char.edition === '2024' && w.mastery && MASTERY[w.mastery]) extra += ` · 专精「${w.mastery}」：${MASTERY[w.mastery]}`;
+            // 指定了目标（@名字）时由界面按目标 AC 判定命中并扣血
+            attack = { total: t.total, crit, fumble: t.fumble, damage: dmgTotal + always.reduce((n, x) => n + x.amount, 0), type: w.type, magical: !!w.magical, graze: w.mastery === '擦伤' ? Math.max(0, abMod) : 0, target: rest.match(/@(\S+)/)?.[1] || '' };
             if (w.magicExtra) extra += ` · 魔法武器额外 ${w.magicExtra}（按物品说明的条件）`;
             const domainStrike = char.edition === '2014' && D.classLevel(char, 'cleric') >= 8 && DIVINE_STRIKE_2014[D.classEntries(char).find(e => e.classId === 'cleric')?.subclass];
             const strikeType = D.chose(char, 'blessedStrikes', 'divineStrike') ? '光耀或黯蚀' : D.chose(char, 'elementalFury', 'primalStrike') ? '冷冻、火焰、闪电或雷鸣' : domainStrike;
@@ -140,7 +159,7 @@
             const sneak = D.sneakAttackDice(char);
             if (sneak && w.finesseOrRanged) extra += ` · 满足条件可加偷袭 ${level === '重击' ? sneak * 2 : sneak}d6`;
         }
-        return { label: info.label, roll: t.total, target: dc, level, success: level ? success : null, extra, change };
+        return { label: info.label, roll: t.total, target: dc, level, success: level ? success : null, extra, change, ...(attack ? { attack } : {}) };
     };
 
     // .r 表达式
@@ -320,6 +339,7 @@
         char[key] = Math.max(0, Math.min(max, next));
         let note = '';
         if (key === 'exhaustion' && char[key] >= 6) { old.dead = char.dead; char.dead = true; note = '（力竭 6 级，死亡）'; }
+        if (key === 'xp' && D.levelFromXp(char.xp) > (parseInt(char.level) || 1)) note = `（经验够升到 ${D.levelFromXp(char.xp)} 级了，去冒险者档案升级）`;
         return { ok: true, log: `${char.name} 的${STAT_NAMES[key]}：${current} ➔ ${char[key]}${note}`, rollback: old };
     };
 
@@ -439,7 +459,7 @@
     // —— 施法 ——
     // 骰子表达式乘以倍数，用于戏法随等级增强："1d10" × 2 → "2d10"
     const scaleDice = (expr, times) => expr.replace(/(\d*)d(\d+)/g, (m, n, d) => `${(parseInt(n) || 1) * times}d${d}`);
-    const findSpell = (char, name) => Object.values(D.spellBook(char.edition)).find(s => s.name === name || s.id === name || s.name.split('/').includes(name));
+    const findSpell = (char, name) => D.findSpellByName(D.spellBook(char.edition), name);
 
     // .cast 法术名 [N环] [仪式] [@目标]：消耗法术位、处理专注，并结算攻击、豁免、治疗等
     // 返回检定卡片，changes = [{ char, log, rollback }] 记录对施法者和目标的改动
@@ -461,7 +481,13 @@
         const notes = []; let slotLevel = spell.level;
         if (![...(char.spellIds || []), ...D.alwaysPreparedSpells(char)].includes(spell.id)) notes.push('不在已准备的法术中');
 
-        if (spell.level > 0 && !ritual) {
+        // 免费次数：没指定用法术位、也没升环时先用（种族法术、魔法入门、宿敌、2024 圣武士）
+        const upcastTo = parseInt(rest.match(/(\d)\s*环/)?.[1]) || spell.level;
+        const free = spell.level > 0 && !ritual && upcastTo === spell.level && !/法术位|slot/i.test(rest) && D.classResources(char).find(r => r.spell === spell.id && r.left > 0);
+        if (free) {
+            char.resourcesUsed = { ...(char.resourcesUsed || {}), [free.id]: free.used + 1 };
+            notes.push(`${free.name}（剩余 ${free.left - 1}/${free.max}，长休恢复）`);
+        } else if (spell.level > 0 && !ritual) {
             if (castClass === 'warlock' && spell.level >= 6) {
                 const arcanum = D.classResources(char).find(r => r.id === 'arcanum');
                 if (!arcanum?.left) return card('秘法玄奥已用完，需长休恢复');
@@ -597,8 +623,7 @@
             const each = chars.length ? Math.floor(total / chars.length) : 0;
             const changes = each ? chars.map(({ char, index }) => {
                 const r = applyStat(char, 'xp', `+${each}`);
-                const up = D.levelFromXp(char.xp) > char.level ? `，可以升到 ${D.levelFromXp(char.xp)} 级` : '';
-                return { char, index, log: r.log + up, rollback: r.rollback };
+                return { char, index, log: r.log, rollback: r.rollback };
             }) : [];
             return { log: `🏳️ 战斗结束${total ? `，击败敌人共 ${total} 经验${each ? `，每人 +${each}` : ''}` : ''}`, changes };
         },
@@ -651,7 +676,7 @@
             world.advance(w, plan.minutes); w.here = toName;
             const note = m.unit === 'mile' ? [PACE_NOTES[edition]?.[pace], plan.nights && `途中露营 ${plan.nights} 晚`].filter(Boolean).join('，') : '';
             const sub = world.map(w, toName) && toName !== w.map ? `；「${toName}」有自己的地图，可以进入` : '';
-            return `🧭 以${pace}速度${difficult ? '穿过困难地形' : ''}从「${plan.from.name}」前往「${toName}」：${plan.distance} ${UNIT_NAMES[m.unit]}，用时 ${duration(plan.minutes)}${note ? `（${note}）` : ''}，到达时间 ${world.clock(w)}${sub}`;
+            return `🧭 ${pace}行进${difficult ? '（困难地形）' : ''}，从「${plan.from.name}」前往「${toName}」：${plan.distance} ${UNIT_NAMES[m.unit]}，用时 ${duration(plan.minutes)}${note ? `（${note}）` : ''}，到达时间 ${world.clock(w)}${sub}`;
         },
         // 给 DM 的地图与时间摘要
         note(w) {
@@ -701,11 +726,52 @@
     };
 
     // 解析 DM 回复中的战斗指令，按出现顺序执行。chars: [{ char, index }] 参战的玩家角色
+    // 怪物的攻击：「+5 1d8+3 挥砍」直接写，或按怪物库里的攻击名找（如「弯刀」）
+    const parseAttack = (text) => {
+        const m = String(text).match(new RegExp(`^(.*?)\\s*\\+(\\d+)\\s*(?:(?:射程|触及)\\S+\\s*)?(\\d*d\\d+(?:[+-]\\d+)?)\\s*(${D.DAMAGE_TYPES.join('|')})`));
+        return m && { name: m[1].replace(/^.*：/, '').trim(), bonus: +m[2], dice: m[3], type: m[4], ranged: /射程/.test(text) };
+    };
+    const findAttack = (lib, spec) => {
+        const direct = parseAttack(spec); if (direct) return direct;
+        const attacks = String(lib?.actions || '').split('；').map(parseAttack).filter(Boolean);
+        return attacks.find(a => a.name && (a.name.includes(spec) || spec.includes(a.name))) || (/^(攻击|auto)$/i.test(spec) ? attacks[0] : null);
+    };
+    // 被攻击方的状态带来的优势、劣势
+    const targetAdvantage = (target, ranged) => {
+        const has = (c) => (target.conditions || []).includes(c);
+        const adv = ['目盲', '束缚', '麻痹', '震慑', '昏迷', '石化'].some(has) || (has('倒地') && !ranged);
+        const dis = has('隐形') || (has('倒地') && ranged);
+        return { adv, dis };
+    };
+    // .matk 怪物 攻击 @角色 [优势|劣势]：系统掷命中骰对比角色 AC，命中就按伤害类型和抗性扣血
+    const monsterAttack = (state, name, spec, targetName, mode, chars) => {
+        const attacker = state.order.find(e => !e.pc && e.name === name);
+        const lib = attacker?.monster && D.monsterBook(attacker.edition)[attacker.monster];
+        const atk = findAttack(lib, spec.trim());
+        if (!atk) return { log: `⚠️ 找不到「${name}」的攻击「${spec}」，可以写成 .matk ${name} +命中加值 伤害骰 类型 @目标`, changes: [] };
+        const target = chars.find(({ char }) => char.name === targetName) || chars.find(({ char }) => char.name.includes(targetName));
+        if (!target) return { log: `⚠️ 找不到目标「${targetName}」`, changes: [] };
+        const ac = D.armorClass(target.char); const cond = targetAdvantage(target.char, atk.ranged);
+        const t = D.d20Test({ mod: atk.bonus, adv: mode === '优势' || cond.adv, dis: mode === '劣势' || cond.dis });
+        // 麻痹、昏迷的目标被 5 尺内命中算重击
+        const crit = t.crit || (t.total >= ac && !atk.ranged && ['麻痹', '昏迷'].some(c => (target.char.conditions || []).includes(c)));
+        const hit = crit || (!t.fumble && t.total >= ac);
+        let log = `🗡️ ${name} ${atk.name ? `用${atk.name}` : ''}攻击 ${target.char.name}：d20${t.mode !== 'normal' ? `（${t.mode === 'adv' ? '优势' : '劣势'} ${t.rolls.join('/')}）` : ''}=${t.roll} ${D.signed(atk.bonus)} = ${t.total} 对 AC ${ac}，${crit ? '重击！' : hit ? '命中' : '未命中'}`;
+        const changes = [];
+        if (hit) {
+            const dmg = D.rollDice(crit ? critDamage(atk.dice) : atk.dice).total;
+            const r = changeHp(target.char, `-${dmg} ${atk.type}`);
+            log += `，${dmg} ${atk.type}伤害`;
+            if (r.ok) changes.push({ char: target.char, index: target.index, log: r.log, rollback: r.rollback });
+        }
+        return { log, changes };
+    };
+
     // .dmg 名称 伤害 [类型] [魔法]：怪物库里的生物按抗性、免疫、易伤调整伤害
-    const COMBAT_RE = new RegExp(`[.。](combat)\\s+(start|end|开始|结束)|[.。](monster)\\s+(\\S+)((?:\\s+(?:hp|ac|init|xp)=[+-]?\\d+)*)|[.。](dmg|heal)\\s+(\\S+)[ \\t]+([^\\s，。,]+?)(?:[ \\t]*(${D.DAMAGE_TYPES.join('|')}))?(?:[ \\t]*(魔法))?(?=[\\s，。,]|$)|[.。](next)\\b`, 'gi');
+    const COMBAT_RE = new RegExp(`[.。](combat)\\s+(start|end|开始|结束)|[.。](monster)\\s+(\\S+)((?:\\s+(?:hp|ac|init|xp)=[+-]?\\d+)*)|[.。](dmg|heal)\\s+(\\S+)[ \\t]+([^\\s，。,]+?)(?:[ \\t]*(${D.DAMAGE_TYPES.join('|')}))?(?:[ \\t]*(魔法))?(?=[\\s，。,]|$)|[.。](next)\\b|[.。](matk)\\s+(\\S+)\\s+(.+?)[ \\t]+@(\\S+?)(?:[ \\t]*(优势|劣势))?(?=[\\s，。,]|$)`, 'gi');
     // 返回 { logs, changes }，changes 是结算经验时对角色的改动（可撤回）
     const runCombatCommands = (state, content, chars) => {
-        const logs = []; const changes = [];
+        const logs = []; const changes = []; const acted = new Set();
         for (const m of String(content || '').matchAll(COMBAT_RE)) {
             if (m[1]) {
                 if (/start|开始/i.test(m[2])) { const going = state.active; combat.start(state, chars); logs.push(`⚔️ ${going ? '战斗进行中' : '战斗开始！'}先攻顺序：${state.order.map(e => `${e.name}(${e.init})`).join(' → ')}`); }
@@ -726,7 +792,24 @@
             } else if (m[11] && state.active) {
                 combat.next(state);
                 logs.push(`➡️ 第 ${state.round} 轮，轮到 ${state.order[state.turn]?.name}`);
+            } else if (m[12]) {
+                // 怪物在本轮后面才轮到却已经行动了（DM 按叙事顺序结算）：指针跟到它身上，之后再自动轮到下一位
+                const at = state.order.findIndex(e => !e.pc && e.name === m[13]);
+                if (state.active && at > state.turn) state.turn = at;
+                const r = monsterAttack(state, m[13], m[14], m[15], m[16], chars);
+                logs.push(r.log); changes.push(...r.changes); acted.add(m[13]);
             }
+        }
+        // DM 让怪物攻击后忘了 .next：当前轮到的怪物这次已经攻击过，就自动轮到下一位
+        while (state.active && acted.has(state.order[state.turn]?.name) && !state.order[state.turn].pc) {
+            acted.delete(state.order[state.turn].name);
+            combat.next(state);
+            logs.push(`➡️ 第 ${state.round} 轮，轮到 ${state.order[state.turn]?.name}`);
+        }
+        // 敌人全部倒下而 DM 没写 .combat end：自动结束并平分经验
+        const foes = state.order.filter(e => !e.pc);
+        if (state.active && foes.length && foes.every(e => e.hp === 0)) {
+            const r = combat.end(state, chars); logs.push(`${r.log}（敌人全部倒下，自动结束）`); changes.push(...r.changes);
         }
         return { logs, changes };
     };
@@ -824,7 +907,7 @@
         { group: '玩家：检定与掷骰', items: [
             { cmd: '.ra 项目 [优势/劣势] [dc数值] [行动描述]', desc: '掷 d20 检定，自动加属性、熟练、专精，并按状态（中毒、倒地、力竭、狂暴、负重、护甲不熟练等）自动给优势或劣势。项目可以是技能、属性、某属性豁免、先攻、死亡豁免。.rc、.check 效果相同。',
               ex: ['.ra 察觉 我屏住呼吸，扫视走廊尽头', '.ra 敏捷豁免 dc15', '.ra 力量 优势', '.ra 先攻', '.ra 死亡豁免'] },
-            { cmd: '.ra 武器名 [优势/劣势] [投掷]', desc: '武器攻击：命中、重击和伤害一次掷完，自动算狂暴、战斗风格、魔法武器加值，并提示偷袭等额外伤害。投掷武器扔出去时加「投掷」。', ex: ['.ra 长剑', '.ra 手斧 投掷', '.ra 徒手'] },
+            { cmd: '.ra 武器名 [@目标] [优势/劣势] [投掷]', desc: '武器攻击：命中、重击和伤害一次掷完，自动算狂暴、战斗风格、魔法武器加值、专注法术增伤，并提示偷袭等条件伤害和武器专精效果。战斗中写 @敌人名（或描述里只提到一个敌人）时，系统按敌人 AC 判定命中并自动扣血。投掷武器扔出去时加「投掷」。', ex: ['.ra 长剑 @哥布林A', '.ra 手斧 投掷', '.ra 徒手'] },
             { cmd: '.r 骰子表达式', desc: '单纯掷骰，不加任何调整值。', ex: ['.r 2d6+3', '.r d20'] },
         ] },
         { group: '玩家：施法、资源与休息', items: [
@@ -861,6 +944,7 @@
             { cmd: '.monster 名称 [hp= ac= init= xp=]', desc: '加入敌人。怪物库里的生物自动填 AC、生命、先攻、经验和抗性；库外的写全数据。同类敌人用 A、B 区分。', ex: ['.monster 哥布林A', '.monster 黑衣刺客 hp=27 ac=15 init=3 xp=450'] },
             { cmd: '.combat start / .combat end', desc: '开始战斗（自动掷先攻、显示战斗面板）；结束战斗（自动平分被击败敌人的经验）。', ex: ['.combat start'] },
             { cmd: '.dmg 名称 伤害 [伤害类型] [魔法]', desc: '敌人受伤，可写骰子；写上类型会按怪物抗性、免疫、易伤自动调整。', ex: ['.dmg 哥布林A 1d8+3 挥砍', '.dmg 石像鬼 9 钝击 魔法'] },
+            { cmd: '.matk 敌人名 攻击 @角色名 [优势/劣势]', desc: '敌人攻击冒险者：按怪物库里的攻击掷命中骰、对比角色 AC，命中按伤害类型和抗性自动扣血；目标倒地、目盲等状态自动给优势劣势。库外的生物写「+命中加值 伤害骰 类型」。敌人攻击完忘了 .next 时系统会自动轮到下一位。', ex: ['.matk 哥布林A 弯刀 @艾琳', '.matk 黑衣刺客 +6 1d8+4 穿刺 @艾琳 优势'] },
             { cmd: '.heal 名称 数值', desc: '敌人回血。', ex: ['.heal 兽人B 6'] },
             { cmd: '.next', desc: '轮到下一位行动。', ex: ['.next'] },
             { cmd: '.game_end', desc: '模组剧情结束时放在回复最后一行。', ex: ['.game_end'] },
@@ -881,5 +965,20 @@
         '\n【参考清单】', ...guideLists().map(([name, list]) => `${name}：${list.join('、')}`),
     ].join('\n');
 
-    Object.assign(D, { world, runWorldCommands, travelDuration: duration, MAP_KINDS, UNIT_NAMES, PACES, COMMAND_GUIDE, guideLists, commandGuideText, rollCheck, rollExpr, castSpell, itemConflict, inventoryText, spellList, applyStat, undoStat, useResource, fontOfMagic, spendHitDice, rest, combat, runCombatCommands, profile });
+    // 玩家的武器攻击指定了战斗中的敌人：按 AC 判定命中，命中扣血（算抗性），擦伤专精未命中也有伤害
+    // 返回 { name, hit, dealt, log }；只算不改，由房主或单人模式调用 combat.damage 落实
+    const resolveAttack = (state, attack, fallbackText = '') => {
+        if (!state?.active || !attack) return null;
+        const foes = state.order.filter(e => !e.pc && e.hp > 0);
+        const target = foes.find(e => e.name === attack.target) || (!attack.target && foes.filter(e => fallbackText.includes(e.name)).length === 1 ? foes.find(e => fallbackText.includes(e.name)) : null);
+        if (!target) return null;
+        const hit = attack.crit || (!attack.fumble && attack.total >= target.ac);
+        const raw = hit ? attack.damage : attack.graze;
+        const lib = target.monster && D.monsterBook(target.edition)[target.monster];
+        const adj = raw ? D.adjustDamage(raw, attack.type, D.parseDefense(lib?.defense), attack.magical) : { dealt: 0, note: '' };
+        const left = Math.max(0, target.hp - adj.dealt);
+        return { name: target.name, ac: target.ac, hit, dealt: adj.dealt, log: `${hit ? (attack.crit ? '💥 重击' : '💥 命中') : '💨 未命中'} ${target.name}（AC ${target.ac}）${adj.dealt ? `，造成 ${adj.dealt} 点${attack.type}${hit ? '' : '（擦伤）'}${adj.note ? `（${adj.note}）` : ''}，剩余 ${left}/${target.maxHp}${left === 0 ? '，倒下了' : ''}` : ''}` };
+    };
+
+    Object.assign(D, { resolveAttack, world, runWorldCommands, travelDuration: duration, MAP_KINDS, UNIT_NAMES, PACES, COMMAND_GUIDE, guideLists, commandGuideText, rollCheck, rollExpr, castSpell, itemConflict, inventoryText, spellList, applyStat, undoStat, useResource, fontOfMagic, spendHitDice, rest, combat, runCombatCommands, profile });
 })(typeof window !== 'undefined' ? window : globalThis);

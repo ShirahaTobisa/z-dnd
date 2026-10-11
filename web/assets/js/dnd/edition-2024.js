@@ -9,6 +9,12 @@
         subclassLevel: {},
         defaultSubclassLevel: 3,
         // 子职业法术：始终准备、不占数量（键为职业等级）
+        // 职业能力始终准备的法术（键为职业等级）：游侠宿敌、圣武士至圣斩与忠诚坐骑、德鲁伊语
+        classAlwaysPrepared: {
+            ranger: { 1: ['huntersMark'] },
+            paladin: { 2: ['divineSmite'], 5: ['findSteed'] },
+            druid: { 1: ['speakWithAnimals'] },
+        },
         alwaysPrepared: {
             '生命领域': { 3: ['aid', 'bless', 'cureWounds', 'lesserRestoration'], 5: ['massHealingWord', 'revivify'], 7: ['auraOfLife', 'deathWard'], 9: ['greaterRestoration', 'massCureWounds'] },
             '奉献之誓': { 3: ['protectionFromEvilAndGood', 'shieldOfFaith'], 5: ['aid', 'zoneOfTruth'], 9: ['beaconOfHope', 'dispelMagic'], 13: ['freedomOfMovement', 'guardianOfFaith'], 17: ['commune', 'flameStrike'] },
@@ -89,18 +95,18 @@
         // abilities：可分配的三项属性，+2/+1 或 +1/+1/+1；custom 的三项由玩家自选
         // featId 为送的起源专长；srd: false 的背景只收录技能、属性等规则数值
         backgrounds: {
-            acolyte: { name: '侍僧', abilities: ['INT', 'WIS', 'CHA'], skills: ['insight', 'religion'], feat: '魔法入门（牧师）', featId: 'magicInitiate', gold: 8 },
+            acolyte: { name: '侍僧', abilities: ['INT', 'WIS', 'CHA'], skills: ['insight', 'religion'], feat: '魔法入门（牧师）', featId: 'magicInitiate', magicInitiate: 'cleric', gold: 8 },
             artisan: { name: '工匠', srd: false, abilities: ['STR', 'DEX', 'INT'], skills: ['investigation', 'persuasion'], feat: '工匠', featId: 'crafter', gold: 32 },
             charlatan: { name: '骗子', srd: false, abilities: ['DEX', 'CON', 'CHA'], skills: ['deception', 'sleightOfHand'], feat: '多才多艺', featId: 'skilled', gold: 15 },
             criminal: { name: '罪犯', abilities: ['DEX', 'CON', 'INT'], skills: ['sleightOfHand', 'stealth'], feat: '警觉', featId: 'alert', gold: 16 },
             entertainer: { name: '艺人', srd: false, abilities: ['STR', 'DEX', 'CHA'], skills: ['acrobatics', 'performance'], feat: '乐手', featId: 'musician', gold: 11 },
             farmer: { name: '农夫', srd: false, abilities: ['STR', 'CON', 'WIS'], skills: ['animalHandling', 'nature'], feat: '健壮', featId: 'tough', gold: 30 },
             guard: { name: '守卫', srd: false, abilities: ['STR', 'INT', 'WIS'], skills: ['athletics', 'perception'], feat: '警觉', featId: 'alert', gold: 12 },
-            guide: { name: '向导', srd: false, abilities: ['DEX', 'CON', 'WIS'], skills: ['stealth', 'survival'], feat: '魔法入门（德鲁伊）', featId: 'magicInitiate', gold: 3 },
+            guide: { name: '向导', srd: false, abilities: ['DEX', 'CON', 'WIS'], skills: ['stealth', 'survival'], feat: '魔法入门（德鲁伊）', featId: 'magicInitiate', magicInitiate: 'druid', gold: 3 },
             hermit: { name: '隐士', srd: false, abilities: ['CON', 'WIS', 'CHA'], skills: ['medicine', 'religion'], feat: '医疗者', featId: 'healer', gold: 16 },
             merchant: { name: '商人', srd: false, abilities: ['CON', 'INT', 'CHA'], skills: ['animalHandling', 'persuasion'], feat: '幸运儿', featId: 'lucky', gold: 22 },
             noble: { name: '贵族', srd: false, abilities: ['STR', 'INT', 'CHA'], skills: ['history', 'persuasion'], feat: '多才多艺', featId: 'skilled', gold: 29 },
-            sage: { name: '贤者', abilities: ['CON', 'INT', 'WIS'], skills: ['arcana', 'history'], feat: '魔法入门（法师）', featId: 'magicInitiate', gold: 8 },
+            sage: { name: '贤者', abilities: ['CON', 'INT', 'WIS'], skills: ['arcana', 'history'], feat: '魔法入门（法师）', featId: 'magicInitiate', magicInitiate: 'wizard', gold: 8 },
             sailor: { name: '水手', srd: false, abilities: ['STR', 'DEX', 'WIS'], skills: ['acrobatics', 'perception'], feat: '酒馆斗殴者', featId: 'tavernBrawler', gold: 20 },
             scribe: { name: '书记员', srd: false, abilities: ['DEX', 'INT', 'WIS'], skills: ['investigation', 'perception'], feat: '多才多艺', featId: 'skilled', gold: 23 },
             soldier: { name: '士兵', abilities: ['STR', 'DEX', 'CON'], skills: ['athletics', 'intimidation'], feat: '凶蛮打击者', featId: 'savageAttacker', gold: 14 },
@@ -200,7 +206,7 @@
                     { id: 'freeSmite', name: '免费至圣斩', max: steps([[2, 1]]), recharge: 'long' },
                     { id: 'channel', name: '引导神力', max: steps([[3, 2], [11, 3]]), recharge: 'long', shortRegain: 1 },
                 ],
-                ranger: [{ id: 'favoredEnemy', name: '免费猎人印记', max: steps([[1, 2], [5, 3], [9, 4], [13, 5], [17, 6]]), recharge: 'long' }],
+                ranger: [{ id: 'favoredEnemy', name: '免费猎人印记', spell: 'huntersMark', max: steps([[1, 2], [5, 3], [9, 4], [13, 5], [17, 6]]), recharge: 'long' }],
                 rogue: [{ id: 'strokeOfLuck', name: '好运', max: steps([[20, 1]]), recharge: 'short' }],
                 sorcerer: [
                     { id: 'innateSorcery', name: '天生术法', max: 2, recharge: 'long' },
